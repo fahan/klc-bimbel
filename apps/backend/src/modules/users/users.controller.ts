@@ -1,6 +1,8 @@
 ﻿import {
   Controller,
   Get,
+  Patch,
+  Post,
   Put,
   Delete,
   Body,
@@ -12,6 +14,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from "@ne
 import { UsersService } from "./users.service"
 import { UpdateRoleDto } from "./dto/update-role.dto"
 import { AssignBranchDto } from "./dto/assign-branch.dto"
+import { UpdateUserInfoDto } from "./dto/update-user-info.dto"
 import { JwtAuthGuard } from "@/common/guards/jwt.guard"
 import { RolesGuard } from "@/common/guards/roles.guard"
 import { Roles } from "@/common/decorators/roles.decorator"
@@ -52,6 +55,30 @@ export class UsersController {
   })
   async findOne(@Param("id") id: string): Promise<any> {
     return this.usersService.findOne(id)
+  }
+
+  @Patch(":id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("OWNER", "ADMIN_GLOBAL")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Update user info (name, email, phone)" })
+  @ApiResponse({ status: 200, description: "User info updated" })
+  @ApiResponse({ status: 409, description: "Email already taken" })
+  async updateUserInfo(
+    @Param("id") id: string,
+    @Body() dto: UpdateUserInfoDto,
+  ): Promise<any> {
+    return this.usersService.updateUserInfo(id, dto)
+  }
+
+  @Post(":id/reset-password")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("OWNER", "ADMIN_GLOBAL")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Reset user password and send via email" })
+  @ApiResponse({ status: 200, description: "Password reset and emailed" })
+  async resetPassword(@Param("id") id: string): Promise<any> {
+    return this.usersService.resetPassword(id)
   }
 
   @Put(":id/role")

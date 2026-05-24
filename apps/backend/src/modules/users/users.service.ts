@@ -1,12 +1,18 @@
-﻿import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common"
+﻿import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
+import * as bcrypt from 'bcryptjs'
 import { PrismaService } from "@/prisma/prisma.service"
+import { MailService } from "@/modules/mail/mail.service"
 import { UpdateRoleDto } from "./dto/update-role.dto"
 import { AssignBranchDto } from "./dto/assign-branch.dto"
+import { UpdateUserInfoDto } from "./dto/update-user-info.dto"
 import { PaginationMeta } from "@/common/dto/pagination.dto"
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mail: MailService,
+  ) {}
 
   async findAll(
     page: number = 1,
@@ -445,6 +451,57 @@ export class UsersService {
       success: true,
       data: this.formatUser(updated),
       message: `Role ${role} removed from user successfully`,
+    }
+  }
+
+  async updateUserInfo(userId: string, dto: UpdateUserInfoDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new NotFoundException("User not found")
+
+    // Check email uniqueness (exclude self)
+    const emailTaken = await this.prisma.user.findFirst({
+      where: { email: dto.email, NOT: { id: userId } },
+    })
+    if (emailTaken) throw new ConflictException("Email sudah digunakan oleh akun lain")
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: dto.name, email: dto.email, phone: dto.phone ?? null },
+      include: {
+        branches: { include: { branch: true } },
+        roles: true,
+      },
+    })
+
+    return {
+      success: true,
+      data: this.formatUser(updated),
+      message: "Informasi pengguna berhasil diperbarui",
+    }
+  }
+
+  async resetPassword(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new NotFoundException("User not found")
+    if (user.role === "OWNER") throw new ForbiddenException("Cannot reset OWNER password")
+
+    // Generate random 10-char temp password: letters + digits
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+    const tempPassword = Array.from({ length: 10 }, () =>
+      chars[Math.floor(Math.random() * chars.length)]
+    ).join('')
+
+    const hashed = await bcrypt.hash(tempPassword, 10)
+    await this.prisma.user.update({ where: { id: userId }, data: { password: hashed } })
+
+    // Send email (fire-and-forget; failure doesn't block the response)
+    this.mail
+      .sendResetPassword({ toName: user.name, toEmail: user.email, tempPassword })
+      .catch(() => {/* already logged in MailService */})
+
+    return {
+      success: true,
+      message: `Password berhasil direset dan dikirim ke ${user.email}`,
     }
   }
 

@@ -17,6 +17,7 @@ import { CommissionsModule } from './modules/commissions/commissions.module'
 import { ProgressReportsModule } from './modules/progress-reports/progress-reports.module'
 import { FinanceModule } from './modules/finance/finance.module'
 import { StoreModule } from './modules/store/store.module'
+import { MailModule } from './modules/mail/mail.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { StoreModule } from './modules/store/store.module'
     ProgressReportsModule,
     FinanceModule,
     StoreModule,
+    MailModule,
   ],
   controllers: [AppController],
   providers: [AppService],
