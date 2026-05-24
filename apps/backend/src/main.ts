@@ -8,14 +8,17 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   // Enable CORS for frontend
-  const allowedOrigins = process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-    'http://127.0.0.1:3002',
-  ]
+  // FRONTEND_URL supports comma-separated list, e.g. "https://www.example.com,https://example.com"
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    : [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3002',
+      ]
 
   app.enableCors({
     origin: allowedOrigins,
