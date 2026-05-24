@@ -1,14 +1,13 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
 
-const COMMISSION_PERCENTAGE = 0.4 // 40%
-
 @Injectable()
 export class CommissionsService {
   /**
    * Commission Formula (per business-rule.md section 8):
-   *   commission = (SPP ÷ total_sessions_in_month) × 40% × sessions_attended
+   *   commission = (SPP ÷ total_sessions_in_month) × commissionPercentage × sessions_attended
    *
+   * commissionPercentage comes from Subject.commissionPercentage (default 40%).
    * Commission goes to actual_teacher_id (recorded in session_logs),
    * not the regular teacher. This handles replacement teacher scenario.
    */
@@ -67,14 +66,14 @@ export class CommissionsService {
       for (const log of logs) {
         // For each student that attended (HADIR), compute commission
         for (const attendance of log.attendances) {
-          // Get student's SPP rate for this subject
+          // Get student's SPP rate and subject's commission percentage
           const studentSubject = await this.prisma.studentSubject.findFirst({
             where: {
               studentId: attendance.studentId,
               subjectId: log.session.subjectId,
               isActive: true,
             },
-            include: { sppRate: true },
+            include: { sppRate: true, subject: true },
           })
 
           if (!studentSubject || !studentSubject.sppRate) continue
@@ -108,8 +107,8 @@ export class CommissionsService {
           if (totalSessionsInMonth === 0) continue
 
           const sppAmount = parseFloat(studentSubject.sppRate.amount.toString())
-          // Commission per attendance: (SPP / total_sessions_in_month) × 40%
-          const commissionAmount = (sppAmount / totalSessionsInMonth) * COMMISSION_PERCENTAGE
+          const commissionRate = parseFloat(studentSubject.subject.commissionPercentage.toString())
+          const commissionAmount = (sppAmount / totalSessionsInMonth) * commissionRate
 
           // Avoid duplicates - only count once per (sessionLog, student)
           const dupKey = `${log.id}-${attendance.studentId}`

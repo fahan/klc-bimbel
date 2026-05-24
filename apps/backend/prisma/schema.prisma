@@ -217,6 +217,7 @@ model Subject {
   trackingType          SubjectTrackingType
   maxCapacityRegular    Int      @default(3)
   maxCapacityPrivate    Int      @default(1)
+  commissionPercentage  Decimal  @default(0.40) @db.Decimal(5, 2)
   isActive              Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

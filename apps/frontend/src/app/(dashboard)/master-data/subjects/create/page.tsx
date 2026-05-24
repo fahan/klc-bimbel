@@ -15,6 +15,7 @@ const subjectSchema = z.object({
   trackingType: z.enum(['MODULE_BASED', 'FREE_MATERIAL']),
   capacity: z.string().optional().transform(v => v ? parseInt(v) : undefined),
   maxCapacity: z.string().optional().transform(v => v ? parseInt(v) : undefined),
+  commissionPercentage: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
 })
 
 type SubjectFormData = z.infer<typeof subjectSchema>
@@ -47,6 +48,7 @@ export default function CreateSubjectPage() {
         trackingType: data.trackingType,
         capacity: data.capacity || undefined,
         maxCapacity: data.maxCapacity || undefined,
+        commissionPercentage: data.commissionPercentage || undefined,
       })
 
       await queryClient.invalidateQueries({ queryKey: ['subjects'] })
@@ -169,6 +171,28 @@ export default function CreateSubjectPage() {
                 disabled={isLoading}
               />
             </div>
+          </div>
+
+          {/* Commission Percentage */}
+          <div>
+            <label htmlFor="commissionPercentage" className="block text-sm font-medium text-gray-700 mb-1">
+              Persentase Komisi Guru (%)
+            </label>
+            <input
+              id="commissionPercentage"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              placeholder="Default: 40"
+              {...register('commissionPercentage')}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.commissionPercentage ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-1">Persentase dari SPP yang diterima guru. Kosongkan untuk pakai default (40%).</p>
+            {errors.commissionPercentage && <p className="text-red-500 text-sm mt-1">{errors.commissionPercentage.message}</p>}
           </div>
 
           {/* Action Buttons */}

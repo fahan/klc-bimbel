@@ -85,6 +85,9 @@ export class SubjectsService {
         trackingType: createSubjectDto.trackingType,
         maxCapacityRegular: createSubjectDto.capacity || 3,
         maxCapacityPrivate: createSubjectDto.maxCapacity || 1,
+        ...(createSubjectDto.commissionPercentage !== undefined && {
+          commissionPercentage: createSubjectDto.commissionPercentage / 100,
+        }),
       },
     })
 
@@ -122,6 +125,9 @@ export class SubjectsService {
         trackingType: updateSubjectDto.trackingType || subject.trackingType,
         maxCapacityRegular: updateSubjectDto.capacity !== undefined ? updateSubjectDto.capacity : subject.maxCapacityRegular,
         maxCapacityPrivate: updateSubjectDto.maxCapacity !== undefined ? updateSubjectDto.maxCapacity : subject.maxCapacityPrivate,
+        ...(updateSubjectDto.commissionPercentage !== undefined && {
+          commissionPercentage: updateSubjectDto.commissionPercentage / 100,
+        }),
       },
       include: {
         sppRates: true,
@@ -165,6 +171,7 @@ export class SubjectsService {
       trackingType: subject.trackingType,
       maxCapacityRegular: subject.maxCapacityRegular,
       maxCapacityPrivate: subject.maxCapacityPrivate,
+      commissionPercentage: parseFloat(subject.commissionPercentage.toString()) * 100,
       isActive: subject.isActive,
       createdAt: subject.createdAt.toISOString(),
       ...(subject.sppRates && { sppRates: subject.sppRates }),

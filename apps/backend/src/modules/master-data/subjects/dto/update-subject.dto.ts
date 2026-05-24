@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsNumber, Min, MinLength, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, MinLength, MaxLength } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 import { SubjectTrackingType } from '@prisma/client'
 
@@ -33,4 +33,11 @@ export class UpdateSubjectDto {
   @IsNumber()
   @Min(1)
   maxCapacity?: number
+
+  @ApiProperty({ example: 40, description: 'Commission percentage (0-100)', required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  commissionPercentage?: number
 }

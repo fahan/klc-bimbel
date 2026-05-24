@@ -15,6 +15,7 @@ const subjectSchema = z.object({
   trackingType: z.enum(['MODULE_BASED', 'FREE_MATERIAL']).optional(),
   capacity: z.string().optional().transform(v => v ? parseInt(v) : undefined),
   maxCapacity: z.string().optional().transform(v => v ? parseInt(v) : undefined),
+  commissionPercentage: z.string().optional().transform(v => v ? parseFloat(v) : undefined),
 })
 
 type SubjectFormData = z.infer<typeof subjectSchema>
@@ -26,6 +27,7 @@ interface Subject {
   trackingType: string
   maxCapacityRegular?: number
   maxCapacityPrivate?: number
+  commissionPercentage?: number
   isActive: boolean
 }
 
@@ -61,6 +63,7 @@ export default function EditSubjectPage() {
           trackingType: data.trackingType,
           capacity: data.maxCapacityRegular?.toString() || '',
           maxCapacity: data.maxCapacityPrivate?.toString() || '',
+          commissionPercentage: data.commissionPercentage?.toString() || '',
         })
       } catch (err: any) {
         setPageError(err.response?.data?.message || 'Failed to load subject')
@@ -88,6 +91,7 @@ export default function EditSubjectPage() {
         trackingType: data.trackingType,
         maxCapacityRegular: data.capacity,
         maxCapacityPrivate: data.maxCapacity,
+        commissionPercentage: data.commissionPercentage,
       })
 
       await queryClient.invalidateQueries({ queryKey: ['subjects'] })
@@ -226,6 +230,24 @@ export default function EditSubjectPage() {
                 disabled={isLoading}
               />
             </div>
+          </div>
+
+          {/* Commission Percentage */}
+          <div>
+            <label htmlFor="commissionPercentage" className="block text-sm font-medium text-gray-700 mb-1">
+              Persentase Komisi Guru (%)
+            </label>
+            <input
+              id="commissionPercentage"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              {...register('commissionPercentage')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-1">Persentase dari SPP yang diterima guru untuk mata pelajaran ini.</p>
           </div>
 
           {/* Status Info */}
