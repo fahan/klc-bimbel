@@ -1,27 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import * as nodemailer from 'nodemailer'
+import { MailtrapClient } from 'mailtrap'
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name)
-  private transporter: nodemailer.Transporter | null = null
+  private client: MailtrapClient | null = null
+  private fromEmail: string
+  private fromName: string
 
   constructor(private config: ConfigService) {
-    const host = this.config.get<string>('MAIL_HOST')
-    const user = this.config.get<string>('MAIL_USER')
-    const pass = this.config.get<string>('MAIL_PASSWORD')
+    const token = this.config.get<string>('MAILTRAP_TOKEN')
+    this.fromEmail = this.config.get<string>('MAIL_FROM_EMAIL') || 'noreply@klcbimbel.com'
+    this.fromName = this.config.get<string>('MAIL_FROM_NAME') || 'KLC Bimbel'
 
-    if (host && user && pass) {
-      this.transporter = nodemailer.createTransport({
-        host,
-        port: Number(this.config.get('MAIL_PORT') || 587),
-        secure: this.config.get('MAIL_SECURE') === 'true',
-        auth: { user, pass },
-      })
-      this.logger.log('Mail transporter configured')
+    if (token) {
+      this.client = new MailtrapClient({ token })
+      this.logger.log(`Mailtrap client configured (from: ${this.fromEmail})`)
     } else {
-      this.logger.warn('MAIL_HOST / MAIL_USER / MAIL_PASSWORD not set — emails will be logged to console only')
+      this.logger.warn('MAILTRAP_TOKEN not set — emails will be logged to console only')
     }
   }
 
@@ -29,12 +26,10 @@ export class MailService {
     toName: string
     toEmail: string
     tempPassword: string
-    appName?: string
   }) {
-    const { toName, toEmail, tempPassword, appName = 'KLC Bimbel' } = opts
+    const { toName, toEmail, tempPassword } = opts
+    const appName = this.fromName
 
-    const from = this.config.get<string>('MAIL_FROM') || `"${appName}" <noreply@klcbimbel.com>`
-    const subject = `[${appName}] Reset Password Akun Anda`
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px; background: #f9fafb; border-radius: 8px;">
         <h2 style="color: #1e40af; margin-bottom: 4px;">${appName}</h2>
@@ -52,13 +47,17 @@ export class MailService {
       </div>
     `
 
-    if (this.transporter) {
-      await this.transporter.sendMail({ from, to: toEmail, subject, html })
+    if (this.client) {
+      await this.client.send({
+        from: { name: this.fromName, email: this.fromEmail },
+        to: [{ email: toEmail, name: toName }],
+        subject: `[${appName}] Reset Password Akun Anda`,
+        html,
+      })
       this.logger.log(`Reset password email sent to ${toEmail}`)
     } else {
-      // Dev fallback — log to console so dev can still test
       this.logger.warn(
-        `[DEV] Email NOT sent (SMTP not configured). Would have sent to: ${toEmail} | Temp password: ${tempPassword}`,
+        `[DEV] Email NOT sent (MAILTRAP_TOKEN not set). Would have sent to: ${toEmail} | Temp password: ${tempPassword}`,
       )
     }
   }

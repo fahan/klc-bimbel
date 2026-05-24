@@ -53,6 +53,9 @@ importers:
       class-validator:
         specifier: ^0.14.0
         version: 0.14.4
+      mailtrap:
+        specifier: ^4.6.0
+        version: 4.6.0(@types/nodemailer@8.0.0)(nodemailer@8.0.8)
       nodemailer:
         specifier: ^8.0.8
         version: 8.0.8
@@ -6938,6 +6941,27 @@ packages:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
     dev: true
+
+  /mailtrap@4.6.0(@types/nodemailer@8.0.0)(nodemailer@8.0.8):
+    resolution: {integrity: sha512-H9gJ7J5aKTI4eyoJ+Y66NmDEzyxZTiZ+A7OAIeM5xzsapw2IJH1+9RqDe+1R93W2RkFUo5SaXZWlGjXTWUgU4Q==}
+    engines: {node: '>=16.20.1', yarn: '>=1.22.17'}
+    peerDependencies:
+      '@types/nodemailer': ^6.4.9
+      nodemailer: ^8.0.5
+    peerDependenciesMeta:
+      '@types/nodemailer':
+        optional: true
+      nodemailer:
+        optional: true
+    dependencies:
+      '@types/nodemailer': 8.0.0
+      axios: 1.16.1
+      nodemailer: 8.0.8
+      qs: 6.15.2
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+    dev: false
 
   /make-dir@3.1.0:
     resolution: {integrity: sha512-g3FeP20LNwhALb/6Cz6Dd4F2ngze0jz7tbzrD2wAV+o9FeNHe4rL+yK2md0J/fiSf1sa1ADhXqi5+oVwOM/eGw==}
