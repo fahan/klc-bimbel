@@ -1,5 +1,14 @@
 import apiClient from './client'
 
+// ===== AUTH API =====
+export const authApi = {
+  getMe: () => apiClient.get('/auth/me'),
+  updateProfile: (data: { name: string; email: string; phone?: string }) =>
+    apiClient.patch('/auth/profile', data),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    apiClient.patch('/auth/change-password', data),
+}
+
 // ===== BRANCHES API =====
 export const branchApi = {
   getAll: (page?: number, limit?: number) => {
