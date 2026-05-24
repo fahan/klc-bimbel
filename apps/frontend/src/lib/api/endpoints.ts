@@ -366,4 +366,7 @@ export const usersApi = {
   removeBranch: (id: string, branchId: string) => apiClient.delete(`/users/${id}/branch/${branchId}`),
   deactivate: (id: string) => apiClient.put(`/users/${id}/deactivate`, {}),
   activate: (id: string) => apiClient.put(`/users/${id}/activate`, {}),
+  updateInfo: (id: string, data: { name: string; email: string; phone?: string }) =>
+    apiClient.patch(`/users/${id}`, data),
+  resetPassword: (id: string) => apiClient.post(`/users/${id}/reset-password`, {}),
 }
