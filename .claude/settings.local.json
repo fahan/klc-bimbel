@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm prisma:generate)",
+      "Bash(pnpm prisma:seed)",
+      "Bash(pnpm build *)",
+      "Bash(timeout 5 pnpm dev)",
+      "Bash(pnpm run *)",
+      "Bash(timeout 10 pnpm start:dev)",
+      "Bash(pnpm start:dev)",
+      "Bash(curl -s http://localhost:3001/api)",
+      "Bash(curl -s http://localhost:3002/master-data/students/create)",
+      "Bash(curl -s http://localhost:3001/api/swagger-ui-standalone.js)",
+      "Bash(curl -s -X GET http://localhost:3001/students -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -X GET http://localhost:3001/api/students -H \"Authorization: Bearer test\")",
+      "Bash(curl -s -X GET http://localhost:3001/students)",
+      "Bash(curl -s -X GET http://localhost:3001/branches)",
+      "Bash(pkill -f \"pnpm.*dev:backend\")",
+      "Bash(pnpm dev:backend)",
+      "Bash(curl -s http://localhost:3001/api-json)",
+      "Bash(curl -s http://localhost:3001/auth/login -X POST -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(curl -s -X GET http://localhost:3001/students/test-auth-check)",
+      "Bash(curl -s http://localhost:3001/students)",
+      "Bash(curl -s http://localhost:3001/branches/1 -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c\")",
+      "Bash(curl -s http://localhost:3001/students -H \"Authorization: Bearer test\")",
+      "Bash(netstat -tuln)",
+      "Bash(curl -s http://localhost:3002/master-data/students)",
+      "Bash(curl -s http://localhost:3002/)",
+      "mcp__Claude_Preview__preview_start",
+      "WebFetch(domain:api.anthropic.com)",
+      "mcp__code-review-graph__build_or_update_graph_tool",
+      "mcp__645d3f64-86bf-4655-bb7e-48ba8d880a7c__list_organizations",
+      "mcp__645d3f64-86bf-4655-bb7e-48ba8d880a7c__list_projects",
+      "Bash(nslookup aws-0-ap-northeast-2.pooler.supabase.com)",
+      "Bash(nslookup aws-1-ap-northeast-2.pooler.supabase.com)",
+    ]
+  }
+}

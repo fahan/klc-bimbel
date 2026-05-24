@@ -1,0 +1,165 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import apiClient from '@/lib/api/client'
+
+const loginSchema = z.object({
+  email: z.string().email('Email tidak valid'),
+  password: z.string().min(6, 'Password minimal 6 karakter'),
+})
+
+type LoginFormData = z.infer<typeof loginSchema>
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
+
+  const onSubmit = async (data: LoginFormData) => {
+    try {
+      setIsLoading(true)
+      setError('')
+
+      console.log('🔐 Login attempt with:', { email: data.email })
+
+      const response = await apiClient.post('/auth/login', data)
+      console.log('✅ Login response:', response.data)
+
+      if (response.data.success) {
+        const { user, token } = response.data.data
+
+        // Store token & role in localStorage
+        localStorage.setItem('token', token)
+        localStorage.setItem('userRole', user.role)
+        localStorage.setItem('userId', user.id)
+        localStorage.setItem('userName', user.name)
+
+        console.log('✅ Token saved, redirecting to dashboard...')
+
+        // Redirect based on role
+        if (user.role === 'GURU') {
+          router.push('/guru/presensi')
+        } else {
+          router.push('/dashboard')
+        }
+      } else {
+        throw new Error(response.data.message || 'Login failed')
+      }
+    } catch (err: any) {
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        'Login gagal - silakan cek console untuk detail'
+
+      console.error('❌ Login error:', {
+        message: errorMessage,
+        status: err.response?.status,
+        data: err.response?.data,
+        error: err,
+      })
+
+      setError(errorMessage)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="w-full max-w-md">
+      <div className="bg-white rounded-lg shadow-lg p-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-primary mb-2">🎓 BimbelApp</h1>
+          <p className="text-gray-600">Sistem Manajemen Bimbel Multi-Cabang</p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          {/* Email */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="admin@bimbel.com"
+              {...register('email')}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.email ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isLoading}
+            />
+            {errors.email && (
+              <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              {...register('password')}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.password ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isLoading}
+            />
+            {errors.password && (
+              <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-primary hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? 'Loading...' : 'Login'}
+          </button>
+        </form>
+
+        {/* Test Credentials */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <p className="text-sm text-gray-600 mb-2">Test Credentials:</p>
+          <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
+            <p>
+              <strong>Owner:</strong> owner@bimbel.com / password
+            </p>
+            <p>
+              <strong>Admin:</strong> admin@bimbel.com / password
+            </p>
+            <p>
+              <strong>Guru:</strong> guru@bimbel.com / password
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

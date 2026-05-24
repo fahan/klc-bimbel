@@ -1,0 +1,27 @@
+{
+  "name": "bimbel-management-system",
+  "version": "1.0.0",
+  "description": "Sistem Manajemen Bimbel Multi-Cabang",
+  "private": true,
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:backend": "pnpm -F apps-backend start:dev",
+    "dev:frontend": "pnpm -F apps-frontend dev",
+    "build": "pnpm -r build",
+    "build:backend": "pnpm -F apps-backend build",
+    "build:frontend": "pnpm -F apps-frontend build",
+    "start": "pnpm -F apps-backend start",
+    "start:prod": "pnpm -F apps-backend start:prod",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
+    "prisma:generate": "pnpm -F apps-backend prisma:generate",
+    "prisma:migrate": "pnpm -F apps-backend prisma:migrate",
+    "prisma:studio": "pnpm -F apps-backend prisma:studio",
+    "type-check": "pnpm -r type-check"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

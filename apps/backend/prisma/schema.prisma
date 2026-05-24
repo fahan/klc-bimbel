@@ -1,0 +1,674 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ===== ENUMS =====
+
+enum Role {
+  OWNER
+  ADMIN_GLOBAL
+  ADMIN_CABANG
+  GURU
+}
+
+enum SubjectTrackingType {
+  MODULE_BASED
+  FREE_MATERIAL
+}
+
+enum SessionType {
+  REGULAR
+  PRIVATE
+}
+
+enum DayOfWeek {
+  SENIN
+  SELASA
+  RABU
+  KAMIS
+  JUMAT
+  SABTU
+  MINGGU
+}
+
+enum SessionLogStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionStatus {
+  ACTIVE
+  OVERCAPACITY
+  CANCELLED
+  ARCHIVED
+}
+
+enum SessionCreatedReason {
+  SINGLE
+  COMBINED_2SUBJECTS
+}
+
+enum AttendanceStatus {
+  HADIR
+  ABSEN
+  IZIN
+  SAKIT
+}
+
+enum Predicate {
+  PERLU_BIMBINGAN
+  CUKUP
+  BAIK
+  BAIK_SEKALI
+  MEMUASKAN
+}
+
+enum ModuleStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum CommissionStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+}
+
+enum InvoiceType {
+  SPP
+  REGISTRATION
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  OTHER
+}
+
+enum ProductCategory {
+  STATIONARY
+  MODULE
+  UNIFORM
+  STATIONERY
+}
+
+enum StockMutationType {
+  IN
+  OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum SppRateType {
+  REGULAR
+  PRIVATE
+}
+
+// ===== 1. ORGANISASI (3 tabel) =====
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users              UserBranch[]
+  students           Student[]
+  sessions           Session[]
+  commissions        Commission[]
+  invoices           Invoice[]
+  payments           Payment[]
+  products           Product[]
+  stockMutations     StockMutation[]
+  sales              Sale[]
+  progressReportLinks ProgressReportLink[]
+
+  @@map("branches")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  role      Role     // Keep for backward compatibility, but use UserRole for multi-role
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  branches           UserBranch[]
+  roles              UserRole[]
+  sessionsAsTeacher  Session[] @relation("teacher")
+  sessionLogsAsActualTeacher SessionLog[] @relation("actual_teacher")
+  sessionLogsAsScheduledTeacher SessionLog[] @relation("scheduled_teacher")
+  attendances        Attendance[] @relation("recorded_by")
+  progressLogs       ProgressLog[] @relation("recorded_by")
+  commissions        Commission[]
+  commissionApprovements Commission[] @relation("approved_by")
+  invoices           Invoice[] @relation("generated_by")
+  progressReportLinksGenerated ProgressReportLink[] @relation("generated_by")
+  payments           Payment[] @relation("recorded_by")
+  stockMutations     StockMutation[]
+  sales              Sale[]
+
+  @@map("users")
+}
+
+model UserBranch {
+  id        String   @id @default(cuid())
+  userId    String
+  branchId  String
+  isPrimary Boolean  @default(false)
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, branchId])
+  @@map("user_branches")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+  @@map("user_roles")
+}
+
+// ===== 2. MASTER DATA (3 tabel) =====
+
+model Subject {
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  code                  String   @unique
+  trackingType          SubjectTrackingType
+  maxCapacityRegular    Int      @default(3)
+  maxCapacityPrivate    Int      @default(1)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  sppRates              SppRate[]
+  curriculumModules     CurriculumModule[]
+  sessions              Session[]
+  studentSubjects       StudentSubject[]
+  progressLogs          ProgressLog[]
+  commissionDetails     CommissionDetail[]
+
+  @@map("subjects")
+}
+
+model SppRate {
+  id              String   @id @default(cuid())
+  subjectId       String
+  type            SppRateType
+  amount          Decimal  @db.Decimal(12, 2)
+  effectiveFrom   DateTime
+  effectiveUntil  DateTime?
+  createdAt       DateTime @default(now())
+
+  // Relations
+  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  studentSubjects StudentSubject[]
+
+  @@map("spp_rates")
+}
+
+model CurriculumModule {
+  id             String   @id @default(cuid())
+  subjectId      String
+  orderNumber    Int
+  name           String
+  totalChapters  Int
+  createdAt      DateTime @default(now())
+
+  // Relations
+  subject        Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  studentModuleProgress StudentModuleProgress[]
+  progressLogs   ProgressLog[] @relation("module")
+
+  @@unique([subjectId, orderNumber])
+  @@map("curriculum_modules")
+}
+
+// ===== 3. SISWA (2 tabel) =====
+
+model Student {
+  id            String   @id @default(cuid())
+  branchId      String
+  name          String
+  classLevel    String?
+  parentName    String?
+  parentPhone   String?
+  registeredAt  DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  branch                Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  studentSubjects       StudentSubject[]
+  sessionStudents       SessionStudent[]
+  attendances           Attendance[]
+  progressLogs          ProgressLog[]
+  studentModuleProgress StudentModuleProgress[]
+  invoices              Invoice[]
+  sales                 Sale[]
+  progressReportLinks   ProgressReportLink[]
+  commissionDetails     CommissionDetail[]
+
+  @@map("students")
+}
+
+model StudentSubject {
+  id           String   @id @default(cuid())
+  studentId    String
+  subjectId    String
+  sppRateId    String
+  type         SessionType
+  enrolledAt   DateTime
+  isActive     Boolean  @default(true)
+
+  // Relations
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject      Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  sppRate      SppRate  @relation(fields: [sppRateId], references: [id])
+
+  @@unique([studentId, subjectId])
+  @@map("student_subjects")
+}
+
+// ===== 4. JADWAL & SESI (3 tabel) =====
+
+model Session {
+  id                String   @id @default(cuid())
+  branchId          String
+  subjectId         String
+  teacherId         String
+  type              SessionType
+  dayOfWeek         DayOfWeek
+  startTime         String   // Format: HH:mm
+  durationMinutes   Int      @default(60)
+
+  // NEW: Combined session support (max 2 subjects per session)
+  sessionGroupId    String?  @db.Text
+  groupSize         Int      @default(1)  // 1=single, 2=combined (max 2)
+  maxCapacity       Int      @default(2)  // Capacity: MIN of all linked sessions' capacities (default 2 for REGULAR)
+  currentEnrolled   Int      @default(0)  // Denormalized for fast validation
+  createdReason     SessionCreatedReason @default(SINGLE)
+  status            SessionStatus        @default(ACTIVE)
+  notes             String?
+  createdBy         String?
+
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  subject           Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher           User     @relation("teacher", fields: [teacherId], references: [id])
+  studentSessions   SessionStudent[]
+  sessionLogs       SessionLog[]
+  linkedSessions    Session[]             @relation("SessionGroup")
+  parentSession     Session?              @relation("SessionGroup", fields: [sessionGroupId], references: [id])
+  auditLogs         SessionAuditLog[]
+
+  @@unique([teacherId, dayOfWeek, startTime])
+  @@index([sessionGroupId])
+  @@index([branchId, dayOfWeek])
+  @@map("sessions")
+}
+
+model SessionStudent {
+  id        String   @id @default(cuid())
+  sessionId String
+  studentId String
+  joinedAt  DateTime
+  isActive  Boolean  @default(true)
+
+  // Relations
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+  @@map("session_students")
+}
+
+model SessionLog {
+  id                String   @id @default(cuid())
+  sessionId         String
+  sessionDate       DateTime @db.Date
+  scheduledTeacherId String  // Original teacher (from Session)
+  actualTeacherId   String   // Teacher who actually taught (can be substitution)
+  isReplacement     Boolean  @default(false)
+  substitutionReason String? // Optional: reason for substitution
+  status            SessionLogStatus @default(SCHEDULED)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  scheduledTeacher  User     @relation("scheduled_teacher", fields: [scheduledTeacherId], references: [id])
+  actualTeacher     User     @relation("actual_teacher", fields: [actualTeacherId], references: [id])
+  attendances       Attendance[]
+  progressLogs      ProgressLog[]
+  commissionDetails CommissionDetail[]
+
+  @@unique([sessionId, sessionDate])
+  @@map("session_logs")
+}
+
+// NEW: Audit log untuk tracking session changes, especially combined sessions
+model SessionAuditLog {
+  id           String   @id @default(cuid())
+  sessionId    String
+  action       String   // CREATE_COMBINED, ADD_STUDENT, REMOVE_STUDENT, FORCE_ADD_OVERCAPACITY, etc
+  performedBy  String?  // User ID
+  reason       String?  // Why was this action taken?
+  details      Json?    // Additional context (capacity info, etc)
+  timestamp    DateTime @default(now())
+
+  // Relations
+  session      Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([action])
+  @@map("session_audit_logs")
+}
+
+// ===== 5. PRESENSI & PROGRESS (5 tabel) =====
+
+model Attendance {
+  id            String   @id @default(cuid())
+  sessionLogId  String
+  studentId     String
+  status        AttendanceStatus
+  recordedById  String?
+  recordedAt    DateTime
+
+  // Relations
+  sessionLog    SessionLog @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  recordedBy    User?      @relation("recorded_by", fields: [recordedById], references: [id])
+
+  @@unique([sessionLogId, studentId])
+  @@map("attendances")
+}
+
+model ProgressLog {
+  id             String   @id @default(cuid())
+  sessionLogId   String
+  studentId      String
+  subjectId      String
+  trackingType   SubjectTrackingType
+  topic          String?  // For FREE_MATERIAL
+  moduleId       String?  // For MODULE_BASED
+  chapterFrom    Int?     // For MODULE_BASED
+  chapterTo      Int?     // For MODULE_BASED
+  moduleCompleted Boolean  @default(false)
+  predicate      Predicate?
+  notes          String?
+  recordedById   String?
+  recordedAt     DateTime
+
+  // Relations
+  sessionLog     SessionLog @relation(fields: [sessionLogId], references: [id], onDelete: Cascade)
+  student        Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject        Subject    @relation(fields: [subjectId], references: [id])
+  module         CurriculumModule? @relation("module", fields: [moduleId], references: [id])
+  recordedBy     User?      @relation("recorded_by", fields: [recordedById], references: [id])
+
+  @@map("progress_logs")
+}
+
+model StudentModuleProgress {
+  id            String   @id @default(cuid())
+  studentId     String
+  moduleId      String
+  currentChapter Int
+  status        ModuleStatus @default(NOT_STARTED)
+  predicate     Predicate?
+  completedAt   DateTime?
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  module        CurriculumModule @relation(fields: [moduleId], references: [id])
+
+  @@unique([studentId, moduleId])
+  @@map("student_module_progress")
+}
+
+model ProgressReportLink {
+  id            String   @id @default(cuid())
+  studentId     String
+  branchId      String
+  generatedById String
+  token         String   @unique
+  subjectIds    String[] // JSON array of subject IDs
+  expiresAt     DateTime?
+  viewCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  generatedBy   User     @relation("generated_by", fields: [generatedById], references: [id])
+
+  @@map("progress_report_links")
+}
+
+// ===== 6. KEUANGAN (5 tabel) =====
+
+model Commission {
+  id            String   @id @default(cuid())
+  branchId      String
+  teacherId     String
+  month         Int
+  year          Int
+  totalAmount   Decimal  @db.Decimal(12, 2)
+  status        CommissionStatus @default(DRAFT)
+  approvedById  String?
+  approvedAt    DateTime?
+  calculatedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  teacher       User     @relation(fields: [teacherId], references: [id])
+  approvedBy    User?    @relation("approved_by", fields: [approvedById], references: [id])
+  commissionDetails CommissionDetail[]
+
+  @@unique([branchId, teacherId, month, year])
+  @@map("commissions")
+}
+
+model CommissionDetail {
+  id                  String   @id @default(cuid())
+  commissionId        String
+  sessionLogId        String
+  studentId           String
+  subjectId           String
+  sppAmount           Decimal  @db.Decimal(12, 2)
+  totalSessionsInMonth Int
+  sessionsAttended    Int
+  commissionAmount    Decimal  @db.Decimal(12, 2)
+  isReplacement       Boolean  @default(false)
+
+  // Relations
+  commission          Commission @relation(fields: [commissionId], references: [id], onDelete: Cascade)
+  sessionLog          SessionLog @relation(fields: [sessionLogId], references: [id])
+  student             Student    @relation(fields: [studentId], references: [id])
+  subject             Subject    @relation(fields: [subjectId], references: [id])
+
+  @@map("commission_details")
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  branchId      String
+  studentId     String
+  invoiceNumber String   @unique
+  type          InvoiceType
+  month         Int?
+  year          Int?
+  totalAmount   Decimal  @db.Decimal(12, 2)
+  paidAmount    Decimal  @db.Decimal(12, 2) @default(0)
+  status        InvoiceStatus @default(UNPAID)
+  generatedById String
+  publicToken   String   @unique
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  generatedBy   User     @relation("generated_by", fields: [generatedById], references: [id])
+  invoiceItems  InvoiceItem[]
+  payments      Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String   @id @default(cuid())
+  invoiceId String
+  subjectId String?
+  type      InvoiceType
+  sppAmount Decimal  @db.Decimal(12, 2)
+  sessionCount Int
+  amount    Decimal  @db.Decimal(12, 2)
+
+  // Relations
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  branchId  String
+  amount    Decimal  @db.Decimal(12, 2)
+  method    PaymentMethod
+  recordedById String
+  paidAt    DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  recordedBy User    @relation("recorded_by", fields: [recordedById], references: [id])
+
+  @@map("payments")
+}
+
+// ===== 7. TOKO (4 tabel) =====
+
+model Product {
+  id        String   @id @default(cuid())
+  branchId  String
+  name      String
+  category  ProductCategory
+  price     Decimal  @db.Decimal(12, 2)
+  stock     Int      @default(0)
+  minStock  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  stockMutations StockMutation[]
+  saleItems SaleItem[]
+
+  @@map("products")
+}
+
+model StockMutation {
+  id        String   @id @default(cuid())
+  productId String
+  branchId  String
+  type      StockMutationType
+  quantity  Int
+  notes     String?
+  createdById String
+  createdAt DateTime @default(now())
+
+  // Relations
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@map("stock_mutations")
+}
+
+model Sale {
+  id             String   @id @default(cuid())
+  branchId       String
+  studentId      String?
+  totalAmount    Decimal  @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod
+  createdById    String
+  createdAt      DateTime @default(now())
+
+  // Relations
+  branch         Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  student        Student? @relation(fields: [studentId], references: [id])
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  saleItems      SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(12, 2)
+  subtotal  Decimal  @db.Decimal(12, 2)
+
+  // Relations
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}

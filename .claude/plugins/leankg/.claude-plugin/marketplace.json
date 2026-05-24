@@ -1,0 +1,24 @@
+{
+  "name": "leankg",
+  "owner": {
+    "name": "LeanKG Team",
+    "email": "leankg@example.com"
+  },
+  "metadata": {
+    "description": "LeanKG - Lightweight knowledge graph for codebase understanding",
+    "version": "0.17.0"
+  },
+  "plugins": [
+    {
+      "name": "leankg",
+      "source": "./",
+      "description": "Claude Code plugin for lightweight knowledge graph-based codebase understanding. Indexes code, builds dependency graphs, calculates impact radius.",
+      "version": "0.17.0",
+      "author": {
+        "name": "LeanKG Team"
+      },
+      "category": "development",
+      "keywords": ["mcp", "knowledge-graph", "code-indexing", "dependency-analysis", "context-window"]
+    }
+  ]
+}
