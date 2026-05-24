@@ -15,6 +15,7 @@ interface AddSubjectModalProps {
 export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose, onSuccess }: AddSubjectModalProps) {
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [selectedType, setSelectedType] = useState<'REGULAR' | 'PRIVATE'>('REGULAR')
+  const [enrolledAt, setEnrolledAt] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
@@ -58,6 +59,7 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
       await studentApi.addSubject(studentId, {
         subjectId: selectedSubject,
         type: selectedType,
+        ...(enrolledAt ? { enrolledAt } : {}),
       })
 
       onSuccess()
@@ -136,6 +138,22 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
               </div>
             </div>
           )}
+
+          {/* Tanggal Masuk Aktual */}
+          <div className="space-y-1 mb-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Tanggal Masuk Aktual
+              <span className="ml-1 text-xs font-normal text-gray-400">(opsional)</span>
+            </label>
+            <input
+              type="date"
+              value={enrolledAt}
+              onChange={e => setEnrolledAt(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400">Isi jika siswa ini sebenarnya sudah terdaftar sebelumnya (data historis).</p>
+          </div>
 
           {/* SPP Rate Display */}
           {selectedSubject && sppAmount > 0 && (

@@ -237,7 +237,7 @@ export class StudentsController {
     @Param('id') studentId: string,
     @Body() addSubjectDto: AddSubjectDto,
   ): Promise<any> {
-    return this.studentsService.addSubjectEnrollment(studentId, addSubjectDto.subjectId, addSubjectDto.type as 'REGULAR' | 'PRIVATE')
+    return this.studentsService.addSubjectEnrollment(studentId, addSubjectDto.subjectId, addSubjectDto.type as 'REGULAR' | 'PRIVATE', addSubjectDto.enrolledAt)
   }
 
   @Put(':id/subjects/:subjectId')

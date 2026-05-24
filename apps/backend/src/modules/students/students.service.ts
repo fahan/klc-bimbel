@@ -214,14 +214,16 @@ export class StudentsService {
         throw new BadRequestException('Session does not match subject or branch')
       }
 
-      // Get current SPP rate (lock on enrollment date)
-      const now = new Date()
+      // Get SPP rate at enrollment date (supports historical data entry)
+      const enrollmentDate = enrollmentRequestDto.enrolledAt
+        ? new Date(enrollmentRequestDto.enrolledAt)
+        : new Date()
       const sppRate = await this.prisma.sppRate.findFirst({
         where: {
           subjectId: subjectEnroll.subjectId,
           type: subjectEnroll.type as any,
-          effectiveFrom: { lte: now },
-          OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+          effectiveFrom: { lte: enrollmentDate },
+          OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
         },
         orderBy: { effectiveFrom: 'desc' },
       })
@@ -244,6 +246,9 @@ export class StudentsService {
     }
 
     // Create student_subjects entries
+    const enrollmentDate = enrollmentRequestDto.enrolledAt
+      ? new Date(enrollmentRequestDto.enrolledAt)
+      : new Date()
     const enrolledSubjects = await Promise.all(
       enrollmentData.map(data =>
         this.prisma.studentSubject.create({
@@ -252,7 +257,7 @@ export class StudentsService {
             subjectId: data.subjectId,
             type: data.type as any,
             sppRateId: data.sppRateId,
-            enrolledAt: new Date(),
+            enrolledAt: enrollmentDate,
             isActive: true,
           },
         }),
@@ -463,7 +468,7 @@ export class StudentsService {
   }
 
   // Add subject to existing student enrollment
-  async addSubjectEnrollment(studentId: string, subjectId: string, type: 'REGULAR' | 'PRIVATE') {
+  async addSubjectEnrollment(studentId: string, subjectId: string, type: 'REGULAR' | 'PRIVATE', enrolledAt?: string) {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
     })
@@ -491,20 +496,20 @@ export class StudentsService {
       throw new BadRequestException(`Subject not found`)
     }
 
-    // Get active SPP rate
-    const now = new Date()
+    // Get SPP rate at enrollment date (supports historical data entry)
+    const enrollmentDate = enrolledAt ? new Date(enrolledAt) : new Date()
     const sppRate = await this.prisma.sppRate.findFirst({
       where: {
         subjectId,
         type: type as any,
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: now } }],
+        effectiveFrom: { lte: enrollmentDate },
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
       },
       orderBy: { effectiveFrom: 'desc' },
     })
 
     if (!sppRate) {
-      throw new BadRequestException(`No active SPP rate for subject ${subject.name} (${type})`)
+      throw new BadRequestException(`No active SPP rate for subject ${subject.name} (${type}) on ${enrollmentDate.toLocaleDateString('id-ID')}`)
     }
 
     // Create enrollment
@@ -514,7 +519,7 @@ export class StudentsService {
         subjectId,
         type: type as any,
         sppRateId: sppRate.id,
-        enrolledAt: new Date(),
+        enrolledAt: enrollmentDate,
         isActive: true,
       },
       include: {

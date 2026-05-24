@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsString, IsArray, IsEnum, ValidateNested, IsOptional } from 'class-validator'
+import { IsString, IsArray, IsEnum, ValidateNested, IsOptional, IsDateString } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class EnrollSubjectDto {
@@ -22,6 +22,15 @@ export class EnrollmentRequestDto {
   @ValidateNested({ each: true })
   @Type(() => EnrollSubjectDto)
   subjects!: EnrollSubjectDto[]
+
+  @ApiProperty({
+    example: '2024-01-15',
+    description: 'Tanggal masuk aktual siswa (untuk input data historis). Kosongkan untuk pakai tanggal hari ini.',
+    required: false,
+  })
+  @IsOptional()
+  @IsDateString()
+  enrolledAt?: string
 }
 
 export class EnrolledSubjectSummaryDto {
@@ -87,6 +96,15 @@ export class AddSubjectDto {
   @ApiProperty({ enum: ['REGULAR', 'PRIVATE'], example: 'REGULAR' })
   @IsEnum(['REGULAR', 'PRIVATE'])
   type!: string
+
+  @ApiProperty({
+    example: '2024-01-15',
+    description: 'Tanggal masuk aktual (untuk input data historis). Kosongkan untuk pakai tanggal hari ini.',
+    required: false,
+  })
+  @IsOptional()
+  @IsDateString()
+  enrolledAt?: string
 }
 
 export class AddSubjectResponseDto {

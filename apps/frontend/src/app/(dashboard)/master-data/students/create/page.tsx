@@ -19,6 +19,7 @@ interface StudentData {
   parentName: string | null
   parentPhone: string | null
   branchId: string
+  enrolledAt: string | null
 }
 
 interface SelectedSubject {
@@ -110,6 +111,7 @@ export default function StudentEnrollmentPage() {
       // Enroll student
       await studentApi.enroll(newStudentId, {
         subjects: enrollmentData,
+        ...(studentData.enrolledAt ? { enrolledAt: studentData.enrolledAt } : {}),
       })
 
       // Invalidate students cache and redirect

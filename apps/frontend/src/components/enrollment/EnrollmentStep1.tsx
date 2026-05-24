@@ -11,6 +11,7 @@ interface StudentData {
   parentName: string | null
   parentPhone: string | null
   branchId: string
+  enrolledAt: string | null
 }
 
 interface EnrollmentStep1Props {
@@ -31,6 +32,7 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
       parentName: initialData?.parentName || '',
       parentPhone: initialData?.parentPhone || '',
       branchId: initialData?.branchId || '',
+      enrolledAt: initialData?.enrolledAt || '',
     },
   })
 
@@ -43,6 +45,7 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
         parentName: initialData.parentName || '',
         parentPhone: initialData.parentPhone || '',
         branchId: initialData.branchId || '',
+        enrolledAt: initialData.enrolledAt || '',
       })
     }
   }, [initialData, reset])
@@ -134,6 +137,23 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
           {errors.branchId && (
             <p className="text-red-500 text-xs mt-1">{errors.branchId.message}</p>
           )}
+        </div>
+
+        {/* Tanggal Masuk Aktual */}
+        <div className="pt-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tanggal Masuk Aktual
+            <span className="ml-1 text-xs font-normal text-gray-400">(opsional — untuk input data historis)</span>
+          </label>
+          <input
+            type="date"
+            {...register('enrolledAt')}
+            max={new Date().toISOString().split('T')[0]}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Kosongkan jika siswa baru mendaftar hari ini. Isi jika Anda sedang menginput data siswa lama.
+          </p>
         </div>
 
         {/* Submit Button */}
