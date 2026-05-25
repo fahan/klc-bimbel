@@ -89,8 +89,8 @@ export default function EditSubjectPage() {
         name: data.name,
         code: data.code,
         trackingType: data.trackingType,
-        maxCapacityRegular: data.capacity,
-        maxCapacityPrivate: data.maxCapacity,
+        capacity: data.capacity,
+        maxCapacity: data.maxCapacity,
         commissionPercentage: data.commissionPercentage,
       })
 

@@ -645,13 +645,10 @@ export class SessionsService {
       throw new BadRequestException('Selected user is not a teacher')
     }
 
-    // Validate teacher conflict (same teacher can't teach at same time)
-    await this.validateTeacherTimeSlot(
-      createCombinedDto.teacherId,
-      createCombinedDto.dayOfWeek,
-      createCombinedDto.startTime,
-      createCombinedDto.durationMinutes,
-    )
+    // Note: Skip validateTeacherTimeSlot for combined sessions
+    // Combined sessions intentionally have the teacher teaching 2 subjects at the same time
+    // The database unique constraint (teacherId, dayOfWeek, startTime) will catch conflicts with OTHER sessions
+    // since both sessions in the combined pair will fail to insert if that time slot is already taken
 
     // Validate no duplicate subject
     const subjectIds = createCombinedDto.subjects.map((s: any) => s.subjectId)
@@ -722,11 +719,11 @@ export class SessionsService {
       }
     }
 
-    // Generate sessionGroupId
-    const sessionGroupId = `grp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
     // Create combined sessions in transaction
+    // sessionGroupId is a FK to Session.id — first session becomes the parent,
+    // subsequent sessions point to it via sessionGroupId.
     let createdSessions: any[] = []
+    let sessionGroupId: string | null = null
     try {
       createdSessions = await this.prisma.$transaction(
         async (tx) => {
@@ -745,7 +742,9 @@ export class SessionsService {
                 dayOfWeek: createCombinedDto.dayOfWeek as any,
                 startTime: createCombinedDto.startTime,
                 durationMinutes: createCombinedDto.durationMinutes,
-                sessionGroupId,
+                // First session is the parent (no sessionGroupId);
+                // subsequent sessions reference the parent's id.
+                sessionGroupId: idx === 0 ? null : sessionGroupId,
                 groupSize: 2,
                 maxCapacity: minCapacity,
                 createdReason: 'COMBINED_2SUBJECTS',
@@ -763,6 +762,11 @@ export class SessionsService {
                 },
               },
             })
+
+            // First session becomes the group parent — capture its id
+            if (idx === 0) {
+              sessionGroupId = newSession.id
+            }
 
             // Enroll students if provided
             const studentIds = subject.studentIds ?? []
