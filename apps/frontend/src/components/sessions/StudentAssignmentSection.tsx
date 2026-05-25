@@ -108,7 +108,7 @@ export function StudentAssignmentSection({
   // Notify parent of changes
   useEffect(() => {
     onStudentsChange(selectedStudentIds)
-  }, [selectedStudentIds, onStudentsChange])
+  }, [selectedStudentIds])
 
   const handleAddStudent = (studentId: string) => {
     if (!isAtCapacity) {
