@@ -910,7 +910,7 @@ export class SessionsService {
 
       if (newStart < existingEnd && newEnd > existingStart) {
         throw new BadRequestException(
-          `Guru sudah memiliki sesi pada ${dayOfWeek} ${existing.startTime}-${this.minutesToTime(existingEnd)}`,
+          `Guru sudah memiliki sesi pada ${dayOfWeek} ${existing.startTime}-${this.minutesToTime(this.timeToMinutes(existing.startTime) + existing.durationMinutes)}`,
         )
       }
     }
@@ -975,7 +975,7 @@ export class SessionsService {
           )
         ) {
           throw new BadRequestException(
-            `Guru sudah memiliki sesi pada ${newSession.dayOfWeek} ${newSession.startTime}-${this.minutesToTime(this.timeToMinutes(newSession.startTime) + createBulkDto.durationMinutes)}`,
+            `Guru sudah memiliki sesi pada ${existing.dayOfWeek} ${existing.startTime}-${this.minutesToTime(this.timeToMinutes(existing.startTime) + existing.durationMinutes)}`,
           )
         }
       }
