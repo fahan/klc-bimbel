@@ -897,6 +897,7 @@ export class SessionsService {
         teacherId,
         dayOfWeek: dayOfWeek as any,
         isActive: true,
+        status: 'ACTIVE', // Only count ACTIVE sessions, not CANCELLED/ARCHIVED
       },
     })
 
@@ -942,6 +943,7 @@ export class SessionsService {
       where: {
         teacherId: createBulkDto.teacherId,
         isActive: true,
+        status: 'ACTIVE', // Only count ACTIVE sessions, not CANCELLED/ARCHIVED
       },
     })
 
@@ -1023,6 +1025,7 @@ export class SessionsService {
           teacherId,
           dayOfWeek,
           isActive: true,
+          status: 'ACTIVE', // Only count ACTIVE sessions, not CANCELLED/ARCHIVED
           NOT: { id },
         },
       })
