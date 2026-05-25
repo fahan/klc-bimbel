@@ -72,6 +72,7 @@ export default function CreateTeacherPage() {
       await teacherApi.create({
         name: data.name,
         email: data.email,
+        password: data.password,
         phone: data.phone || null,
         branchIds: data.branchIds,
       })

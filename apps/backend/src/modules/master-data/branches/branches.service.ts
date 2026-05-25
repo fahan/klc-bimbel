@@ -124,6 +124,7 @@ export class BranchesService {
         code: createBranchDto.code,
         address: createBranchDto.address || null,
         phone: createBranchDto.phone || null,
+        registrationFee: createBranchDto.registrationFee ?? 200000,
         isActive: true,
       },
     })
@@ -170,6 +171,7 @@ export class BranchesService {
         code: updateBranchDto.code || branch.code,
         address: updateBranchDto.address !== undefined ? updateBranchDto.address : branch.address,
         phone: updateBranchDto.phone !== undefined ? updateBranchDto.phone : branch.phone,
+        registrationFee: updateBranchDto.registrationFee !== undefined ? updateBranchDto.registrationFee : branch.registrationFee,
       },
     })
 
@@ -208,6 +210,7 @@ export class BranchesService {
       code: branch.code,
       address: branch.address,
       phone: branch.phone,
+      registrationFee: branch.registrationFee,
       isActive: branch.isActive,
       createdAt: branch.createdAt.toISOString(),
       updatedAt: branch.updatedAt.toISOString(),

@@ -14,6 +14,7 @@ const branchSchema = z.object({
   code: z.string().min(2, 'Code must be at least 2 characters').max(20),
   address: z.string().optional(),
   phone: z.string().optional(),
+  registrationFee: z.coerce.number().int().min(0, 'Biaya registrasi tidak boleh negatif'),
 })
 
 type BranchFormData = z.infer<typeof branchSchema>
@@ -24,6 +25,7 @@ interface Branch {
   code: string
   address?: string
   phone?: string
+  registrationFee: number
   isActive: boolean
 }
 
@@ -59,6 +61,7 @@ export default function EditBranchPage() {
           code: data.code,
           address: data.address || '',
           phone: data.phone || '',
+          registrationFee: data.registrationFee ?? 200000,
         })
       } catch (err: any) {
         setPageError(err.response?.data?.message || 'Failed to load branch')
@@ -85,6 +88,7 @@ export default function EditBranchPage() {
         code: data.code,
         address: data.address || null,
         phone: data.phone || null,
+        registrationFee: data.registrationFee,
       })
 
       await queryClient.invalidateQueries({ queryKey: ['branches'] })
@@ -205,6 +209,26 @@ export default function EditBranchPage() {
               disabled={isLoading}
             />
             {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>}
+          </div>
+
+          {/* Registration Fee Field */}
+          <div>
+            <label htmlFor="registrationFee" className="block text-sm font-medium text-gray-700 mb-1">
+              Biaya Registrasi (Rp) *
+            </label>
+            <input
+              id="registrationFee"
+              type="number"
+              min="0"
+              step="1000"
+              {...register('registrationFee')}
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary ${
+                errors.registrationFee ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isLoading}
+            />
+            {errors.registrationFee && <p className="text-red-500 text-sm mt-1">{errors.registrationFee.message}</p>}
+            <p className="text-xs text-gray-500 mt-1">Biaya pendaftaran siswa baru di cabang ini</p>
           </div>
 
           {/* Status Info */}

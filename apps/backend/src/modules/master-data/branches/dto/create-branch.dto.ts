@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator'
+import { IsString, IsOptional, IsInt, Min, MinLength, MaxLength } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateBranchDto {
@@ -23,4 +23,10 @@ export class CreateBranchDto {
   @IsOptional()
   @IsString()
   phone?: string
+
+  @ApiProperty({ example: 200000, description: 'Biaya registrasi siswa baru (Rupiah)', required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  registrationFee?: number
 }

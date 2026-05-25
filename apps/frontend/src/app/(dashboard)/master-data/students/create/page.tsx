@@ -57,8 +57,12 @@ export default function StudentEnrollmentPage() {
     queryFn: () => subjectApi.getAll(),
   })
 
+  // Get registration fee from selected branch, fallback to 200000
+  const branches = branchesData?.data?.data || []
+  const selectedBranch = branches.find((b: any) => b.id === studentData.branchId)
+  const registrationFee = selectedBranch?.registrationFee ?? 200000
+
   // Calculate summary data
-  const registrationFee = 200000
   const totalSppFirstMonth = selectedSubjects.reduce((sum, s) => sum + s.sppAmount, 0)
   const totalFirstBill = registrationFee + totalSppFirstMonth
 
