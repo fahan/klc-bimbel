@@ -18,6 +18,7 @@ import { ProgressReportsModule } from './modules/progress-reports/progress-repor
 import { FinanceModule } from './modules/finance/finance.module'
 import { StoreModule } from './modules/store/store.module'
 import { MailModule } from './modules/mail/mail.module'
+import { LandingModule } from './modules/landing/landing.module'
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MailModule } from './modules/mail/mail.module'
     FinanceModule,
     StoreModule,
     MailModule,
+    LandingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

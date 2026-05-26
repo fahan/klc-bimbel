@@ -171,6 +171,7 @@ export class SubjectsService {
       trackingType: subject.trackingType,
       maxCapacityRegular: subject.maxCapacityRegular,
       maxCapacityPrivate: subject.maxCapacityPrivate,
+      sessionsPerMonth: subject.sessionsPerMonth,
       commissionPercentage: parseFloat(subject.commissionPercentage.toString()) * 100,
       isActive: subject.isActive,
       createdAt: subject.createdAt.toISOString(),

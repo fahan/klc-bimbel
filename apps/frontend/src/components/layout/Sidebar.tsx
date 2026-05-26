@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Users, Clock, CheckSquare, CreditCard, TrendingUp, Gift, BookOpen, LogOut, ChevronDown, BarChart3, Building, DollarSign, FileText, GraduationCap, Receipt, Mail, ShoppingBag, Truck } from 'lucide-react'
+import { LayoutDashboard, Users, Clock, CheckSquare, CreditCard, TrendingUp, Gift, BookOpen, LogOut, ChevronDown, BarChart3, Building, DollarSign, FileText, GraduationCap, Receipt, Mail, ShoppingBag, Truck, Globe } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
 
 export default function Sidebar() {
@@ -79,6 +79,7 @@ export default function Sidebar() {
       title: 'ADMINISTRASI',
       items: [
         { label: 'Manajemen Pengguna', path: '/manajemen-user', icon: Users },
+        { label: 'Konten Landing Page', path: '/landing-content', icon: Globe },
       ]
     },
     {

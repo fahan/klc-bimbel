@@ -122,6 +122,14 @@ enum SppRateType {
   PRIVATE
 }
 
+enum TrialRegistrationStatus {
+  NEW
+  CONTACTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
 // ===== 1. ORGANISASI (3 tabel) =====
 
 model Branch {
@@ -218,6 +226,7 @@ model Subject {
   trackingType          SubjectTrackingType
   maxCapacityRegular    Int      @default(3)
   maxCapacityPrivate    Int      @default(1)
+  sessionsPerMonth      Int      @default(8)
   commissionPercentage  Decimal  @default(0.40) @db.Decimal(5, 2)
   isActive              Boolean  @default(true)
   createdAt             DateTime @default(now())
@@ -674,4 +683,32 @@ model SaleItem {
   product   Product  @relation(fields: [productId], references: [id])
 
   @@map("sale_items")
+}
+
+// ===== 8. LANDING PAGE =====
+
+model LandingContent {
+  id          String   @id @default(cuid())
+  section     String   @unique
+  content     Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("landing_content")
+}
+
+model FreeTrialRegistration {
+  id          String   @id @default(cuid())
+  childName   String
+  parentName  String
+  phone       String
+  grade       String
+  subjects    String[]
+  branchCode  String?
+  notes       String?
+  status      TrialRegistrationStatus @default(NEW)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("free_trial_registrations")
 }

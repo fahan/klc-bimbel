@@ -370,3 +370,48 @@ export const usersApi = {
     apiClient.patch(`/users/${id}`, data),
   resetPassword: (id: string) => apiClient.post(`/users/${id}/reset-password`, {}),
 }
+
+// ===== LANDING API =====
+export const landingApi = {
+  register: (data: {
+    childName: string
+    parentName: string
+    phone: string
+    grade: string
+    subjects: string[]
+    branchCode?: string
+    notes?: string
+  }) => apiClient.post('/landing/register', data),
+
+  getRegistrations: (filters?: { status?: string; branchCode?: string; page?: number; limit?: number }) => {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.branchCode) params.append('branchCode', filters.branchCode)
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.limit) params.append('limit', String(filters.limit))
+    const qs = params.toString()
+    return apiClient.get(`/landing/registrations${qs ? `?${qs}` : ''}`)
+  },
+
+  updateRegistration: (id: string, data: { status?: string; notes?: string }) =>
+    apiClient.patch(`/landing/registrations/${id}`, data),
+
+  getSppRates: () => apiClient.get('/landing/spp-rates'),
+  getBranches: () => apiClient.get('/landing/branches'),
+
+  getAllContent: () => apiClient.get('/landing/content'),
+  getContentSection: (section: string) => apiClient.get(`/landing/content/${section}`),
+  upsertContentSection: (section: string, content: any) =>
+    apiClient.put(`/landing/content/${section}`, { content }),
+
+  uploadImage: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiClient.post('/landing/upload', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
+  deleteImage: (path: string) =>
+    apiClient.delete('/landing/upload', { data: { path } }),
+}

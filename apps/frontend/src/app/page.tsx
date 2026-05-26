@@ -1,8 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useQuery } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import './landing.css'
+import { landingApi } from '@/lib/api/endpoints'
 
 /**
  * IMPORTANT: Landing Page Data Consistency
@@ -27,9 +32,150 @@ import './landing.css'
  * Last verified: 2026-05-03 - All data consistent ✓
  */
 
+const registrationSchema = z.object({
+  childName: z.string().min(2, 'Nama anak minimal 2 karakter'),
+  parentName: z.string().min(2, 'Nama orang tua minimal 2 karakter'),
+  phone: z
+    .string()
+    .min(9, 'Nomor HP tidak valid')
+    .max(15, 'Nomor HP tidak valid')
+    .regex(/^[0-9+\-\s]+$/, 'Nomor HP tidak valid'),
+  grade: z.string().min(1, 'Pilih kelas anak'),
+  subjects: z.array(z.string()).min(1, 'Pilih minimal 1 mata pelajaran'),
+  branchCode: z.string().optional(),
+  notes: z.string().max(500, 'Catatan maksimal 500 karakter').optional(),
+})
+
+type RegistrationForm = z.infer<typeof registrationSchema>
+
+const GRADE_OPTIONS = [
+  'TK / PAUD',
+  'Kelas 1 SD',
+  'Kelas 2 SD',
+  'Kelas 3 SD',
+  'Kelas 4 SD',
+  'Kelas 5 SD',
+  'Kelas 6 SD',
+  'Kelas 7 SMP',
+  'Kelas 8 SMP',
+  'Kelas 9 SMP',
+  'Kelas 10 SMA',
+  'Kelas 11 SMA',
+  'Kelas 12 SMA',
+]
+
+const SUBJECT_OPTIONS = [
+  { value: 'AHE', label: '🧮 AHE — Aritmatika' },
+  { value: 'ASE', label: '📐 ASE — Aljabar' },
+  { value: 'Matematika', label: '📊 Matematika' },
+  { value: 'Les Ngaji', label: '📖 Les Ngaji' },
+]
+
+// BRANCH_OPTIONS now built dynamically from branchesData inside component
+
+const ID_NUMBERS: Record<number, string> = {
+  1: 'Satu', 2: 'Dua', 3: 'Tiga', 4: 'Empat', 5: 'Lima',
+  6: 'Enam', 7: 'Tujuh', 8: 'Delapan', 9: 'Sembilan', 10: 'Sepuluh',
+}
+const toIdWord = (n: number) => ID_NUMBERS[n] ?? String(n)
+
+// Default content fallbacks
+const DEFAULT_CONTENT = {
+  hero: {
+    eyebrowText: 'Pendaftaran Tahun Ajaran 2026/2027 Dibuka',
+    headline: 'Anak belajar <em>tuntas</em>,\norang tua selalu <em>tahu</em>.',
+    subheadline: 'Bimbel keluarga dengan metode <strong>Mastery Learning</strong> — anak naik level setelah benar-benar paham, bukan karena umur. Setiap minggu Anda menerima laporan progress lewat WhatsApp, langsung dari guru kelas.',
+    photoUrl: '',
+    stats: [
+      { num: '12+', label: 'Tahun mendampingi' },
+      { num: '4', label: 'Cabang di Jawa' },
+      { num: '1.400+', label: 'Siswa aktif & alumni' },
+      { num: '96%', label: 'Kehadiran rata-rata' },
+    ],
+  },
+  teachers: [
+    { name: 'Bu Rini Astuti', role: 'Guru AHE & ASE', badge: '7 tahun di KLC', photoUrl: null },
+    { name: 'Pak Doni Pratama', role: 'Guru Matematika', badge: 'Lulusan UPI', photoUrl: null },
+    { name: 'Bu Tia Maharani', role: 'Guru AHE Tingkat Lanjut', badge: '5 tahun di KLC', photoUrl: null },
+    { name: 'Ust. Ali Mubarok', role: 'Guru Les Ngaji', badge: 'Hafidz 30 juz', photoUrl: null },
+  ],
+  testimonials: [
+    { quote: '"Yang membuat saya tenang adalah laporan WA tiap minggu. Saya tahu Aira sedang di modul mana, di bab mana, dan apa yang perlu dilatih di rumah. Tidak ada kejutan saat ujian sekolah."', authorName: 'Ibu Diah Hasanah', authorMeta: 'Wali Aira · 2 tahun di KLC PWK', initials: 'DH' },
+    { quote: '"Anak saya pindah dinas ke Bandung — di tempat lain artinya daftar ulang. Di KLC tinggal lapor admin, tarif lama tetap, modul Bagas lanjut dari posisi terakhir. Sangat menghargai keluarga."', authorName: 'Bapak Surya Prasetya', authorMeta: 'Wali Bagas · pindah PWK → BDG', initials: 'SP' },
+    { quote: '"Hafidz dulu takut hitung. Sekarang dia minta sendiri ditambahin sesi karena ingin lulus modul. Predikat "Memuaskan" jadi target dia. Mastery learning betul-betul mengubah motivasi anak."', authorName: 'Ibu Fitri Maulida', authorMeta: 'Wali Hafidz · 1 tahun di KLC BWS', initials: 'FM' },
+  ],
+  faq: [
+    { question: 'Anak saya kelas 5 SD tapi belum lancar perkalian. Mulai dari mana?', answer: 'Di sesi pertama gratis, guru kami diagnostik dulu posisi anak. Kalau perkalian belum lancar, kami mulai dari modul perkalian dasar. Tidak ada gengsi-gengsi — yang penting tuntas.' },
+    { question: 'Bagaimana saya tahu anak benar-benar belajar, bukan sekadar duduk?', answer: 'Setiap minggu Anda dapat link laporan via WhatsApp: posisi modul anak, predikat tiap bab, catatan guru, dan persentase kehadiran. Kalau ada yang janggal, langsung balas chat — admin pasti respon.' },
+    { question: 'Kalau anak sakit / izin, bagaimana?', answer: 'Sesi ditandai "Izin" atau "Sakit" — tidak menambah biaya, dan kami atur sesi pengganti di hari lain pada minggu yang sama.' },
+    { question: 'Saya pindah kota karena pekerjaan. Anak saya bagaimana?', answer: 'Cukup lapor admin cabang lama. Modul, predikat, dan tarif lock anak otomatis ikut ke cabang baru. Tidak ada biaya pindah, tidak perlu daftar ulang.' },
+    { question: 'Apakah ada diskon kalau ambil 2 mapel?', answer: 'Ya. Mapel kedua dapat potongan 10%, mapel ketiga 15%. Untuk saudara kandung yang ikut, tambahan diskon 10% per anak.' },
+    { question: 'Bagaimana cara coba gratis 1 sesi?', answer: 'Klik tombol "Coba Gratis" di atas, isi nama anak, kelas, dan mapel yang diminati. Admin cabang akan menghubungi via WhatsApp dalam 24 jam untuk atur jadwal.' },
+  ],
+  contact: {
+    phone: '08123445566',
+    whatsapp: '628123445566',
+    email: 'halo@klcbimbel.id',
+    instagram: 'klcbimbel',
+    waMessage: 'Halo%20KLC%20Bimbel%2C%20saya%20tertarik%20coba%20gratis',
+  },
+}
+
 export default function LandingPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
+
+  const { data: contentData } = useQuery({
+    queryKey: ['landing-content-public'],
+    queryFn: () => landingApi.getAllContent(),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const { data: sppRatesData } = useQuery({
+    queryKey: ['landing-spp-rates-public'],
+    queryFn: () => landingApi.getSppRates(),
+    staleTime: 5 * 60 * 1000,
+  })
+  const sppRates: { id: string; name: string; code: string; sessionsPerMonth: number; amount: number }[] =
+    sppRatesData?.data?.data ?? []
+
+  // Map subject code → display icon
+  const SUBJECT_ICONS: Record<string, string> = {
+    AHE: '🧮', ASE: '📐', MTK: '📊', NGJ: '📖',
+  }
+  const subjectIcon = (code: string) =>
+    SUBJECT_ICONS[code] ?? SUBJECT_ICONS[Object.keys(SUBJECT_ICONS).find(k => code.toUpperCase().includes(k)) ?? ''] ?? '📚'
+
+  const { data: branchesData } = useQuery({
+    queryKey: ['landing-branches-public'],
+    queryFn: () => landingApi.getBranches(),
+    staleTime: 5 * 60 * 1000,
+  })
+  const branches: { id: string; code: string; name: string; address: string | null; phone: string | null; studentCount: number }[] =
+    branchesData?.data?.data ?? []
+  const cms = contentData?.data?.data ?? {}
+  const hero = { ...DEFAULT_CONTENT.hero, ...(cms.hero ?? {}) }
+  const teachers: typeof DEFAULT_CONTENT.teachers = cms.teachers ?? DEFAULT_CONTENT.teachers
+  const testimonials: typeof DEFAULT_CONTENT.testimonials = cms.testimonials ?? DEFAULT_CONTENT.testimonials
+  const faqs: { question: string; answer: string }[] = cms.faq ?? DEFAULT_CONTENT.faq
+  const contact = { ...DEFAULT_CONTENT.contact, ...(cms.contact ?? {}) }
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<RegistrationForm>({
+    resolver: zodResolver(registrationSchema),
+    defaultValues: { subjects: [] },
+  })
+
+  const selectedSubjects = watch('subjects')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -37,41 +183,45 @@ export default function LandingPage() {
     }
   }, [])
 
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setIsMobileMenuOpen(false)
+      }
+    }
+    if (isMobileMenuOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [isMobileMenuOpen])
+
   const toggleFaq = (i: number) => {
     setOpenFaqIndex(openFaqIndex === i ? null : i)
   }
 
-  const faqs = [
-    {
-      q: 'Anak saya kelas 5 SD tapi belum lancar perkalian. Mulai dari mana?',
-      a: 'Di sesi pertama gratis, guru kami diagnostik dulu posisi anak. Kalau perkalian belum lancar, kami mulai dari modul perkalian dasar. Tidak ada gengsi-gengsi — yang penting tuntas.',
-    },
-    {
-      q: 'Bagaimana saya tahu anak benar-benar belajar, bukan sekadar duduk?',
-      a: 'Setiap minggu Anda dapat link laporan via WhatsApp: posisi modul anak, predikat tiap bab, catatan guru, dan persentase kehadiran. Kalau ada yang janggal, langsung balas chat — admin pasti respon.',
-    },
-    {
-      q: 'Kalau anak sakit / izin, bagaimana?',
-      a: 'Sesi ditandai "Izin" atau "Sakit" — tidak menambah biaya, dan kami atur sesi pengganti di hari lain pada minggu yang sama. Kalau sesi belum tuntas dipahami, guru akan ulang materinya.',
-    },
-    {
-      q: 'Saya pindah kota karena pekerjaan. Anak saya bagaimana?',
-      a: 'Cukup lapor admin cabang lama. Modul, predikat, dan tarif lock anak otomatis ikut ke cabang baru. Tidak ada biaya pindah, tidak perlu daftar ulang.',
-    },
-    {
-      q: 'Apakah ada diskon kalau ambil 2 mapel?',
-      a: 'Ya. Mapel kedua dapat potongan 10%, mapel ketiga 15%. Untuk saudara kandung yang ikut, tambahan diskon 10% per anak.',
-    },
-    {
-      q: 'Bagaimana cara coba gratis 1 sesi?',
-      a: 'Klik tombol "Coba Gratis" di atas, isi nama anak, kelas, dan mapel yang diminati. Admin cabang akan menghubungi via WhatsApp dalam 24 jam untuk atur jadwal.',
-    },
-  ]
+  const toggleSubject = (value: string) => {
+    const current = selectedSubjects ?? []
+    const next = current.includes(value) ? current.filter((s) => s !== value) : [...current, value]
+    setValue('subjects', next, { shouldValidate: true })
+  }
+
+  const onSubmit = async (data: RegistrationForm) => {
+    setSubmitError(null)
+    try {
+      await landingApi.register(data)
+      setSubmitSuccess(true)
+    } catch (err: any) {
+      setSubmitError(
+        err?.response?.data?.message ?? 'Terjadi kesalahan. Silakan coba lagi atau hubungi kami via WhatsApp.',
+      )
+    }
+  }
+
+  const closeMobileMenu = () => setIsMobileMenuOpen(false)
 
   return (
     <div className="klc">
       {/* ============== NAV ============== */}
-      <nav className="klc-nav">
+      <nav className="klc-nav" ref={mobileMenuRef}>
         <div className="klc-container klc-nav-inner">
           <div className="klc-logo">
             <div className="klc-logo-mark">K</div>
@@ -99,6 +249,35 @@ export default function LandingPage() {
               Coba Gratis 1 Sesi
             </a>
           </div>
+          <button
+            className={`klc-nav-toggle ${isMobileMenuOpen ? 'open' : ''}`}
+            onClick={() => setIsMobileMenuOpen((v) => !v)}
+            aria-label="Toggle menu"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+
+        {/* Mobile dropdown menu */}
+        <div className={`klc-nav-mobile ${isMobileMenuOpen ? 'open' : ''}`}>
+          <a href="#mapel" onClick={closeMobileMenu}>Mata Pelajaran</a>
+          <a href="#metode" onClick={closeMobileMenu}>Metode</a>
+          <a href="#komitmen" onClick={closeMobileMenu}>Komitmen</a>
+          <a href="#cabang" onClick={closeMobileMenu}>Cabang</a>
+          <a href="#tarif" onClick={closeMobileMenu}>Tarif</a>
+          <a href="#faq" onClick={closeMobileMenu}>FAQ</a>
+          <Link
+            href={isLoggedIn ? '/dashboard' : '/login'}
+            className="klc-btn klc-btn--ghost"
+            onClick={closeMobileMenu}
+          >
+            {isLoggedIn ? 'Dashboard' : 'Masuk'}
+          </Link>
+          <a href="#daftar" className="klc-btn klc-btn--primary" onClick={closeMobileMenu}>
+            Coba Gratis 1 Sesi
+          </a>
         </div>
       </nav>
 
@@ -108,17 +287,10 @@ export default function LandingPage() {
         <div className="klc-container klc-hero-grid">
           <div>
             <span className="klc-eyebrow">
-              <span className="pulse"></span>Pendaftaran Tahun Ajaran 2026/2027 Dibuka
+              <span className="pulse"></span>{hero.eyebrowText}
             </span>
-            <h1>
-              Anak belajar <span className="em">tuntas</span>,<br />
-              orang tua selalu <span className="em">tahu</span>.
-            </h1>
-            <p className="klc-hero-sub">
-              Bimbel keluarga dengan metode <strong>Mastery Learning</strong> — anak naik level setelah benar-benar
-              paham, bukan karena umur. Setiap minggu Anda menerima laporan progress lewat WhatsApp, langsung dari
-              guru kelas.
-            </p>
+            <h1 dangerouslySetInnerHTML={{ __html: hero.headline.replace(/\n/g, '<br />').replace(/<em>/g, '<span class="em">').replace(/<\/em>/g, '</span>') }} />
+            <p className="klc-hero-sub" dangerouslySetInnerHTML={{ __html: hero.subheadline }} />
             <div className="klc-hero-cta">
               <a href="#daftar" className="klc-btn klc-btn--primary klc-btn--lg">
                 Coba Gratis 1 Sesi →
@@ -128,27 +300,20 @@ export default function LandingPage() {
               </a>
             </div>
             <div className="klc-hero-trust">
-              <div>
-                <div className="num">12+</div>
-                <div className="lbl">Tahun mendampingi</div>
-              </div>
-              <div>
-                <div className="num">4</div>
-                <div className="lbl">Cabang di Jawa</div>
-              </div>
-              <div>
-                <div className="num">1.400+</div>
-                <div className="lbl">Siswa aktif & alumni</div>
-              </div>
-              <div>
-                <div className="num">96%</div>
-                <div className="lbl">Kehadiran rata-rata</div>
-              </div>
+              {hero.stats.map((stat: { num: string; label: string }, i: number) => (
+                <div key={i}>
+                  <div className="num">{stat.num}</div>
+                  <div className="lbl">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
           <div className="klc-hero-stack">
             <div className="klc-photo klc-photo--main">
-              <div className="klc-photo-figure">[ foto: anak & guru, suasana belajar ]</div>
+              {hero.photoUrl
+                ? <img src={hero.photoUrl} alt="Suasana belajar KLC" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '24px' }} />
+                : <div className="klc-photo-figure">[ foto: anak & guru, suasana belajar ]</div>
+              }
             </div>
             <div className="klc-photo klc-photo--badge">
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px' }}>
@@ -538,38 +703,19 @@ export default function LandingPage() {
           </div>
 
           <div className="klc-guru-grid">
-            <div className="klc-guru-card">
-              <div className="klc-guru-photo">
-                <span className="label">[ foto Bu Rini ]</span>
+            {teachers.map((t: { name: string; role: string; badge: string; photoUrl: string | null }, i: number) => (
+              <div className="klc-guru-card" key={i}>
+                <div className="klc-guru-photo">
+                  {t.photoUrl
+                    ? <img src={t.photoUrl} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                    : <span className="label">[ foto {t.name} ]</span>
+                  }
+                </div>
+                <h4>{t.name}</h4>
+                <div className="role">{t.role}</div>
+                <span className="pill">{t.badge}</span>
               </div>
-              <h4>Bu Rini Astuti</h4>
-              <div className="role">Guru AHE & ASE</div>
-              <span className="pill">7 tahun di KLC</span>
-            </div>
-            <div className="klc-guru-card">
-              <div className="klc-guru-photo" style={{ background: 'linear-gradient(135deg,#C2A079,#8A6743)' }}>
-                <span className="label">[ foto Pak Doni ]</span>
-              </div>
-              <h4>Pak Doni Pratama</h4>
-              <div className="role">Guru Matematika</div>
-              <span className="pill">Lulusan UPI</span>
-            </div>
-            <div className="klc-guru-card">
-              <div className="klc-guru-photo" style={{ background: 'linear-gradient(135deg,#DCB892,#A37F5C)' }}>
-                <span className="label">[ foto Bu Tia ]</span>
-              </div>
-              <h4>Bu Tia Maharani</h4>
-              <div className="role">Guru AHE Tingkat Lanjut</div>
-              <span className="pill">5 tahun di KLC</span>
-            </div>
-            <div className="klc-guru-card">
-              <div className="klc-guru-photo" style={{ background: 'linear-gradient(135deg,#B89B7E,#735540)' }}>
-                <span className="label">[ foto Ust. Ali ]</span>
-              </div>
-              <h4>Ust. Ali Mubarok</h4>
-              <div className="role">Guru Les Ngaji</div>
-              <span className="pill">Hafidz 30 juz</span>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -610,57 +756,20 @@ export default function LandingPage() {
           </div>
 
           <div className="klc-testi-grid">
-            <div className="klc-testi">
-              <div className="klc-testi-quote">"</div>
-              <div className="klc-stars">★★★★★</div>
-              <p className="klc-testi-text">
-                "Yang membuat saya tenang adalah laporan WA tiap minggu. Saya tahu Aira sedang di modul mana, di bab
-                mana, dan apa yang perlu dilatih di rumah. Tidak ada kejutan saat ujian sekolah."
-              </p>
-              <div className="klc-testi-author">
-                <div className="klc-testi-av">DH</div>
-                <div>
-                  <div className="klc-testi-name">Ibu Diah Hasanah</div>
-                  <div className="klc-testi-meta">Wali Aira · 2 tahun di KLC PWK</div>
+            {testimonials.map((t: { quote: string; authorName: string; authorMeta: string; initials: string }, i: number) => (
+              <div className="klc-testi" key={i}>
+                <div className="klc-testi-quote">"</div>
+                <div className="klc-stars">★★★★★</div>
+                <p className="klc-testi-text">{t.quote}</p>
+                <div className="klc-testi-author">
+                  <div className="klc-testi-av">{t.initials}</div>
+                  <div>
+                    <div className="klc-testi-name">{t.authorName}</div>
+                    <div className="klc-testi-meta">{t.authorMeta}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="klc-testi">
-              <div className="klc-testi-quote">"</div>
-              <div className="klc-stars">★★★★★</div>
-              <p className="klc-testi-text">
-                "Anak saya pindah dinas ke Bandung — di tempat lain artinya daftar ulang. Di KLC tinggal lapor
-                admin, tarif lama tetap, modul Bagas lanjut dari posisi terakhir. Sangat menghargai keluarga."
-              </p>
-              <div className="klc-testi-author">
-                <div className="klc-testi-av" style={{ background: 'linear-gradient(135deg,#B89B7E,#735540)' }}>
-                  SP
-                </div>
-                <div>
-                  <div className="klc-testi-name">Bapak Surya Prasetya</div>
-                  <div className="klc-testi-meta">Wali Bagas · pindah PWK → BDG</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="klc-testi">
-              <div className="klc-testi-quote">"</div>
-              <div className="klc-stars">★★★★★</div>
-              <p className="klc-testi-text">
-                "Hafidz dulu takut hitung. Sekarang dia minta sendiri ditambahin sesi karena ingin lulus modul.
-                Predikat "Memuaskan" jadi target dia. Mastery learning betul-betul mengubah motivasi anak."
-              </p>
-              <div className="klc-testi-author">
-                <div className="klc-testi-av" style={{ background: 'linear-gradient(135deg,#C99974,#8A6743)' }}>
-                  FM
-                </div>
-                <div>
-                  <div className="klc-testi-name">Ibu Fitri Maulida</div>
-                  <div className="klc-testi-meta">Wali Hafidz · 1 tahun di KLC BWS</div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -670,7 +779,7 @@ export default function LandingPage() {
         <div className="klc-container">
           <div className="klc-section-head">
             <div className="klc-section-eyebrow">Lokasi Cabang</div>
-            <h2>Empat cabang, satu standar mengajar</h2>
+            <h2>{toIdWord(branches.length)} cabang, satu standar mengajar</h2>
             <p className="klc-section-sub">
               Kurikulum, predikat, dan komitmen ke orang tua sama persis di setiap cabang. Pindah kota? Pindah
               cabang saja.
@@ -678,46 +787,32 @@ export default function LandingPage() {
           </div>
 
           <div className="klc-branch-grid">
-            <div className="klc-branch">
-              <span className="klc-branch-code">PWK</span>
-              <h4>Purwakarta</h4>
-              <p>Jl. Ipik Gandamanah No. 12, Purwakarta. Buka Senin–Sabtu, 09:00–19:00.</p>
-              <div className="meta">
-                <span>147 siswa aktif</span>
-                <span>•</span>
-                <span>4 ruang kelas</span>
-              </div>
-            </div>
-            <div className="klc-branch">
-              <span className="klc-branch-code">BDG</span>
-              <h4>Bandung</h4>
-              <p>Jl. Surya Sumantri No. 28, Sukajadi, Bandung. Buka Senin–Sabtu, 09:00–20:00.</p>
-              <div className="meta">
-                <span>312 siswa aktif</span>
-                <span>•</span>
-                <span>6 ruang kelas</span>
-              </div>
-            </div>
-            <div className="klc-branch">
-              <span className="klc-branch-code">JKT</span>
-              <h4>Jakarta</h4>
-              <p>Ruko Greenville Blok A2, Jakarta Barat. Buka Senin–Sabtu, 10:00–20:00.</p>
-              <div className="meta">
-                <span>485 siswa aktif</span>
-                <span>•</span>
-                <span>8 ruang kelas</span>
-              </div>
-            </div>
-            <div className="klc-branch">
-              <span className="klc-branch-code">BWS</span>
-              <h4>Banyuwangi</h4>
-              <p>Jl. Diponegoro No. 41, Banyuwangi. Buka Senin–Jumat & Minggu, 09:00–18:00.</p>
-              <div className="meta">
-                <span>89 siswa aktif</span>
-                <span>•</span>
-                <span>3 ruang kelas</span>
-              </div>
-            </div>
+            {branches.length > 0
+              ? branches.map((b) => (
+                  <div className="klc-branch" key={b.id}>
+                    <span className="klc-branch-code">{b.code}</span>
+                    <h4>{b.name}</h4>
+                    {b.address && <p>{b.address}</p>}
+                    <div className="meta">
+                      <span>{b.studentCount} siswa aktif</span>
+                      {b.phone && (
+                        <>
+                          <span>•</span>
+                          <span>{b.phone}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              : /* skeleton saat loading */
+                [1, 2, 3, 4].map((n) => (
+                  <div className="klc-branch" key={n} style={{ opacity: 0.4 }}>
+                    <span className="klc-branch-code">···</span>
+                    <h4 style={{ background: '#eee', height: 20, borderRadius: 6 }}></h4>
+                    <p style={{ background: '#eee', height: 14, borderRadius: 6, marginTop: 8 }}></p>
+                  </div>
+                ))
+            }
           </div>
         </div>
       </section>
@@ -748,34 +843,18 @@ export default function LandingPage() {
             </div>
 
             <div className="klc-tarif-grid">
-              <div className="klc-tarif-card">
-                <div className="name">AHE</div>
-                <div className="desc">12× sesi/bulan</div>
-                <div className="price">
-                  Rp 350<small>rb</small>
-                </div>
-              </div>
-              <div className="klc-tarif-card">
-                <div className="name">ASE</div>
-                <div className="desc">12× sesi/bulan</div>
-                <div className="price">
-                  Rp 350<small>rb</small>
-                </div>
-              </div>
-              <div className="klc-tarif-card">
-                <div className="name">Matematika</div>
-                <div className="desc">8× sesi/bulan</div>
-                <div className="price">
-                  Rp 320<small>rb</small>
-                </div>
-              </div>
-              <div className="klc-tarif-card">
-                <div className="name">Les Ngaji</div>
-                <div className="desc">8× sesi/bulan</div>
-                <div className="price">
-                  Rp 280<small>rb</small>
-                </div>
-              </div>
+              {sppRates.map((r) => {
+                const amountRb = Math.round(r.amount / 1000)
+                return (
+                  <div className="klc-tarif-card" key={r.id}>
+                    <div className="name">{subjectIcon(r.code)} {r.name}</div>
+                    <div className="desc">{r.sessionsPerMonth}× sesi/bulan</div>
+                    <div className="price">
+                      Rp {amountRb}<small>rb</small>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
 
             <div className="klc-tarif-lock">
@@ -798,13 +877,13 @@ export default function LandingPage() {
           </div>
 
           <div className="klc-faq">
-            {faqs.map((faq, i) => (
+            {faqs.map((faq: { question: string; answer: string }, i: number) => (
               <div key={i} className={`klc-faq-item ${openFaqIndex === i ? 'open' : ''}`}>
                 <div className="klc-faq-q" onClick={() => toggleFaq(i)}>
-                  {faq.q}
+                  {faq.question}
                   <span className="toggle">+</span>
                 </div>
-                <div className="klc-faq-a">{faq.a}</div>
+                <div className="klc-faq-a">{faq.answer}</div>
               </div>
             ))}
           </div>
@@ -812,7 +891,7 @@ export default function LandingPage() {
       </section>
 
       {/* ============== FINAL CTA ============== */}
-      <section className="klc-section" id="daftar" style={{ paddingTop: 0, paddingBottom: '96px' }}>
+      <section className="klc-section" style={{ paddingTop: 0, paddingBottom: '24px' }}>
         <div className="klc-finalcta">
           <h2>Coba dulu 1 sesi — gratis, tanpa kewajiban</h2>
           <p>
@@ -824,7 +903,7 @@ export default function LandingPage() {
               Daftar Coba Gratis →
             </a>
             <a
-              href="https://wa.me/628123445566?text=Halo%20KLC%20Bimbel%2C%20saya%20tertarik%20coba%20gratis"
+              href={`https://wa.me/${contact.whatsapp}?text=${contact.waMessage}`}
               target="_blank"
               rel="noopener noreferrer"
               className="klc-btn klc-btn--wa klc-btn--lg"
@@ -832,6 +911,173 @@ export default function LandingPage() {
             >
               Tanya via WhatsApp
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ============== FORM DAFTAR COBA GRATIS ============== */}
+      <section className="klc-section" id="daftar" style={{ paddingTop: '56px', paddingBottom: '96px' }}>
+        <div className="klc-container">
+          <div className="klc-section-head" style={{ marginBottom: '40px' }}>
+            <div className="klc-section-eyebrow">Daftar Sekarang</div>
+            <h2>Coba gratis 1 sesi — kami hubungi dalam 24 jam</h2>
+            <p className="klc-section-sub">
+              Isi form di bawah ini. Admin cabang terdekat akan menghubungi via WhatsApp untuk mengatur jadwal sesi pertama.
+            </p>
+          </div>
+
+          <div className="klc-register">
+            {submitSuccess ? (
+              <div className="klc-form-success">
+                <div className="klc-form-success-icon">✓</div>
+                <h3>Pendaftaran Berhasil!</h3>
+                <p>
+                  Terima kasih! Tim KLC Bimbel akan menghubungi Anda via WhatsApp dalam <strong>24 jam</strong> untuk
+                  mengatur jadwal sesi gratis pertama.
+                </p>
+                <p style={{ marginTop: '16px', fontSize: '14px', color: 'var(--klc-ink-3)' }}>
+                  Pertanyaan mendesak? Langsung chat kami di{' '}
+                  <a
+                    href={`https://wa.me/${contact.whatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--klc-orange-700)', fontWeight: 600 }}
+                  >
+                    WhatsApp: {contact.phone}
+                  </a>
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="klc-register-title">Formulir Pendaftaran Gratis</div>
+                <div className="klc-register-sub">
+                  Isi data anak & orang tua. Tidak ada biaya apapun untuk sesi pertama.
+                </div>
+
+                <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                  <div className="klc-form-grid">
+                    <div className="klc-form-group">
+                      <label htmlFor="childName">Nama Anak *</label>
+                      <input
+                        id="childName"
+                        type="text"
+                        placeholder="Contoh: Aira Putri"
+                        className={errors.childName ? 'error' : ''}
+                        {...register('childName')}
+                      />
+                      {errors.childName && <span className="klc-form-error">{errors.childName.message}</span>}
+                    </div>
+
+                    <div className="klc-form-group">
+                      <label htmlFor="parentName">Nama Orang Tua / Wali *</label>
+                      <input
+                        id="parentName"
+                        type="text"
+                        placeholder="Contoh: Ibu Diah"
+                        className={errors.parentName ? 'error' : ''}
+                        {...register('parentName')}
+                      />
+                      {errors.parentName && <span className="klc-form-error">{errors.parentName.message}</span>}
+                    </div>
+
+                    <div className="klc-form-group">
+                      <label htmlFor="phone">Nomor WhatsApp *</label>
+                      <input
+                        id="phone"
+                        type="tel"
+                        placeholder="08123456789"
+                        className={errors.phone ? 'error' : ''}
+                        {...register('phone')}
+                      />
+                      {errors.phone && <span className="klc-form-error">{errors.phone.message}</span>}
+                    </div>
+
+                    <div className="klc-form-group">
+                      <label htmlFor="grade">Kelas Anak Saat Ini *</label>
+                      <select
+                        id="grade"
+                        className={errors.grade ? 'error' : ''}
+                        {...register('grade')}
+                      >
+                        <option value="">— Pilih kelas —</option>
+                        {GRADE_OPTIONS.map((g) => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
+                      {errors.grade && <span className="klc-form-error">{errors.grade.message}</span>}
+                    </div>
+
+                    <div className="klc-form-group klc-form-full">
+                      <label>Mata Pelajaran yang Diminati *</label>
+                      <div className="klc-form-checks">
+                        {SUBJECT_OPTIONS.map((s) => (
+                          <label key={s.value} className="klc-form-check">
+                            <input
+                              type="checkbox"
+                              checked={selectedSubjects?.includes(s.value) ?? false}
+                              onChange={() => toggleSubject(s.value)}
+                            />
+                            {s.label}
+                          </label>
+                        ))}
+                      </div>
+                      {errors.subjects && <span className="klc-form-error">{errors.subjects.message}</span>}
+                    </div>
+
+                    <div className="klc-form-group">
+                      <label htmlFor="branchCode">Cabang Terdekat</label>
+                      <select id="branchCode" {...register('branchCode')}>
+                        <option value="">— Pilih cabang (opsional) —</option>
+                        {branches.map((b) => (
+                          <option key={b.code} value={b.code}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="klc-form-group">
+                      <label htmlFor="notes">Catatan Tambahan</label>
+                      <input
+                        id="notes"
+                        type="text"
+                        placeholder="Opsional — misal: anak belum lancar perkalian"
+                        {...register('notes')}
+                      />
+                    </div>
+                  </div>
+
+                  {submitError && (
+                    <div
+                      style={{
+                        marginTop: '16px',
+                        padding: '14px 16px',
+                        background: 'var(--klc-rose-50)',
+                        border: '1px solid var(--klc-rose)',
+                        borderRadius: '10px',
+                        fontSize: '14px',
+                        color: 'var(--klc-rose)',
+                      }}
+                    >
+                      {submitError}
+                    </div>
+                  )}
+
+                  <button type="submit" className="klc-form-submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Mengirim...' : 'Daftar Coba Gratis →'}
+                  </button>
+
+                  <p
+                    style={{
+                      marginTop: '14px',
+                      fontSize: '13px',
+                      color: 'var(--klc-ink-3)',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Tidak ada biaya. Admin kami akan menghubungi via WhatsApp dalam 24 jam.
+                  </p>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -898,13 +1144,13 @@ export default function LandingPage() {
               <h5>Hubungi Kami</h5>
               <ul>
                 <li>
-                  <a href="https://wa.me/628123445566" target="_blank" rel="noopener noreferrer">WhatsApp: 0812-3344-5566</a>
+                  <a href={`https://wa.me/${contact.whatsapp}`} target="_blank" rel="noopener noreferrer">WhatsApp: {contact.phone}</a>
                 </li>
                 <li>
-                  <a href="mailto:halo@klcbimbel.id">halo@klcbimbel.id</a>
+                  <a href={`mailto:${contact.email}`}>{contact.email}</a>
                 </li>
                 <li>
-                  <a href="https://instagram.com/klcbimbel" target="_blank" rel="noopener noreferrer">Instagram @klcbimbel</a>
+                  <a href={`https://instagram.com/${contact.instagram}`} target="_blank" rel="noopener noreferrer">Instagram @{contact.instagram}</a>
                 </li>
                 <li>
                   <a href="#daftar">Karir di KLC</a>
