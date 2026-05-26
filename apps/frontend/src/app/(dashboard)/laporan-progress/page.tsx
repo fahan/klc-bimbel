@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { progressReportApi, studentApi } from '@/lib/api/endpoints'
 import {
@@ -9,8 +9,6 @@ import {
   MessageCircle,
   Copy,
   X,
-  AlertCircle,
-  Clock,
   CheckCircle,
   RefreshCw,
   Trash2,
@@ -40,10 +38,23 @@ export default function LaporanProgressPage() {
 
   // Form state
   const [formStudentId, setFormStudentId] = useState('')
+  const [formStudentName, setFormStudentName] = useState('')
+  const [formStudentSubjects, setFormStudentSubjects] = useState<any[]>([])
+  const [formStudentSearch, setFormStudentSearch] = useState('')
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState('')
+  const [formStudentDropdownOpen, setFormStudentDropdownOpen] = useState(false)
   const [formSubjectIds, setFormSubjectIds] = useState<string[]>([])
   const [formDuration, setFormDuration] = useState<number>(30)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
+
+  // Debounce student search input (300ms)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedStudentSearch(formStudentSearch), 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [formStudentSearch])
 
   const { data: linksData, isLoading, refetch } = useQuery({
     queryKey: ['progress-report-links', filterStatus],
@@ -55,17 +66,15 @@ export default function LaporanProgressPage() {
     queryFn: () => progressReportApi.getMetrics(),
   })
 
-  const { data: studentsData } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => studentApi.getAll(),
+  const { data: studentsData, isFetching: studentsLoading } = useQuery({
+    queryKey: ['students-search', debouncedStudentSearch],
+    queryFn: () => studentApi.getAll(1, 20, undefined, debouncedStudentSearch || undefined),
+    enabled: formStudentDropdownOpen,
   })
 
   const links = linksData?.data?.data || []
   const metrics = metricsData?.data?.data
-  const students = studentsData?.data?.data || []
-
-  const selectedStudent = students.find((s: any) => s.id === formStudentId)
-  const studentSubjects = selectedStudent?.subjects || []
+  const students: any[] = studentsData?.data?.data || []
 
   // Filter links by search term
   const filteredLinks = useMemo(
@@ -101,6 +110,8 @@ export default function LaporanProgressPage() {
         durationDays: formDuration,
       })
       setFormStudentId('')
+      setFormStudentName('')
+      setFormStudentSubjects([])
       setFormSubjectIds([])
       refetch()
     } catch (err: any) {
@@ -378,40 +389,88 @@ ${expiryText} Hubungi kami jika ada pertanyaan.`
             </h2>
 
             {/* Student */}
-            <div className="mb-4">
+            <div className="mb-4 relative">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Pilih Siswa <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formStudentId}
-                onChange={(e) => {
-                  setFormStudentId(e.target.value)
-                  setFormSubjectIds([])
-                }}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- Pilih siswa --</option>
-                {students.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              {formStudentId ? (
+                <div className="flex items-center gap-2 px-3 py-2 border border-blue-300 bg-blue-50 rounded-lg">
+                  <span className="text-sm font-medium text-blue-900 flex-1">{formStudentName}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormStudentId('')
+                      setFormStudentName('')
+                      setFormStudentSubjects([])
+                      setFormStudentSearch('')
+                      setFormSubjectIds([])
+                    }}
+                    className="text-blue-400 hover:text-blue-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama siswa..."
+                    value={formStudentSearch}
+                    onChange={(e) => {
+                      setFormStudentSearch(e.target.value)
+                      setFormStudentDropdownOpen(true)
+                    }}
+                    onFocus={() => setFormStudentDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setFormStudentDropdownOpen(false), 150)}
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {formStudentDropdownOpen && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {studentsLoading ? (
+                        <p className="text-xs text-gray-400 px-3 py-2 italic">Mencari...</p>
+                      ) : students.length === 0 ? (
+                        <p className="text-xs text-gray-500 px-3 py-2 italic">
+                          {debouncedStudentSearch ? 'Siswa tidak ditemukan' : 'Ketik untuk mencari siswa'}
+                        </p>
+                      ) : (
+                        students.map((s: any) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setFormStudentId(s.id)
+                              setFormStudentName(s.name)
+                              setFormStudentSubjects(s.subjects || [])
+                              setFormStudentSearch('')
+                              setFormSubjectIds([])
+                              setFormStudentDropdownOpen(false)
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-blue-50 transition"
+                          >
+                            {s.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Subjects checklist */}
-            {selectedStudent && (
+            {formStudentId && (
               <div className="mb-4">
                 <label className="block text-xs font-medium text-gray-700 mb-2">
                   Mata Pelajaran yang Ditampilkan <span className="text-red-500">*</span>
                 </label>
-                {studentSubjects.length === 0 ? (
+                {formStudentSubjects.length === 0 ? (
                   <p className="text-xs text-gray-500 italic p-2 bg-gray-50 rounded">
                     Siswa belum terdaftar di mapel manapun
                   </p>
                 ) : (
                   <div className="space-y-1.5">
-                    {studentSubjects.map((s: any) => {
+                    {formStudentSubjects.map((s: any) => {
                       const isChecked = formSubjectIds.includes(s.subjectId)
                       return (
                         <label
