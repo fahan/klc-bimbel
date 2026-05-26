@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "landing_content" (
+CREATE TABLE IF NOT EXISTS "landing_content" (
     "id"          TEXT NOT NULL DEFAULT gen_random_uuid()::text,
     "section"     TEXT NOT NULL,
     "content"     JSONB NOT NULL DEFAULT '{}',

@@ -1,8 +1,12 @@
--- CreateEnum
-CREATE TYPE "TrialRegistrationStatus" AS ENUM ('NEW', 'CONTACTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED');
+-- CreateEnum (safe: skip if already exists)
+DO $$ BEGIN
+  CREATE TYPE "TrialRegistrationStatus" AS ENUM ('NEW', 'CONTACTED', 'SCHEDULED', 'COMPLETED', 'CANCELLED');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- CreateTable
-CREATE TABLE "free_trial_registrations" (
+CREATE TABLE IF NOT EXISTS "free_trial_registrations" (
     "id" TEXT NOT NULL DEFAULT gen_random_uuid()::text,
     "childName" TEXT NOT NULL,
     "parentName" TEXT NOT NULL,
