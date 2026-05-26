@@ -100,40 +100,51 @@ export class LandingService {
   // ─── Public SPP Rates ────────────────────────────────────────────────────
 
   async getPublicSppRates() {
-    const today = new Date()
+    // Use raw SQL to avoid Prisma client cache issues with new columns
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string
+        name: string
+        code: string
+        sessions_per_month: number
+        amount: string | null
+        rate_id: string | null
+      }>
+    >`
+      SELECT
+        s.id,
+        s.name,
+        s.code,
+        COALESCE(s.sessions_per_month, 8) AS sessions_per_month,
+        r.amount,
+        r.id AS rate_id
+      FROM subjects s
+      LEFT JOIN LATERAL (
+        SELECT id, amount
+        FROM spp_rates
+        WHERE "subjectId" = s.id
+          AND type = 'REGULAR'
+          AND "effectiveFrom" <= NOW()
+          AND ("effectiveUntil" IS NULL OR "effectiveUntil" >= NOW())
+        ORDER BY "effectiveFrom" DESC
+        LIMIT 1
+      ) r ON true
+      WHERE s."isActive" = true
+      ORDER BY s."createdAt" ASC
+    `
 
-    // Get all active subjects
-    const subjects = await this.prisma.subject.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    const result = rows
+      .filter((r) => r.amount !== null)
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        code: r.code,
+        sessionsPerMonth: Number(r.sessions_per_month),
+        amount: Number(r.amount),
+        rateId: r.rate_id,
+      }))
 
-    // For each subject, find the current active REGULAR rate
-    const result = await Promise.all(
-      subjects.map(async (s) => {
-        const rate = await this.prisma.sppRate.findFirst({
-          where: {
-            subjectId: s.id,
-            type: 'REGULAR',
-            effectiveFrom: { lte: today },
-            OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: today } }],
-          },
-          orderBy: { effectiveFrom: 'desc' },
-        })
-
-        return {
-          id: s.id,
-          name: s.name,
-          code: s.code,
-          sessionsPerMonth: s.sessionsPerMonth,
-          amount: rate ? Number(rate.amount) : null,
-          rateId: rate?.id ?? null,
-        }
-      }),
-    )
-
-    // Only return subjects that have a current rate
-    return { success: true, data: result.filter((r) => r.amount !== null) }
+    return { success: true, data: result }
   }
 
   // ─── Public Branch List ───────────────────────────────────────────────────

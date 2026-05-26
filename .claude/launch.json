@@ -4,16 +4,8 @@
     {
       "name": "frontend",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-F", "apps-frontend", "dev"],
-      "port": 3000,
-      "autoPort": true
-    },
-    {
-      "name": "backend",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["-F", "apps-backend", "start:dev"],
-      "port": 3001,
-      "autoPort": true
+      "runtimeArgs": ["-F", "apps-frontend", "exec", "next", "dev", "-p", "3002"],
+      "port": 3002
     }
   ]
 }
