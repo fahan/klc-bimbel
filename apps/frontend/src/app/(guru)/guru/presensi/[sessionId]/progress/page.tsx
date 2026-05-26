@@ -75,7 +75,7 @@ export default function ProgressInputPage() {
   // Get curriculum modules for MODULE_BASED subjects
   const { data: modulesData } = useQuery({
     queryKey: ['curriculum-modules', session?.subjectId],
-    queryFn: () => curriculumModuleApi.getAll(session?.subjectId),
+    queryFn: () => curriculumModuleApi.getBySubject(session?.subjectId),
     enabled: !!session?.subjectId && session?.subjectTrackingType === 'MODULE_BASED',
   })
 

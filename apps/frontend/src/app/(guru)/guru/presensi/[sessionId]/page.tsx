@@ -92,6 +92,12 @@ export default function PresensiDetailPage() {
   }
 
   const handleSubmit = async () => {
+    // If attendance already recorded, skip submit and go directly to progress
+    if (existingLog?.id) {
+      router.push(`/guru/presensi/${sessionId}/progress?sessionLogId=${existingLog.id}`)
+      return
+    }
+
     if (Object.keys(attendances).length === 0) {
       setError('Pilih status presensi untuk minimal satu siswa')
       return
@@ -123,10 +129,9 @@ export default function PresensiDetailPage() {
       const sessionLogId = result.data.data.id
       const sessionLogData = result.data.data
 
-      // Cache the session log data for progress page
+      // Cache the session log data for progress page (match axios response shape)
       queryClient.setQueryData(['session-log', sessionId, today], {
-        success: true,
-        data: sessionLogData,
+        data: { success: true, data: sessionLogData },
       })
 
       // Invalidate today sessions cache so list updates with new attendance status
