@@ -64,14 +64,7 @@ const GRADE_OPTIONS = [
   'Kelas 12 SMA',
 ]
 
-const SUBJECT_OPTIONS = [
-  { value: 'AHE', label: '🧮 AHE — Aritmatika' },
-  { value: 'ASE', label: '📐 ASE — Aljabar' },
-  { value: 'Matematika', label: '📊 Matematika' },
-  { value: 'Les Ngaji', label: '📖 Les Ngaji' },
-]
-
-// BRANCH_OPTIONS now built dynamically from branchesData inside component
+// SUBJECT_OPTIONS and BRANCH_OPTIONS are now built dynamically inside component
 
 const ID_NUMBERS: Record<number, string> = {
   1: 'Satu', 2: 'Dua', 3: 'Tiga', 4: 'Empat', 5: 'Lima',
@@ -149,6 +142,12 @@ export default function LandingPage() {
   }
   const subjectIcon = (code: string) =>
     SUBJECT_ICONS[code] ?? SUBJECT_ICONS[Object.keys(SUBJECT_ICONS).find(k => code.toUpperCase().includes(k)) ?? ''] ?? '📚'
+
+  // Dynamic subject options for the registration form — derived from sppRates
+  const subjectOptions = sppRates.map((r) => ({
+    value: r.name,
+    label: `${subjectIcon(r.code)} ${r.name}`,
+  }))
 
   const { data: branchesData } = useQuery({
     queryKey: ['landing-branches-public'],
@@ -1010,16 +1009,20 @@ export default function LandingPage() {
                     <div className="klc-form-group klc-form-full">
                       <label>Mata Pelajaran yang Diminati *</label>
                       <div className="klc-form-checks">
-                        {SUBJECT_OPTIONS.map((s) => (
-                          <label key={s.value} className="klc-form-check">
-                            <input
-                              type="checkbox"
-                              checked={selectedSubjects?.includes(s.value) ?? false}
-                              onChange={() => toggleSubject(s.value)}
-                            />
-                            {s.label}
-                          </label>
-                        ))}
+                        {subjectOptions.length === 0 ? (
+                          <span style={{ color: '#999', fontSize: '14px' }}>Memuat mata pelajaran...</span>
+                        ) : (
+                          subjectOptions.map((s) => (
+                            <label key={s.value} className="klc-form-check">
+                              <input
+                                type="checkbox"
+                                checked={selectedSubjects?.includes(s.value) ?? false}
+                                onChange={() => toggleSubject(s.value)}
+                              />
+                              {s.label}
+                            </label>
+                          ))
+                        )}
                       </div>
                       {errors.subjects && <span className="klc-form-error">{errors.subjects.message}</span>}
                     </div>
