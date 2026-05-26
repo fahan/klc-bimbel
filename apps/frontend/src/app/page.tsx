@@ -146,7 +146,7 @@ export default function LandingPage() {
   // Dynamic subject options for the registration form — derived from sppRates
   const subjectOptions = sppRates.map((r) => ({
     value: r.name,
-    label: `${subjectIcon(r.code)} ${r.name}`,
+    label: r.name,
   }))
 
   const { data: branchesData } = useQuery({
