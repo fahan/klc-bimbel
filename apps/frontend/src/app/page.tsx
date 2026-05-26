@@ -1019,7 +1019,7 @@ export default function LandingPage() {
                                 checked={selectedSubjects?.includes(s.value) ?? false}
                                 onChange={() => toggleSubject(s.value)}
                               />
-                              {s.label}
+                              <span>{s.label}</span>
                             </label>
                           ))
                         )}

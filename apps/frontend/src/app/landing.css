@@ -624,28 +624,36 @@
 .klc-form-error { font-size: 12px; color: var(--klc-rose); margin-top: 2px; }
 .klc-form-checks {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-top: 6px;
 }
 .klc-form-check {
   display: flex;
-  align-items: flex-start;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 10px 12px;
   border: 1.5px solid var(--klc-line-strong);
   border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.35;
   color: var(--klc-ink-2);
   transition: border-color .15s, background .15s;
   user-select: none;
 }
 .klc-form-check input[type="checkbox"] {
   flex-shrink: 0;
-  margin-top: 2px;
+  width: 16px;
+  height: 16px;
   accent-color: var(--klc-orange);
+  cursor: pointer;
+}
+.klc-form-check span {
+  flex: 1;
+  min-width: 0;
 }
 .klc-form-check:has(input:checked) {
   border-color: var(--klc-orange);
@@ -837,7 +845,7 @@
   .klc-register { padding: 32px 24px; border-radius: 20px; }
   .klc-form-grid { grid-template-columns: 1fr; }
   .klc-form-full { grid-column: 1; }
-  .klc-form-checks { grid-template-columns: 1fr 1fr; }
+  .klc-form-checks { grid-template-columns: repeat(2, 1fr); }
 
   /* Footer */
   .klc-footer-grid { grid-template-columns: 1fr 1fr; gap: 28px; }
