@@ -144,7 +144,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Test Credentials */}
+        {/* Test Credentials 
         <div className="mt-6 pt-6 border-t border-gray-200">
           <p className="text-sm text-gray-600 mb-2">Test Credentials:</p>
           <div className="bg-gray-50 p-3 rounded text-sm space-y-1">
@@ -158,7 +158,7 @@ export default function LoginPage() {
               <strong>Guru:</strong> guru@bimbel.com / password
             </p>
           </div>
-        </div>
+        </div>*/}
       </div>
     </div>
   )
