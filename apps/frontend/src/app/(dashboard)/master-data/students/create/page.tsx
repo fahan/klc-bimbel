@@ -15,9 +15,13 @@ import EnrollmentSummary from '@/components/enrollment/EnrollmentSummary'
 
 interface StudentData {
   name: string
+  sureName: string | null
   classLevel: string | null
+  birthDate: string | null
+  birthPlace: string | null
   parentName: string | null
   parentPhone: string | null
+  address: string | null
   branchId: string
   enrolledAt: string | null
 }
@@ -94,9 +98,13 @@ export default function StudentEnrollmentPage() {
       // Create student first
       const studentResponse = await studentApi.create({
         name: studentData.name,
+        sureName: studentData.sureName || null,
         classLevel: studentData.classLevel || null,
+        birthDate: studentData.birthDate || null,
+        birthPlace: studentData.birthPlace || null,
         parentName: studentData.parentName || null,
         parentPhone: studentData.parentPhone || null,
+        address: studentData.address || null,
         branchId: studentData.branchId,
       })
 

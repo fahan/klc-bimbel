@@ -15,6 +15,7 @@ import {
   Phone,
   Building,
   Calendar,
+  MapPin,
   Trash2,
   Edit3,
   Plus,
@@ -26,9 +27,15 @@ import EditSubjectModal from '@/components/enrollment/EditSubjectModal'
 
 const studentSchema = z.object({
   name: z.string().min(3, 'Nama minimal 3 karakter').max(100, 'Nama maksimal 100 karakter'),
+  sureName: z.string().optional(),
   classLevel: z.string().optional(),
+  birthDate: z.string().optional(),
+  birthPlace: z.string().optional(),
   parentName: z.string().optional(),
   parentPhone: z.string().optional(),
+  address: z.string().optional(),
+  endDate: z.string().optional(),
+  isActive: z.boolean().optional(),
 })
 
 type StudentFormData = z.infer<typeof studentSchema>
@@ -69,16 +76,20 @@ export default function StudentDetailPage() {
     resolver: zodResolver(studentSchema),
   })
 
-  // Pre-fill form and set page title when student data loads
   useEffect(() => {
     if (student) {
       reset({
         name: student.name || '',
+        sureName: student.sureName || '',
         classLevel: student.classLevel || '',
+        birthDate: student.birthDate ? student.birthDate.split('T')[0] : '',
+        birthPlace: student.birthPlace || '',
         parentName: student.parentName || '',
         parentPhone: student.parentPhone || '',
+        address: student.address || '',
+        endDate: student.endDate ? student.endDate.split('T')[0] : '',
+        isActive: student.isActive,
       })
-      // Update browser tab title
       document.title = `${student.name} - Detail Siswa`
     }
   }, [student, reset])
@@ -90,16 +101,21 @@ export default function StudentDetailPage() {
 
       await studentApi.update(studentId, {
         name: data.name,
+        sureName: data.sureName || null,
         classLevel: data.classLevel || null,
+        birthDate: data.birthDate || null,
+        birthPlace: data.birthPlace || null,
         parentName: data.parentName || null,
         parentPhone: data.parentPhone || null,
+        address: data.address || null,
+        endDate: data.endDate || null,
+        isActive: data.isActive,
       })
 
       await queryClient.invalidateQueries({ queryKey: ['students'] })
       setSuccess('Data siswa berhasil diperbarui')
       setIsEditing(false)
       refetch()
-
       setTimeout(() => setSuccess(''), 3000)
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal memperbarui data siswa')
@@ -125,9 +141,15 @@ export default function StudentDetailPage() {
     if (student) {
       reset({
         name: student.name || '',
+        sureName: student.sureName || '',
         classLevel: student.classLevel || '',
+        birthDate: student.birthDate ? student.birthDate.split('T')[0] : '',
+        birthPlace: student.birthPlace || '',
         parentName: student.parentName || '',
         parentPhone: student.parentPhone || '',
+        address: student.address || '',
+        endDate: student.endDate ? student.endDate.split('T')[0] : '',
+        isActive: student.isActive,
       })
     }
     setIsEditing(false)
@@ -153,6 +175,11 @@ export default function StudentDetailPage() {
     (sum: number, s: any) => sum + parseFloat(s.sppAmount || '0'),
     0,
   ) || 0
+
+  const inputClass = (hasError?: boolean) =>
+    `w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+      hasError ? 'border-red-500' : 'border-gray-300'
+    } ${!isEditing ? 'bg-gray-50 cursor-not-allowed text-gray-600' : 'bg-white'}`
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -197,7 +224,7 @@ export default function StudentDetailPage() {
       {/* Student Header */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <div className="flex items-start gap-4">
-          <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-2xl">
+          <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-2xl shrink-0">
             {student.name
               .split(' ')
               .map((n: string) => n[0])
@@ -205,27 +232,45 @@ export default function StudentDetailPage() {
               .slice(0, 2)
               .toUpperCase()}
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-1">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-900">{student.name}</h1>
+              {student.sureName && (
+                <span className="text-sm text-gray-500 font-normal">({student.sureName})</span>
+              )}
               <StatusBadge status={student.isActive ? 'active' : 'inactive'} />
             </div>
             <p className="text-sm text-gray-500">ID: {student.id}</p>
             <div className="flex items-center gap-4 mt-3 text-sm text-gray-600 flex-wrap">
               <div className="flex items-center gap-2">
-                <Building className="w-4 h-4 text-gray-400" />
+                <Building className="w-4 h-4 text-gray-400 shrink-0" />
                 {branchName}
               </div>
               {student.classLevel && (
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-gray-400" />
+                  <User className="w-4 h-4 text-gray-400 shrink-0" />
                   {student.classLevel}
+                </div>
+              )}
+              {student.birthDate && (
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                  {student.birthPlace ? `${student.birthPlace}, ` : ''}
+                  {new Date(student.birthDate).toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'long', year: 'numeric',
+                  })}
                 </div>
               )}
               {student.parentPhone && (
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-gray-400" />
+                  <Phone className="w-4 h-4 text-gray-400 shrink-0" />
                   {student.parentPhone}
+                </div>
+              )}
+              {student.address && (
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                  <span className="truncate max-w-xs">{student.address}</span>
                 </div>
               )}
             </div>
@@ -268,135 +313,156 @@ export default function StudentDetailPage() {
               <p className="text-sm text-gray-600">Bergabung</p>
               <p className="text-sm font-bold text-gray-900">
                 {new Date(student.registeredAt).toLocaleDateString('id-ID', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
+                  day: 'numeric', month: 'long', year: 'numeric',
                 })}
               </p>
+              {student.endDate && (
+                <p className="text-xs text-red-500 mt-0.5">
+                  Keluar: {new Date(student.endDate).toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'short', year: 'numeric',
+                  })}
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Success Message */}
+      {/* Success / Error */}
       {success && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
           <div className="text-green-600">✓</div>
           <p className="text-sm font-medium text-green-900">{success}</p>
         </div>
       )}
-
-      {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Form (or Read View) */}
+      {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Personal Info Card */}
+
+        {/* Informasi Pribadi */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-blue-600" />
             Informasi Pribadi
           </h2>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Name */}
+
+            {/* Nama Lengkap */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nama Lengkap <span className="text-red-500">*</span>
               </label>
-              <input
-                id="name"
-                type="text"
-                {...register('name')}
-                disabled={!isEditing || isLoading}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.name ? 'border-red-500' : 'border-gray-300'
-                } ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              />
+              <input type="text" {...register('name')} disabled={!isEditing || isLoading}
+                className={inputClass(!!errors.name)} />
               {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
             </div>
 
-            {/* Class Level */}
+            {/* Nama Panggilan */}
             <div>
-              <label htmlFor="classLevel" className="block text-sm font-medium text-gray-700 mb-1">
-                Kelas
-              </label>
-              <input
-                id="classLevel"
-                type="text"
-                placeholder="Contoh: 10 SMA"
-                {...register('classLevel')}
-                disabled={!isEditing || isLoading}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.classLevel ? 'border-red-500' : 'border-gray-300'
-                } ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              />
-              {errors.classLevel && (
-                <p className="text-red-500 text-xs mt-1">{errors.classLevel.message}</p>
-              )}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nama Panggilan</label>
+              <input type="text" {...register('sureName')} disabled={!isEditing || isLoading}
+                placeholder="Nama panggilan sehari-hari"
+                className={inputClass()} />
             </div>
 
-            {/* Parent Name */}
+            {/* Tempat Lahir */}
             <div>
-              <label htmlFor="parentName" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Orang Tua
-              </label>
-              <input
-                id="parentName"
-                type="text"
-                placeholder="Contoh: Ibu Sarah"
-                {...register('parentName')}
-                disabled={!isEditing || isLoading}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.parentName ? 'border-red-500' : 'border-gray-300'
-                } ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              />
-              {errors.parentName && (
-                <p className="text-red-500 text-xs mt-1">{errors.parentName.message}</p>
-              )}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tempat Lahir</label>
+              <input type="text" {...register('birthPlace')} disabled={!isEditing || isLoading}
+                placeholder="Misal: Brebes"
+                className={inputClass()} />
             </div>
 
-            {/* Parent Phone */}
+            {/* Tanggal Lahir */}
             <div>
-              <label htmlFor="parentPhone" className="block text-sm font-medium text-gray-700 mb-1">
-                No. HP Orang Tua
-              </label>
-              <input
-                id="parentPhone"
-                type="tel"
-                placeholder="081234567890"
-                {...register('parentPhone')}
-                disabled={!isEditing || isLoading}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.parentPhone ? 'border-red-500' : 'border-gray-300'
-                } ${!isEditing ? 'bg-gray-50 cursor-not-allowed' : ''}`}
-              />
-              {errors.parentPhone && (
-                <p className="text-red-500 text-xs mt-1">{errors.parentPhone.message}</p>
-              )}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+              <input type="date" {...register('birthDate')} disabled={!isEditing || isLoading}
+                className={inputClass()} />
             </div>
 
-            {/* Branch (read-only) */}
-            <div className="md:col-span-2">
+            {/* Kelas */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+              <input type="text" {...register('classLevel')} disabled={!isEditing || isLoading}
+                placeholder="Misal: 3 SD"
+                className={inputClass()} />
+            </div>
+
+            {/* Cabang (read-only) */}
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cabang</label>
-              <input
-                type="text"
-                value={branchName}
-                disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed text-gray-600"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Cabang tidak bisa diubah dari halaman ini. Gunakan fitur transfer cabang jika perlu.
-              </p>
+              <input type="text" value={branchName} disabled
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed text-gray-600" />
+            </div>
+
+            {/* Alamat */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+              <textarea {...register('address')} disabled={!isEditing || isLoading} rows={2}
+                placeholder="Alamat lengkap siswa"
+                className={`${inputClass()} resize-none`} />
             </div>
           </div>
         </div>
 
-        {/* Save Button (only when editing) */}
+        {/* Informasi Orang Tua */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Phone className="w-5 h-5 text-blue-600" />
+            Informasi Orang Tua
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nama Orang Tua</label>
+              <input type="text" {...register('parentName')} disabled={!isEditing || isLoading}
+                placeholder="Nama orang tua / wali"
+                className={inputClass()} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">No. HP Orang Tua</label>
+              <input type="tel" {...register('parentPhone')} disabled={!isEditing || isLoading}
+                placeholder="081234567890"
+                className={inputClass()} />
+            </div>
+          </div>
+        </div>
+
+        {/* Status Keanggotaan */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-blue-600" />
+            Status Keanggotaan
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Keluar</label>
+              <input type="date" {...register('endDate')} disabled={!isEditing || isLoading}
+                className={inputClass()} />
+              <p className="text-xs text-gray-400 mt-1">Isi jika siswa sudah tidak aktif bimbel</p>
+            </div>
+            {isEditing && (
+              <div className="flex items-center gap-3 pt-6">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  {...register('isActive')}
+                  disabled={isLoading}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
+                  Siswa Aktif
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Save Button */}
         {isEditing && (
           <div className="flex gap-4">
             <button
@@ -417,7 +483,7 @@ export default function StudentDetailPage() {
         )}
       </form>
 
-      {/* Enrolled Subjects with Management */}
+      {/* Enrolled Subjects */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -472,8 +538,7 @@ export default function StudentDetailPage() {
                   <div className="text-right space-y-2">
                     <div>
                       <p className="font-semibold text-blue-600">
-                        Rp{' '}
-                        {parseFloat(subject.sppAmount || '0').toLocaleString('id-ID')}
+                        Rp {parseFloat(subject.sppAmount || '0').toLocaleString('id-ID')}
                       </p>
                       <p className="text-xs text-gray-500">per bulan</p>
                     </div>
@@ -488,9 +553,7 @@ export default function StudentDetailPage() {
                       <button
                         onClick={() => {
                           if (confirm(`Yakin ingin menghapus ${subject.subjectName}?`)) {
-                            studentApi.removeSubject(studentId, subject.subjectId).then(() => {
-                              refetch()
-                            })
+                            studentApi.removeSubject(studentId, subject.subjectId).then(() => refetch())
                           }
                         }}
                         className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-medium transition"
@@ -507,19 +570,15 @@ export default function StudentDetailPage() {
         )}
       </div>
 
-      {/* Add Subject Modal */}
       {showAddSubjectModal && (
         <AddSubjectModal
           studentId={studentId}
           enrolledSubjectIds={student?.subjects?.map((s: any) => s.subjectId) || []}
           onClose={() => setShowAddSubjectModal(false)}
-          onSuccess={() => {
-            refetch()
-          }}
+          onSuccess={() => refetch()}
         />
       )}
 
-      {/* Edit Subject Modal */}
       {editingSubjectId && (
         <EditSubjectModal
           studentId={studentId}

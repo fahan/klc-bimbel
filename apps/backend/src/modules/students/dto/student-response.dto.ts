@@ -34,7 +34,16 @@ export class StudentDto {
   name!: string
 
   @ApiProperty({ required: false })
+  sureName?: string
+
+  @ApiProperty({ required: false })
   classLevel?: string
+
+  @ApiProperty({ required: false })
+  birthDate?: string
+
+  @ApiProperty({ required: false })
+  birthPlace?: string
 
   @ApiProperty({ required: false })
   parentName?: string
@@ -42,8 +51,14 @@ export class StudentDto {
   @ApiProperty({ required: false })
   parentPhone?: string
 
+  @ApiProperty({ required: false })
+  address?: string
+
   @ApiProperty()
   registeredAt!: string
+
+  @ApiProperty({ required: false })
+  endDate?: string
 
   @ApiProperty()
   isActive!: boolean

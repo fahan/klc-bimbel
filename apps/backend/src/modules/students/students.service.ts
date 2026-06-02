@@ -96,9 +96,13 @@ export class StudentsService {
     const student = await this.prisma.student.create({
       data: {
         name: createStudentDto.name,
+        sureName: createStudentDto.sureName || null,
         classLevel: createStudentDto.classLevel || null,
+        birthDate: createStudentDto.birthDate ? new Date(createStudentDto.birthDate) : null,
+        birthPlace: createStudentDto.birthPlace || null,
         parentName: createStudentDto.parentName || null,
         parentPhone: createStudentDto.parentPhone || null,
+        address: createStudentDto.address || null,
         branchId: createStudentDto.branchId,
         registeredAt: new Date(),
         isActive: true,
@@ -132,10 +136,16 @@ export class StudentsService {
     const updated = await this.prisma.student.update({
       where: { id },
       data: {
-        name: updateStudentDto.name || student.name,
-        classLevel: updateStudentDto.classLevel !== undefined ? updateStudentDto.classLevel : student.classLevel,
-        parentName: updateStudentDto.parentName !== undefined ? updateStudentDto.parentName : student.parentName,
-        parentPhone: updateStudentDto.parentPhone !== undefined ? updateStudentDto.parentPhone : student.parentPhone,
+        ...(updateStudentDto.name && { name: updateStudentDto.name }),
+        ...(updateStudentDto.sureName !== undefined && { sureName: updateStudentDto.sureName }),
+        ...(updateStudentDto.classLevel !== undefined && { classLevel: updateStudentDto.classLevel }),
+        ...(updateStudentDto.birthDate !== undefined && { birthDate: updateStudentDto.birthDate ? new Date(updateStudentDto.birthDate) : null }),
+        ...(updateStudentDto.birthPlace !== undefined && { birthPlace: updateStudentDto.birthPlace }),
+        ...(updateStudentDto.parentName !== undefined && { parentName: updateStudentDto.parentName }),
+        ...(updateStudentDto.parentPhone !== undefined && { parentPhone: updateStudentDto.parentPhone }),
+        ...(updateStudentDto.address !== undefined && { address: updateStudentDto.address }),
+        ...(updateStudentDto.endDate !== undefined && { endDate: updateStudentDto.endDate ? new Date(updateStudentDto.endDate) : null }),
+        ...(updateStudentDto.isActive !== undefined && { isActive: updateStudentDto.isActive }),
       },
       include: {
         studentSubjects: {
@@ -718,10 +728,15 @@ export class StudentsService {
       id: student.id,
       branchId: student.branchId,
       name: student.name,
+      sureName: student.sureName,
       classLevel: student.classLevel,
+      birthDate: student.birthDate ? student.birthDate.toISOString().split('T')[0] : null,
+      birthPlace: student.birthPlace,
       parentName: student.parentName,
       parentPhone: student.parentPhone,
+      address: student.address,
       registeredAt: student.registeredAt.toISOString(),
+      endDate: student.endDate ? student.endDate.toISOString() : null,
       isActive: student.isActive,
       createdAt: student.createdAt.toISOString(),
       subjects: student.studentSubjects?.map((ss: any) => ({

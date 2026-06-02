@@ -174,10 +174,22 @@ export default function StudentsListPage() {
                     <tr key={student.id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-4">
                         <p className="font-medium text-gray-900">{student.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">ID: {student.id.slice(0, 8)}</p>
+                        {student.sureName && (
+                          <p className="text-xs text-blue-500 mt-0.5">"{student.sureName}"</p>
+                        )}
+                        {student.birthDate && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(student.birthDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">{getBranchName(student.branchId)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-600">{student.parentPhone || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        <p>{student.parentPhone || '-'}</p>
+                        {student.parentName && (
+                          <p className="text-xs text-gray-400 mt-0.5">{student.parentName}</p>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-sm">
                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
                           {student.subjects?.length || 0} mapel

@@ -3,9 +3,13 @@ import { Edit2 } from 'lucide-react'
 
 interface StudentData {
   name?: string
+  sureName?: string | null
   classLevel?: string | null
+  birthDate?: string | null
+  birthPlace?: string | null
   parentName?: string | null
   parentPhone?: string | null
+  address?: string | null
   branchId?: string
 }
 
@@ -29,13 +33,33 @@ export default function EnrollmentStep1Display({ data, onEdit }: EnrollmentStep1
       </div>
 
       <div className="space-y-3">
-        <div>
-          <p className="text-xs text-gray-500 uppercase">Nama Lengkap</p>
-          <p className="text-sm font-medium text-gray-900">{data.name}</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Nama Lengkap</p>
+            <p className="text-sm font-medium text-gray-900">{data.name || '-'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Nama Panggilan</p>
+            <p className="text-sm font-medium text-gray-900">{data.sureName || '-'}</p>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-gray-500 uppercase">Tanggal Lahir + Kelas</p>
+            <p className="text-xs text-gray-500 uppercase">Tempat Lahir</p>
+            <p className="text-sm font-medium text-gray-900">{data.birthPlace || '-'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Tanggal Lahir</p>
+            <p className="text-sm font-medium text-gray-900">
+              {data.birthDate
+                ? new Date(data.birthDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+                : '-'}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Kelas</p>
             <p className="text-sm font-medium text-gray-900">{data.classLevel || '-'}</p>
           </div>
           <div>
@@ -47,6 +71,12 @@ export default function EnrollmentStep1Display({ data, onEdit }: EnrollmentStep1
           <p className="text-xs text-gray-500 uppercase">Nama Orang Tua</p>
           <p className="text-sm font-medium text-gray-900">{data.parentName || '-'}</p>
         </div>
+        {data.address && (
+          <div>
+            <p className="text-xs text-gray-500 uppercase">Alamat</p>
+            <p className="text-sm font-medium text-gray-900">{data.address}</p>
+          </div>
+        )}
       </div>
     </div>
   )

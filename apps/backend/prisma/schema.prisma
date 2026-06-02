@@ -226,7 +226,7 @@ model Subject {
   trackingType          SubjectTrackingType
   maxCapacityRegular    Int      @default(3)
   maxCapacityPrivate    Int      @default(1)
-  sessionsPerMonth      Int      @default(8)
+  sessionsPerMonth      Int      @default(8) @map("sessions_per_month")
   commissionPercentage  Decimal  @default(0.40) @db.Decimal(5, 2)
   isActive              Boolean  @default(true)
   createdAt             DateTime @default(now())
@@ -279,16 +279,21 @@ model CurriculumModule {
 // ===== 3. SISWA (2 tabel) =====
 
 model Student {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   branchId      String
   name          String
+  sureName      String?
   classLevel    String?
+  birthDate     DateTime? @db.Date
+  birthPlace    String?
   parentName    String?
   parentPhone   String?
+  address       String?
   registeredAt  DateTime
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  endDate       DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
   branch                Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)

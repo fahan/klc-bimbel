@@ -7,9 +7,13 @@ import { useForm } from 'react-hook-form'
 
 interface StudentData {
   name: string
+  sureName: string | null
   classLevel: string | null
+  birthDate: string | null
+  birthPlace: string | null
   parentName: string | null
   parentPhone: string | null
+  address: string | null
   branchId: string
   enrolledAt: string | null
 }
@@ -28,22 +32,29 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
   } = useForm<Partial<StudentData>>({
     defaultValues: {
       name: initialData?.name || '',
+      sureName: initialData?.sureName || '',
       classLevel: initialData?.classLevel || '',
+      birthDate: initialData?.birthDate || '',
+      birthPlace: initialData?.birthPlace || '',
       parentName: initialData?.parentName || '',
       parentPhone: initialData?.parentPhone || '',
+      address: initialData?.address || '',
       branchId: initialData?.branchId || '',
       enrolledAt: initialData?.enrolledAt || '',
     },
   })
 
-  // Re-populate form when initialData changes (e.g., user navigates back to edit)
   useEffect(() => {
     if (initialData) {
       reset({
         name: initialData.name || '',
+        sureName: initialData.sureName || '',
         classLevel: initialData.classLevel || '',
+        birthDate: initialData.birthDate || '',
+        birthPlace: initialData.birthPlace || '',
         parentName: initialData.parentName || '',
         parentPhone: initialData.parentPhone || '',
+        address: initialData.address || '',
         branchId: initialData.branchId || '',
         enrolledAt: initialData.enrolledAt || '',
       })
@@ -80,6 +91,39 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
           {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
         </div>
 
+        {/* Nama Panggilan */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nama Panggilan</label>
+          <input
+            type="text"
+            {...register('sureName')}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Nama panggilan sehari-hari"
+          />
+        </div>
+
+        {/* Tempat & Tanggal Lahir */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tempat Lahir</label>
+            <input
+              type="text"
+              {...register('birthPlace')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Misal: Brebes"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+            <input
+              type="date"
+              {...register('birthDate')}
+              max={new Date().toISOString().split('T')[0]}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
         {/* Kelas */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
@@ -87,7 +131,7 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
             type="text"
             {...register('classLevel')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Misal: 3 SD"
+            placeholder="Misal: 3 SD, Kelas 2"
           />
         </div>
 
@@ -115,6 +159,17 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
             {...register('parentName')}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Nama orang tua / wali"
+          />
+        </div>
+
+        {/* Alamat */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+          <textarea
+            {...register('address')}
+            rows={2}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            placeholder="Alamat lengkap siswa"
           />
         </div>
 
@@ -152,7 +207,7 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Kosongkan jika siswa baru mendaftar hari ini. Isi jika Anda sedang menginput data siswa lama.
+            Kosongkan jika siswa baru mendaftar hari ini.
           </p>
         </div>
 
