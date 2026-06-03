@@ -14,6 +14,7 @@ import { ProgressModule } from './modules/progress/progress.module'
 import { InvoicesModule } from './modules/invoices/invoices.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { CommissionsModule } from './modules/commissions/commissions.module'
+import { CommissionFormulasModule } from './modules/commission-formulas/commission-formulas.module'
 import { ProgressReportsModule } from './modules/progress-reports/progress-reports.module'
 import { FinanceModule } from './modules/finance/finance.module'
 import { StoreModule } from './modules/store/store.module'
@@ -38,6 +39,7 @@ import { LandingModule } from './modules/landing/landing.module'
     InvoicesModule,
     PaymentsModule,
     CommissionsModule,
+    CommissionFormulasModule,
     ProgressReportsModule,
     FinanceModule,
     StoreModule,

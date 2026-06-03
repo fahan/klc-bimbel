@@ -160,7 +160,9 @@ export default function KomisiGuruPage() {
         <p className="text-xs text-blue-800 leading-relaxed">
           💡 <strong>Cara hitung komisi:</strong>
           <br />
-          (SPP ÷ total sesi bulan ini) × <strong>40%</strong> × jumlah sesi yang dihadiri
+          Default: <strong>SPP ÷ 12 × % komisi × sesi terlaksana</strong>
+          <br />
+          Formula dapat berbeda per mata pelajaran dan jenis sesi sesuai pengaturan admin.
         </p>
       </div>
     </div>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, Users, Clock, CheckSquare, CreditCard, TrendingUp, Gift, BookOpen, LogOut, ChevronDown, BarChart3, Building, DollarSign, FileText, GraduationCap, Receipt, Mail, ShoppingBag, Truck, Globe } from 'lucide-react'
+import { LayoutDashboard, Users, Clock, CheckSquare, CreditCard, TrendingUp, Gift, BookOpen, LogOut, ChevronDown, BarChart3, Building, DollarSign, FileText, GraduationCap, Receipt, Mail, ShoppingBag, Truck, Globe, Settings2 } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
 
 export default function Sidebar() {
@@ -88,6 +88,7 @@ export default function Sidebar() {
         { label: 'Presensi', path: '/laporan-presensi', icon: CheckSquare },
         { label: 'Keuangan', path: '/laporan-keuangan', icon: TrendingUp },
         { label: 'Komisi Guru', path: '/komisi-guru', icon: Gift },
+        { label: 'Formula Komisi', path: '/formula-komisi', icon: Settings2 },
       ]
     }
   ]

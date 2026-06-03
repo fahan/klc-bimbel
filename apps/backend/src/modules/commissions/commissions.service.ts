@@ -1,29 +1,44 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
+import { CommissionFormulasService } from '../commission-formulas/commission-formulas.service'
 
 @Injectable()
 export class CommissionsService {
   /**
-   * Commission Formula (per business-rule.md section 8):
-   *   commission = (SPP ÷ total_sessions_in_month) × commissionPercentage × sessions_attended
+   * Formula is resolved dynamically per subject + session type via SubjectCommissionFormula.
+   * Default: MONTHLY_RATE → spp_rate ÷ 12 × commission_pct × sessions_attended
+   * Alternative: PER_SESSION → spp_rate ÷ total_sessions_in_month × commission_pct × sessions_attended
    *
-   * commissionPercentage comes from Subject.commissionPercentage (default 40%).
-   * Commission goes to actual_teacher_id (recorded in session_logs),
-   * not the regular teacher. This handles replacement teacher scenario.
+   * Commission goes to actual_teacher_id (handles replacement teacher scenario).
    */
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private formulasService: CommissionFormulasService,
+  ) {}
+
+  private applyFormula(
+    sppAmount: number,
+    commissionPercentage: number,
+    sessionsAttended: number,
+    totalSessionsInMonth: number,
+    formulaType: 'MONTHLY_RATE' | 'PER_SESSION',
+  ): number {
+    if (formulaType === 'PER_SESSION') {
+      if (totalSessionsInMonth === 0) return 0
+      return (sppAmount / totalSessionsInMonth) * commissionPercentage * sessionsAttended
+    }
+    // MONTHLY_RATE (default)
+    return (sppAmount / 12) * commissionPercentage * sessionsAttended
+  }
 
   async calculateForMonth(branchId: string, month: number, year: number) {
-    // Validate inputs
     if (month < 1 || month > 12) {
       throw new BadRequestException('Month must be 1-12')
     }
 
-    // Get all session logs in the month for this branch
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
-    // Fetch both regular and approved ad-hoc session logs for this branch
     const sessionLogs = await this.prisma.sessionLog.findMany({
       where: {
         sessionDate: { gte: startDate, lt: endDate },
@@ -44,7 +59,6 @@ export class CommissionsService {
       },
     })
 
-    // Group by actual_teacher_id
     const teacherMap = new Map<string, any[]>()
     for (const log of sessionLogs) {
       const tid = log.actualTeacherId
@@ -52,26 +66,27 @@ export class CommissionsService {
       teacherMap.get(tid)!.push(log)
     }
 
-    // For each teacher, compute commission
     const results: any[] = []
 
     for (const [teacherId, logs] of teacherMap.entries()) {
-      // Get teacher
       const teacher = await this.prisma.user.findUnique({ where: { id: teacherId } })
       if (!teacher) continue
 
-      // For each session log, compute commission per student
       const commissionDetails: any[] = []
       let totalCommission = 0
 
       for (const log of logs) {
-        // Resolve subjectId: regular sessions use session.subjectId, ad-hoc use adHocSubjectId
         const subjectId = log.isAdHoc ? log.adHocSubjectId : log.session?.subjectId
         if (!subjectId) continue
 
-        // For each student that attended (HADIR), compute commission
+        // Resolve session type for formula lookup
+        const sessionType: 'REGULAR' | 'PRIVATE' =
+          (log.session?.type as 'REGULAR' | 'PRIVATE') ?? 'REGULAR'
+
+        // Get effective formula for this subject + session type
+        const formula = await this.formulasService.getEffectiveFormula(subjectId, sessionType)
+
         for (const attendance of log.attendances) {
-          // Get student's SPP rate and subject's commission percentage
           const studentSubject = await this.prisma.studentSubject.findFirst({
             where: {
               studentId: attendance.studentId,
@@ -83,8 +98,6 @@ export class CommissionsService {
 
           if (!studentSubject || !studentSubject.sppRate) continue
 
-          // Total sessions in month for this student in this subject
-          // Counts both: regular sessions the student is enrolled in, and approved ad-hoc sessions they attended
           const regularSessionCount = await this.prisma.sessionLog.count({
             where: {
               sessionDate: { gte: startDate, lt: endDate },
@@ -111,7 +124,6 @@ export class CommissionsService {
 
           const totalSessionsInMonth = regularSessionCount + adHocSessionCount
 
-          // Sessions actually attended by this student in this subject (with this teacher)
           const sessionsAttended = await this.prisma.attendance.count({
             where: {
               studentId: attendance.studentId,
@@ -127,13 +139,19 @@ export class CommissionsService {
             },
           })
 
-          if (totalSessionsInMonth === 0) continue
-
           const sppAmount = parseFloat(studentSubject.sppRate.amount.toString())
-          const commissionRate = parseFloat(studentSubject.subject.commissionPercentage.toString())
-          const commissionAmount = (sppAmount / totalSessionsInMonth) * commissionRate
 
-          // Avoid duplicates - only count once per (sessionLog, student)
+          // Guard: PER_SESSION needs at least 1 session
+          if (formula.formulaType === 'PER_SESSION' && totalSessionsInMonth === 0) continue
+
+          const commissionAmount = this.applyFormula(
+            sppAmount,
+            formula.commissionPercentage,
+            sessionsAttended,
+            totalSessionsInMonth,
+            formula.formulaType,
+          )
+
           const dupKey = `${log.id}-${attendance.studentId}`
           if (commissionDetails.some(c => c._dupKey === dupKey)) continue
 
@@ -147,6 +165,8 @@ export class CommissionsService {
             sessionsAttended,
             commissionAmount,
             isReplacement: log.isReplacement,
+            formulaType: formula.formulaType,
+            commissionPercentage: formula.commissionPercentage,
           })
 
           totalCommission += commissionAmount
@@ -161,7 +181,6 @@ export class CommissionsService {
       })
     }
 
-    // Save / update commission records (use upsert)
     for (const r of results) {
       const existing = await this.prisma.commission.findUnique({
         where: {
@@ -174,10 +193,7 @@ export class CommissionsService {
         },
       })
 
-      if (existing && existing.status === 'APPROVED') {
-        // Skip approved entries
-        continue
-      }
+      if (existing && existing.status === 'APPROVED') continue
 
       const commission = await this.prisma.commission.upsert({
         where: {
@@ -204,7 +220,6 @@ export class CommissionsService {
         },
       })
 
-      // Replace details
       await this.prisma.commissionDetail.deleteMany({
         where: { commissionId: commission.id },
       })
@@ -220,6 +235,8 @@ export class CommissionsService {
           sessionsAttended: d.sessionsAttended,
           commissionAmount: d.commissionAmount,
           isReplacement: d.isReplacement,
+          formulaType: d.formulaType,
+          commissionPercentage: d.commissionPercentage,
         })),
       })
     }
@@ -257,7 +274,6 @@ export class CommissionsService {
       orderBy: { teacher: { name: 'asc' } },
     })
 
-    // Aggregate session counts: regular vs replacement
     const data = commissions.map(c => {
       let regularSessions = 0
       let replacementSessions = 0
@@ -287,7 +303,6 @@ export class CommissionsService {
       }
     })
 
-    // Aggregate metrics
     const totalEstimated = data.reduce((sum, c) => sum + parseFloat(c.totalAmount), 0)
     const approved = data.filter(c => c.status === 'APPROVED')
     const totalApproved = approved.reduce((sum, c) => sum + parseFloat(c.totalAmount), 0)
@@ -333,7 +348,6 @@ export class CommissionsService {
 
     if (!commission) throw new NotFoundException('Commission not found')
 
-    // Group by subject
     const bySubject = new Map<string, any>()
     for (const d of commission.commissionDetails) {
       if (!bySubject.has(d.subjectId)) {
@@ -342,6 +356,8 @@ export class CommissionsService {
           subjectName: d.subject.name,
           subjectCode: d.subject.code,
           sessionType: d.sessionLog.session?.type ?? 'REGULAR',
+          formulaType: d.formulaType,
+          commissionPercentage: parseFloat(d.commissionPercentage.toString()),
           students: new Map<string, any>(),
           subtotal: 0,
         })
@@ -388,6 +404,8 @@ export class CommissionsService {
           subjectName: s.subjectName,
           subjectCode: s.subjectCode,
           sessionType: s.sessionType,
+          formulaType: s.formulaType,
+          commissionPercentage: s.commissionPercentage,
           students: Array.from(s.students.values()).map((st: any) => ({
             ...st,
             sppAmount: st.sppAmount.toString(),

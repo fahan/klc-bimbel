@@ -415,7 +415,14 @@ export default function KomisiGuruPage() {
             {detail.bySubject.map((subject: any) => (
               <div key={subject.subjectId} className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900 text-sm">{subject.subjectName}</h3>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">{subject.subjectName}</h3>
+                    <p className="text-[10px] text-gray-500 mt-0.5">
+                      {subject.formulaType === 'MONTHLY_RATE'
+                        ? `SPP ÷ 12 × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`
+                        : `SPP ÷ total sesi × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`}
+                    </p>
+                  </div>
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                       subject.sessionType === 'REGULAR'
@@ -445,7 +452,9 @@ export default function KomisiGuruPage() {
                             )}
                           </p>
                           <p className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                            {formatRupiah(st.sppAmount)} ÷ {st.totalSessionsInMonth} × 40% × {st.sessionsAttended}
+                            {subject.formulaType === 'MONTHLY_RATE'
+                              ? `${formatRupiah(st.sppAmount)} ÷ 12 × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × ${st.sessionsAttended}`
+                              : `${formatRupiah(st.sppAmount)} ÷ ${st.totalSessionsInMonth} × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × ${st.sessionsAttended}`}
                           </p>
                         </div>
                         <p className="text-sm font-semibold text-green-700 whitespace-nowrap">

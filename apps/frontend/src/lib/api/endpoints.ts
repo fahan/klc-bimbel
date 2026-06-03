@@ -258,6 +258,25 @@ export const commissionApi = {
     apiClient.post('/commissions/approve-all', data),
 }
 
+// ===== COMMISSION FORMULAS API =====
+export const commissionFormulaApi = {
+  getAll: (subjectId?: string) => {
+    const qs = subjectId ? `?subjectId=${subjectId}` : ''
+    return apiClient.get(`/commission-formulas${qs}`)
+  },
+  upsert: (
+    subjectId: string,
+    data: {
+      sessionType: 'REGULAR' | 'PRIVATE'
+      formulaType: 'MONTHLY_RATE' | 'PER_SESSION'
+      commissionPercentage: number
+      isActive?: boolean
+    },
+  ) => apiClient.put(`/commission-formulas/${subjectId}`, data),
+  remove: (subjectId: string, sessionType: 'REGULAR' | 'PRIVATE') =>
+    apiClient.delete(`/commission-formulas/${subjectId}/${sessionType}`),
+}
+
 // ===== PROGRESS REPORTS API =====
 export const progressReportApi = {
   // Public — no auth required

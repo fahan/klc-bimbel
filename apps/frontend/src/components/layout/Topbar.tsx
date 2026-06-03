@@ -50,6 +50,9 @@ export default function Topbar() {
     if (pathname === '/komisi-guru' || pathname.startsWith('/komisi-guru/')) {
       return 'Laporan Komisi Guru'
     }
+    if (pathname === '/formula-komisi') {
+      return 'Formula Komisi Guru'
+    }
     if (pathname === '/laporan-progress' || pathname.startsWith('/laporan-progress/')) {
       return 'Laporan Progress Siswa'
     }
