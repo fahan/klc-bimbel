@@ -16,6 +16,7 @@ import {
   Copy,
   X,
   ChevronDown,
+  Trash2,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -67,6 +68,10 @@ export default function InvoiceTagihanPage() {
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'TRANSFER' | 'OTHER'>('TRANSFER')
   const [recordingPayment, setRecordingPayment] = useState(false)
+
+  // Delete confirmation state
+  const [deleteInvoice, setDeleteInvoice] = useState<any>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Data queries
   const { data: invoicesData, isLoading, refetch } = useQuery({
@@ -200,6 +205,21 @@ export default function InvoiceTagihanPage() {
       alert(err.response?.data?.message || 'Gagal catat pembayaran')
     } finally {
       setRecordingPayment(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteInvoice) return
+    try {
+      setDeleting(true)
+      await invoiceApi.delete(deleteInvoice.id)
+      setDeleteInvoice(null)
+      if (selectedInvoiceId === deleteInvoice.id) setSelectedInvoiceId(null)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menghapus invoice')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -445,6 +465,18 @@ Mohon segera dilunasi. Terima kasih 🙏`
                                 >
                                   <Eye className="w-4 h-4" />
                                 </a>
+                                {parseFloat(inv.paidAmount || '0') === 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setDeleteInvoice(inv)
+                                    }}
+                                    className="p-1.5 hover:bg-red-50 text-red-500 rounded transition"
+                                    title="Hapus invoice"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -770,6 +802,49 @@ Mohon segera dilunasi. Terima kasih 🙏`
                   Batal
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteInvoice && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setDeleteInvoice(null)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-full">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Hapus Invoice?</h3>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm space-y-1">
+              <p className="font-mono text-xs text-gray-500">{deleteInvoice.invoiceNumber}</p>
+              <p className="font-medium text-gray-900">{deleteInvoice.studentName}</p>
+              <p className="text-gray-600">{formatRupiah(deleteInvoice.totalAmount)}</p>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              Invoice ini akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 rounded-lg transition disabled:opacity-50 text-sm"
+              >
+                {deleting ? 'Menghapus...' : 'Ya, Hapus'}
+              </button>
+              <button
+                onClick={() => setDeleteInvoice(null)}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 rounded-lg transition text-sm"
+              >
+                Batal
+              </button>
             </div>
           </div>
         </div>
