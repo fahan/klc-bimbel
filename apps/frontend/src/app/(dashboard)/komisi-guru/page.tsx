@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { commissionApi } from '@/lib/api/endpoints'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { commissionApi, teacherBonusApi, teacherApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
 import {
   ChevronLeft,
@@ -14,6 +14,10 @@ import {
   Clock,
   TrendingUp,
   X,
+  Gift,
+  Plus,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -48,6 +52,12 @@ export default function KomisiGuruPage() {
   const [calculating, setCalculating] = useState(false)
   const [approvingAll, setApprovingAll] = useState(false)
 
+  // Bonus state
+  const [showBonusModal, setShowBonusModal] = useState(false)
+  const [editingBonus, setEditingBonus] = useState<any | null>(null)
+  const [bonusForm, setBonusForm] = useState({ teacherId: '', amount: '', reason: '' })
+  const qc = useQueryClient()
+
   const { data: commissionsData, isLoading, refetch } = useQuery({
     queryKey: ['commissions', branchId, month, year],
     queryFn: () => commissionApi.getByMonth(branchId, month, year),
@@ -60,9 +70,24 @@ export default function KomisiGuruPage() {
     enabled: !!selectedCommissionId,
   })
 
+  const { data: bonusData, refetch: refetchBonuses } = useQuery({
+    queryKey: ['teacher-bonuses', branchId, month, year],
+    queryFn: () => teacherBonusApi.getByMonth(branchId, month, year),
+    enabled: !!branchId,
+  })
+
+  const { data: teachersData } = useQuery({
+    queryKey: ['teachers', branchId],
+    queryFn: () => teacherApi.getAll(undefined, undefined, branchId),
+    enabled: !!branchId,
+  })
+
   const commissions = commissionsData?.data?.data?.commissions || []
   const metrics = commissionsData?.data?.data?.metrics
   const detail = detailData?.data?.data
+  const bonuses: any[] = bonusData?.data?.data?.bonuses || []
+  const bonusMetrics = bonusData?.data?.data?.metrics
+  const teachers: any[] = teachersData?.data?.data || []
 
   const isCurrentMonth = month === today.getMonth() + 1 && year === today.getFullYear()
   const monthLabel = `${MONTHS[month - 1]} ${year}`
@@ -119,6 +144,53 @@ export default function KomisiGuruPage() {
     } finally {
       setApprovingAll(false)
     }
+  }
+
+  const createBonusMutation = useMutation({
+    mutationFn: (data: any) => teacherBonusApi.create(data),
+    onSuccess: () => { refetchBonuses(); setShowBonusModal(false); setBonusForm({ teacherId: '', amount: '', reason: '' }) },
+    onError: (err: any) => alert(err.response?.data?.message || 'Gagal menyimpan bonus'),
+  })
+
+  const updateBonusMutation = useMutation({
+    mutationFn: ({ id, data }: any) => teacherBonusApi.update(id, data),
+    onSuccess: () => { refetchBonuses(); setEditingBonus(null) },
+    onError: (err: any) => alert(err.response?.data?.message || 'Gagal mengupdate bonus'),
+  })
+
+  const deleteBonusMutation = useMutation({
+    mutationFn: (id: string) => teacherBonusApi.remove(id),
+    onSuccess: () => refetchBonuses(),
+    onError: (err: any) => alert(err.response?.data?.message || 'Gagal menghapus bonus'),
+  })
+
+  const approveBonusMutation = useMutation({
+    mutationFn: (id: string) => teacherBonusApi.approve(id),
+    onSuccess: () => refetchBonuses(),
+    onError: (err: any) => alert(err.response?.data?.message || 'Gagal menyetujui bonus'),
+  })
+
+  const handleSaveBonus = () => {
+    if (!bonusForm.teacherId || !bonusForm.amount || !bonusForm.reason) {
+      alert('Lengkapi semua field')
+      return
+    }
+    createBonusMutation.mutate({
+      branchId,
+      teacherId: bonusForm.teacherId,
+      month,
+      year,
+      amount: parseFloat(bonusForm.amount),
+      reason: bonusForm.reason,
+    })
+  }
+
+  const handleUpdateBonus = (bonus: any) => {
+    if (!bonus.amount || !bonus.reason) return
+    updateBonusMutation.mutate({
+      id: bonus.id,
+      data: { amount: parseFloat(bonus.amount), reason: bonus.reason },
+    })
   }
 
   const PREDIKAT_LABEL: Record<string, string> = {
@@ -490,6 +562,231 @@ export default function KomisiGuruPage() {
                   Setujui Komisi Ini
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== BONUS SECTION ===== */}
+      {branchId && (
+        <div className="space-y-4">
+          {/* Bonus Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-purple-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Bonus Guru</h2>
+              <span className="text-sm text-gray-500">— {monthLabel}</span>
+            </div>
+            <button
+              onClick={() => { setBonusForm({ teacherId: '', amount: '', reason: '' }); setShowBonusModal(true) }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Tambah Bonus
+            </button>
+          </div>
+
+          {/* Bonus Metrics */}
+          {bonusMetrics && parseInt(bonusMetrics.count) > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm">
+                <p className="text-xs text-gray-500">Total Bonus</p>
+                <p className="text-lg font-bold text-gray-900 mt-0.5">
+                  {formatRupiah(parseFloat(bonusMetrics.totalDraft) + parseFloat(bonusMetrics.totalApproved))}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg border border-purple-200 p-3 shadow-sm">
+                <p className="text-xs text-purple-600">Sudah Disetujui</p>
+                <p className="text-lg font-bold text-purple-700 mt-0.5">{formatRupiah(bonusMetrics.totalApproved)}</p>
+              </div>
+              <div className="bg-white rounded-lg border border-amber-200 p-3 shadow-sm">
+                <p className="text-xs text-amber-600">Menunggu Persetujuan</p>
+                <p className="text-lg font-bold text-amber-700 mt-0.5">{formatRupiah(bonusMetrics.totalDraft)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Bonus Table */}
+          {bonuses.length === 0 ? (
+            <div className="bg-white rounded-lg border border-dashed border-gray-300 p-8 text-center">
+              <Gift className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="text-sm text-gray-400">Belum ada bonus untuk {monthLabel}</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-700">Guru</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-700">Keterangan</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-700">Nominal</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-700">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-700">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bonuses.map((b: any) => (
+                    <tr key={b.id} className="hover:bg-gray-50/50">
+                      {editingBonus?.id === b.id ? (
+                        <>
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900">{b.teacherName}</td>
+                          <td className="px-4 py-2">
+                            <input
+                              className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              value={editingBonus.reason}
+                              onChange={e => setEditingBonus({ ...editingBonus, reason: e.target.value })}
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              className="w-28 text-sm border border-gray-300 rounded px-2 py-1 text-right focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              value={editingBonus.amount}
+                              onChange={e => setEditingBonus({ ...editingBonus, amount: e.target.value })}
+                            />
+                          </td>
+                          <td className="px-4 py-2" />
+                          <td className="px-4 py-2">
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => handleUpdateBonus(editingBonus)}
+                                disabled={updateBonusMutation.isPending}
+                                className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                              >
+                                Simpan
+                              </button>
+                              <button
+                                onClick={() => setEditingBonus(null)}
+                                className="text-xs text-gray-500 px-2 py-1 rounded hover:bg-gray-100"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{b.teacherName}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{b.reason}</td>
+                          <td className="px-4 py-3 text-sm font-semibold text-purple-700 text-right">
+                            {formatRupiah(b.amount)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {b.status === 'APPROVED' ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                                Disetujui
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                Draft
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-1.5">
+                              {b.status === 'DRAFT' && (
+                                <>
+                                  <button
+                                    onClick={() => approveBonusMutation.mutate(b.id)}
+                                    disabled={approveBonusMutation.isPending}
+                                    className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                                  >
+                                    Setujui
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingBonus({ ...b, amount: parseFloat(b.amount).toString() })}
+                                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => { if (confirm('Hapus bonus ini?')) deleteBonusMutation.mutate(b.id) }}
+                                    disabled={deleteBonusMutation.isPending}
+                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add Bonus Modal */}
+      {showBonusModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Gift className="w-5 h-5 text-purple-600" />
+                Tambah Bonus Guru
+              </h3>
+              <button onClick={() => setShowBonusModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Guru</label>
+                <select
+                  value={bonusForm.teacherId}
+                  onChange={e => setBonusForm({ ...bonusForm, teacherId: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Pilih guru...</option>
+                  {teachers.map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan Bonus</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Bonus Lebaran, Bonus Kinerja Q2..."
+                  value={bonusForm.reason}
+                  onChange={e => setBonusForm({ ...bonusForm, reason: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nominal (Rp)</label>
+                <input
+                  type="number"
+                  placeholder="500000"
+                  min={1}
+                  value={bonusForm.amount}
+                  onChange={e => setBonusForm({ ...bonusForm, amount: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                {bonusForm.amount && (
+                  <p className="text-xs text-gray-500 mt-1">{formatRupiah(bonusForm.amount)}</p>
+                )}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={() => setShowBonusModal(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveBonus}
+                disabled={createBonusMutation.isPending}
+                className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium disabled:opacity-50"
+              >
+                {createBonusMutation.isPending ? 'Menyimpan...' : 'Simpan Bonus'}
+              </button>
             </div>
           </div>
         </div>

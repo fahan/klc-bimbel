@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { commissionApi } from '@/lib/api/endpoints'
-import { TrendingUp, Calendar, CheckCircle, Clock } from 'lucide-react'
+import { commissionApi, teacherBonusApi } from '@/lib/api/endpoints'
+import { TrendingUp, Calendar, CheckCircle, Clock, Gift } from 'lucide-react'
 
 const MONTHS = [
   'Januari',
@@ -34,7 +34,14 @@ export default function KomisiGuruPage() {
     queryFn: () => commissionApi.getMy(year),
   })
 
+  const { data: bonusData } = useQuery({
+    queryKey: ['my-bonuses', year],
+    queryFn: () => teacherBonusApi.getMy(year),
+  })
+
   const commissions = data?.data?.data || []
+  const myBonuses: any[] = bonusData?.data?.data || []
+  const approvedBonuses = myBonuses.filter((b: any) => b.status === 'APPROVED')
 
   // Calculate totals
   const totalApproved = commissions
@@ -44,6 +51,10 @@ export default function KomisiGuruPage() {
   const totalPending = commissions
     .filter((c: any) => c.status !== 'APPROVED')
     .reduce((sum: number, c: any) => sum + parseFloat(c.totalAmount), 0)
+
+  const totalBonusApproved = approvedBonuses.reduce(
+    (sum: number, b: any) => sum + parseFloat(b.amount), 0,
+  )
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -76,7 +87,7 @@ export default function KomisiGuruPage() {
             <div className="p-2 bg-green-100 rounded-lg">
               <CheckCircle className="w-4 h-4 text-green-600" />
             </div>
-            <p className="text-xs text-gray-600 font-medium">Sudah Diterima</p>
+            <p className="text-xs text-gray-600 font-medium">Komisi Diterima</p>
           </div>
           <p className="text-lg font-bold text-green-700 mt-2">{formatRupiah(totalApproved)}</p>
         </div>
@@ -85,10 +96,21 @@ export default function KomisiGuruPage() {
             <div className="p-2 bg-amber-100 rounded-lg">
               <Clock className="w-4 h-4 text-amber-600" />
             </div>
-            <p className="text-xs text-gray-600 font-medium">Pending</p>
+            <p className="text-xs text-gray-600 font-medium">Komisi Pending</p>
           </div>
           <p className="text-lg font-bold text-amber-700 mt-2">{formatRupiah(totalPending)}</p>
         </div>
+        {totalBonusApproved > 0 && (
+          <div className="col-span-2 bg-white rounded-lg border border-purple-200 p-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Gift className="w-4 h-4 text-purple-600" />
+              </div>
+              <p className="text-xs text-gray-600 font-medium">Bonus Diterima Tahun {year}</p>
+            </div>
+            <p className="text-lg font-bold text-purple-700 mt-2">{formatRupiah(totalBonusApproved)}</p>
+          </div>
+        )}
       </div>
 
       {/* Commissions List */}
@@ -147,6 +169,45 @@ export default function KomisiGuruPage() {
                       : c.status === 'CALCULATED'
                       ? 'Final'
                       : 'Estimasi'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Bonus History */}
+      {myBonuses.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+            <Gift className="w-4 h-4 text-purple-600" />
+            Riwayat Bonus
+          </h2>
+          {myBonuses.map((b: any) => (
+            <div
+              key={b.id}
+              className={`bg-white border rounded-lg p-3 shadow-sm ${
+                b.status === 'APPROVED' ? 'border-purple-200' : 'border-gray-200'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{b.reason}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {MONTHS[b.month - 1]} {b.year} · {b.branchName}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-purple-700 text-sm">{formatRupiah(b.amount)}</p>
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium mt-1 ${
+                      b.status === 'APPROVED'
+                        ? 'bg-purple-100 text-purple-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}
+                  >
+                    {b.status === 'APPROVED' ? 'Disetujui' : 'Menunggu'}
                   </span>
                 </div>
               </div>

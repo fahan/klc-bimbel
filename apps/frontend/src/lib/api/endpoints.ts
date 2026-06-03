@@ -270,6 +270,28 @@ export const commissionApi = {
     apiClient.post('/commissions/approve-all', data),
 }
 
+// ===== TEACHER BONUSES API =====
+export const teacherBonusApi = {
+  getByMonth: (branchId: string, month: number, year: number) =>
+    apiClient.get(`/teacher-bonuses?branchId=${branchId}&month=${month}&year=${year}`),
+  getMy: (year?: number) => {
+    const params = year ? `?year=${year}` : ''
+    return apiClient.get(`/teacher-bonuses/my${params}`)
+  },
+  create: (data: {
+    branchId: string
+    teacherId: string
+    month: number
+    year: number
+    amount: number
+    reason: string
+  }) => apiClient.post('/teacher-bonuses', data),
+  update: (id: string, data: { amount?: number; reason?: string }) =>
+    apiClient.patch(`/teacher-bonuses/${id}`, data),
+  remove: (id: string) => apiClient.delete(`/teacher-bonuses/${id}`),
+  approve: (id: string) => apiClient.post(`/teacher-bonuses/${id}/approve`, {}),
+}
+
 // ===== COMMISSION FORMULAS API =====
 export const commissionFormulaApi = {
   getAll: (subjectId?: string) => {

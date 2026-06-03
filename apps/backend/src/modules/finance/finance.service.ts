@@ -22,8 +22,8 @@ export class FinanceService {
       return { year: tYear, month: tMonth, start: tDate, end: new Date(tYear, tMonth, 1) }
     })
 
-    // Phase 1: current month — 6 queries parallel (max concurrent = 6)
-    const [sppAgg, regAgg, salesAgg, commissionAgg, stockIn, unpaidInvoices] = await Promise.all([
+    // Phase 1: current month — 7 queries parallel
+    const [sppAgg, regAgg, salesAgg, commissionAgg, bonusAgg, stockIn, unpaidInvoices] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'SPP' } },
@@ -40,6 +40,10 @@ export class FinanceService {
         _sum: { totalAmount: true },
         where: { ...branchFilter, month, year, status: 'APPROVED' },
       }),
+      this.prisma.teacherBonus.aggregate({
+        _sum: { amount: true },
+        where: { ...branchFilter, month, year, status: 'APPROVED' },
+      }),
       this.prisma.stockMutation.findMany({
         where: { ...branchFilter, type: 'IN', createdAt: { gte: startDate, lt: endDate } },
         select: { quantity: true, product: { select: { price: true } } },
@@ -50,10 +54,10 @@ export class FinanceService {
       }),
     ])
 
-    // Phase 2: trend — each month runs 4 queries in parallel, 6 months concurrently (max = 4)
+    // Phase 2: trend — each month runs 5 queries in parallel, 6 months concurrently
     const trend = await Promise.all(
       trendRanges.map(async r => {
-        const [tSpp, tReg, tSales, tComm] = await Promise.all([
+        const [tSpp, tReg, tSales, tComm, tBonus] = await Promise.all([
           this.prisma.payment.aggregate({
             _sum: { amount: true },
             where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
@@ -70,12 +74,18 @@ export class FinanceService {
             _sum: { totalAmount: true },
             where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
           }),
+          this.prisma.teacherBonus.aggregate({
+            _sum: { amount: true },
+            where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
+          }),
         ])
         const tIncome =
           parseFloat((tSpp._sum.amount || 0).toString()) +
           parseFloat((tReg._sum.amount || 0).toString()) +
           parseFloat((tSales._sum.totalAmount || 0).toString())
-        const tExpense = parseFloat((tComm._sum.totalAmount || 0).toString())
+        const tExpense =
+          parseFloat((tComm._sum.totalAmount || 0).toString()) +
+          parseFloat((tBonus._sum.amount || 0).toString())
         return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
       }),
     )
@@ -87,11 +97,12 @@ export class FinanceService {
     const totalIncome = sppIncome + regIncome + storeIncome
 
     const commissionExpense = parseFloat((commissionAgg._sum.totalAmount || 0).toString())
+    const bonusExpense = parseFloat((bonusAgg._sum.amount || 0).toString())
     const stockExpense = stockIn.reduce(
       (sum, m) => sum + m.quantity * parseFloat(m.product.price.toString()),
       0,
     )
-    const totalExpense = commissionExpense + stockExpense
+    const totalExpense = commissionExpense + bonusExpense + stockExpense
     const netBalance = totalIncome - totalExpense
 
     const unpaidAmount = unpaidInvoices.reduce(
@@ -113,7 +124,7 @@ export class FinanceService {
         },
         breakdown: {
           income: { spp: sppIncome, registration: regIncome, store: storeIncome },
-          expense: { commission: commissionExpense, stock: stockExpense },
+          expense: { commission: commissionExpense, bonus: bonusExpense, stock: stockExpense },
         },
         trend,
       },
@@ -123,7 +134,7 @@ export class FinanceService {
   async getRecentTransactions(branchId: string | undefined, limit: number = 20) {
     const branchFilter = branchId ? { branchId } : {}
 
-    const [payments, sales, commissions] = await Promise.all([
+    const [payments, sales, commissions, bonuses] = await Promise.all([
       this.prisma.payment.findMany({
         where: branchFilter,
         include: {
@@ -144,6 +155,12 @@ export class FinanceService {
         take: limit,
       }),
       this.prisma.commission.findMany({
+        where: { ...branchFilter, status: 'APPROVED' },
+        include: { teacher: true, approvedBy: true },
+        orderBy: { approvedAt: 'desc' },
+        take: limit,
+      }),
+      this.prisma.teacherBonus.findMany({
         where: { ...branchFilter, status: 'APPROVED' },
         include: { teacher: true, approvedBy: true },
         orderBy: { approvedAt: 'desc' },
@@ -187,6 +204,18 @@ export class FinanceService {
         description: `Komisi ${c.teacher.name} · ${this.monthName(c.month)} ${c.year}`,
         recordedByName: c.approvedBy?.name,
         amount: parseFloat(c.totalAmount.toString()),
+        direction: 'OUT',
+      })
+    })
+
+    bonuses.forEach(b => {
+      transactions.push({
+        id: b.id,
+        date: b.approvedAt!.toISOString(),
+        type: 'BONUS',
+        description: `Bonus ${b.teacher.name} · ${b.reason} · ${this.monthName(b.month)} ${b.year}`,
+        recordedByName: b.approvedBy?.name,
+        amount: parseFloat(b.amount.toString()),
         direction: 'OUT',
       })
     })
