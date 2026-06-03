@@ -30,6 +30,12 @@ enum SessionType {
   PRIVATE
 }
 
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED_OUT
+}
+
 enum DayOfWeek {
   SENIN
   SELASA
@@ -338,13 +344,15 @@ model Student {
 }
 
 model StudentSubject {
-  id           String   @id @default(cuid())
+  id           String           @id @default(cuid())
   studentId    String
   subjectId    String
   sppRateId    String
   type         SessionType
   enrolledAt   DateTime
-  isActive     Boolean  @default(true)
+  endDate      DateTime?
+  status       EnrollmentStatus @default(ACTIVE)
+  isActive     Boolean          @default(true)
 
   // Relations
   student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)

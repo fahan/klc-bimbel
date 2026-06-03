@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -17,7 +18,7 @@ import { StudentsService } from './students.service'
 import { CreateStudentDto } from './dto/create-student.dto'
 import { UpdateStudentDto } from './dto/update-student.dto'
 import { StudentResponseDto } from './dto/student-response.dto'
-import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto } from './dto/enrollment.dto'
+import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto, EndEnrollmentDto } from './dto/enrollment.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
 import { Roles } from '@/common/decorators/roles.decorator'
@@ -271,6 +272,25 @@ export class StudentsController {
     @Body() updateSubjectDto: UpdateSubjectDto,
   ): Promise<any> {
     return this.studentsService.updateSubjectEnrollment(studentId, subjectId, updateSubjectDto)
+  }
+
+  @Patch(':id/subjects/:subjectId/end')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Tandai enrollment siswa selesai atau keluar',
+    description: 'Set status enrollment menjadi COMPLETED (selesai/lulus) atau DROPPED_OUT (keluar di tengah jalan), beserta tanggal berakhir. Data presensi dan history tetap tersimpan.',
+  })
+  @ApiResponse({ status: 200, description: 'Enrollment berhasil diakhiri' })
+  @ApiResponse({ status: 400, description: 'Status tidak valid' })
+  @ApiResponse({ status: 404, description: 'Siswa atau enrollment tidak ditemukan' })
+  async endSubjectEnrollment(
+    @Param('id') studentId: string,
+    @Param('subjectId') subjectId: string,
+    @Body() dto: EndEnrollmentDto,
+  ): Promise<any> {
+    return this.studentsService.endSubjectEnrollment(studentId, subjectId, dto.status as 'COMPLETED' | 'DROPPED_OUT', dto.endDate)
   }
 
   @Delete(':id/subjects/:subjectId')

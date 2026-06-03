@@ -696,29 +696,73 @@ export class StudentsService {
       throw new NotFoundException('Subject enrollment not found')
     }
 
-    // Soft delete: deactivate subject enrollment
     await this.prisma.studentSubject.update({
       where: { id: studentSubject.id },
+      data: {
+        isActive: false,
+        status: 'DROPPED_OUT',
+        endDate: new Date(),
+      },
+    })
+
+    await this.prisma.sessionStudent.updateMany({
+      where: { studentId, session: { subjectId } },
       data: { isActive: false },
     })
 
-    // Also deactivate related session enrollments
-    await this.prisma.sessionStudent.updateMany({
-      where: {
-        studentId,
-        session: {
-          subjectId,
+    return {
+      success: true,
+      data: { studentSubjectId: studentSubject.id },
+      message: 'Mata pelajaran berhasil dihapus. Data presensi tetap disimpan.',
+    }
+  }
+
+  // End subject enrollment with explicit status (COMPLETED or DROPPED_OUT)
+  async endSubjectEnrollment(studentId: string, subjectId: string, status: 'COMPLETED' | 'DROPPED_OUT', endDate?: string) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+    })
+    if (!student) {
+      throw new NotFoundException('Student not found')
+    }
+
+    const studentSubject = await this.prisma.studentSubject.findFirst({
+      where: { studentId, subjectId, isActive: true },
+      include: { subject: true },
+    })
+    if (!studentSubject) {
+      throw new NotFoundException('Subject enrollment not found or already ended')
+    }
+
+    const resolvedEndDate = endDate ? new Date(endDate) : new Date()
+
+    await this.prisma.$transaction(async tx => {
+      await tx.studentSubject.update({
+        where: { id: studentSubject.id },
+        data: {
+          isActive: false,
+          status,
+          endDate: resolvedEndDate,
         },
-      },
-      data: { isActive: false },
+      })
+
+      await tx.sessionStudent.updateMany({
+        where: { studentId, session: { subjectId } },
+        data: { isActive: false },
+      })
     })
 
     return {
       success: true,
       data: {
         studentSubjectId: studentSubject.id,
+        subjectName: (studentSubject as any).subject.name,
+        status,
+        endDate: resolvedEndDate.toISOString().split('T')[0],
       },
-      message: 'Mata pelajaran berhasil dihapus. Data presensi tetap disimpan.',
+      message: status === 'COMPLETED'
+        ? 'Enrollment berhasil ditandai selesai.'
+        : 'Siswa berhasil ditandai keluar dari mata pelajaran.',
     }
   }
 
@@ -746,6 +790,8 @@ export class StudentsService {
         type: ss.type,
         sppAmount: ss.sppRate?.amount.toString(),
         enrolledAt: ss.enrolledAt.toISOString(),
+        endDate: ss.endDate ? ss.endDate.toISOString().split('T')[0] : null,
+        status: ss.status,
         isActive: ss.isActive,
       })),
     }

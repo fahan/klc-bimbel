@@ -161,3 +161,23 @@ export class UpdateSubjectResponseDto {
   @ApiProperty({ required: false })
   message?: string
 }
+
+// ===== END SUBJECT ENROLLMENT =====
+export class EndEnrollmentDto {
+  @ApiProperty({
+    enum: ['COMPLETED', 'DROPPED_OUT'],
+    example: 'COMPLETED',
+    description: 'Status akhir enrollment: COMPLETED (selesai/lulus) atau DROPPED_OUT (keluar)',
+  })
+  @IsEnum(['COMPLETED', 'DROPPED_OUT'])
+  status!: string
+
+  @ApiProperty({
+    example: '2026-06-03',
+    description: 'Tanggal berakhir enrollment. Kosongkan untuk pakai tanggal hari ini.',
+    required: false,
+  })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string
+}
