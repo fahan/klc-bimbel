@@ -276,7 +276,7 @@ export default function ProgressInputPage() {
           <p className="text-sm font-semibold text-green-900">Presensi tercatat</p>
         </div>
         <p className="text-xs text-green-700">
-          {presentStudents.map((s: any) => s.studentName).join(', ')}{' '}
+          {presentStudents.map((s: any) => s.studentName || s.fullName).join(', ')}{' '}
           — {presentStudents.length} siswa hadir
         </p>
       </div>
@@ -324,14 +324,14 @@ export default function ProgressInputPage() {
               <div key={s.studentId} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-medium text-xs">
-                    {s.studentName
+                    {(s.studentName || s.fullName)
                       ?.split(' ')
                       .map((n: string) => n[0])
                       .join('')
                       .slice(0, 2)
                       .toUpperCase()}
                   </div>
-                  <p className="font-medium text-gray-900 text-sm">{s.studentName}</p>
+                  <p className="font-medium text-gray-900 text-sm">{s.studentName || s.fullName}</p>
                 </div>
 
                 {/* Module Selector */}
@@ -512,14 +512,14 @@ export default function ProgressInputPage() {
                 {/* Student Header */}
                 <div className="bg-gray-50 px-3 py-2 flex items-center gap-2 border-b border-gray-200">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-medium text-xs">
-                    {s.studentName
+                    {(s.studentName || s.fullName)
                       ?.split(' ')
                       .map((n: string) => n[0])
                       .join('')
                       .slice(0, 2)
                       .toUpperCase()}
                   </div>
-                  <p className="font-medium text-gray-900 text-sm flex-1">{s.studentName}</p>
+                  <p className="font-medium text-gray-900 text-sm flex-1">{s.studentName || s.fullName}</p>
                   <span className="text-[10px] px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-medium">
                     Hadir
                   </span>
@@ -563,7 +563,7 @@ export default function ProgressInputPage() {
                   {/* Notes */}
                   <div>
                     <label className="text-xs font-medium text-gray-700 mb-1 block">
-                      Catatan untuk {s.studentName} (opsional)
+                      Catatan untuk {s.studentName || s.fullName} (opsional)
                     </label>
                     <textarea
                       value={progress.notes}

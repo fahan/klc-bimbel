@@ -24,7 +24,7 @@ export default function SesDaruratPage() {
   const [subjectId, setSubjectId] = useState('')
   const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().split('T')[0])
   const [startTime, setStartTime] = useState('08:00')
-  const [durationMinutes, setDurationMinutes] = useState(60)
+  const [durationMinutes, setDurationMinutes] = useState(30)
   const [notes, setNotes] = useState('')
   const [attendances, setAttendances] = useState<{ [studentId: string]: AttendanceStatus }>({})
 

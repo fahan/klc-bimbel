@@ -501,7 +501,7 @@ export class AttendanceService {
         student: { branchId, isActive: true },
       },
       include: {
-        student: { select: { id: true, name: true, classLevel: true } },
+        student: { select: { id: true, name: true, sureName: true, classLevel: true } },
       },
     })
 
@@ -509,7 +509,8 @@ export class AttendanceService {
       success: true,
       data: studentSubjects.map(ss => ({
         studentId: ss.studentId,
-        studentName: ss.student.name,
+        studentName: ss.student.sureName?.trim() || ss.student.name,
+        fullName: ss.student.name,
         classLevel: ss.student.classLevel,
       })),
     }

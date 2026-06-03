@@ -1396,7 +1396,8 @@ export class SessionsService {
       students: session.studentSessions?.map((ss: any) => ({
         id: ss.id,
         studentId: ss.studentId,
-        studentName: ss.student?.name,
+        studentName: ss.student?.sureName?.trim() || ss.student?.name,
+        fullName: ss.student?.name,
         joinedAt: ss.joinedAt?.toISOString(),
         isActive: ss.isActive,
       })),
