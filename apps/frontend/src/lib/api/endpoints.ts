@@ -132,6 +132,7 @@ export const attendanceApi = {
   submit: (data: any) => apiClient.post('/attendance/submit', data),
   getSessionLog: (sessionId: string, date: string) =>
     apiClient.get(`/attendance/session/${sessionId}?date=${date}`),
+  getLogById: (sessionLogId: string) => apiClient.get(`/attendance/log/${sessionLogId}`),
   getHistory: (sessionId: string) => apiClient.get(`/attendance/history/${sessionId}`),
   getReport: (filters?: {
     dateFrom?: string
@@ -151,6 +152,32 @@ export const attendanceApi = {
     const qs = params.toString()
     return apiClient.get(`/attendance/report${qs ? `?${qs}` : ''}`)
   },
+
+  // --- Ad-hoc (Sesi Darurat) ---
+  submitAdHoc: (data: {
+    branchId: string
+    subjectId: string
+    sessionDate: string
+    startTime: string
+    durationMinutes?: number
+    notes?: string
+    attendances: Array<{ studentId: string; status: string }>
+  }) => apiClient.post('/attendance/adhoc', data),
+
+  getAdHocPending: (branchId?: string) => {
+    const qs = branchId ? `?branchId=${branchId}` : ''
+    return apiClient.get(`/attendance/adhoc/pending${qs}`)
+  },
+
+  getMyAdHocHistory: () => apiClient.get('/attendance/adhoc/my-history'),
+
+  getEligibleStudents: (branchId: string, subjectId: string) =>
+    apiClient.get(`/attendance/adhoc/eligible-students?branchId=${branchId}&subjectId=${subjectId}`),
+
+  approveAdHoc: (id: string) => apiClient.patch(`/attendance/adhoc/${id}/approve`),
+
+  rejectAdHoc: (id: string, reason: string) =>
+    apiClient.patch(`/attendance/adhoc/${id}/reject`, { reason }),
 }
 
 // ===== PROGRESS API =====

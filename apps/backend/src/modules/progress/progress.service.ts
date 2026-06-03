@@ -23,8 +23,22 @@ export class ProgressService {
       throw new NotFoundException('Session log not found')
     }
 
-    const subjectId = sessionLog.session.subjectId
-    const subjectTrackingType = sessionLog.session.subject.trackingType
+    // session is nullable for ad-hoc logs — resolve subjectId from either source
+    const subjectId = sessionLog.isAdHoc
+      ? sessionLog.adHocSubjectId
+      : sessionLog.session?.subjectId
+
+    if (!subjectId) {
+      throw new BadRequestException('Tidak dapat menentukan mata pelajaran untuk sesi ini')
+    }
+
+    // For ad-hoc logs, fetch subject separately to get trackingType
+    let subjectTrackingType = sessionLog.session?.subject?.trackingType
+    if (sessionLog.isAdHoc || !subjectTrackingType) {
+      const subject = await this.prisma.subject.findUnique({ where: { id: subjectId } })
+      if (!subject) throw new NotFoundException('Mata pelajaran tidak ditemukan')
+      subjectTrackingType = subject.trackingType
+    }
 
     if (subjectTrackingType !== submitDto.trackingType) {
       throw new BadRequestException(

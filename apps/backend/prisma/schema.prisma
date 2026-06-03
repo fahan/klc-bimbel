@@ -44,6 +44,8 @@ enum SessionLogStatus {
   SCHEDULED
   COMPLETED
   CANCELLED
+  PENDING_APPROVAL  // Ad-hoc session submitted by teacher, awaiting admin review
+  REJECTED          // Admin rejected the ad-hoc session
 }
 
 enum SessionStatus {
@@ -154,6 +156,7 @@ model Branch {
   stockMutations     StockMutation[]
   sales              Sale[]
   progressReportLinks ProgressReportLink[]
+  adHocSessionLogs   SessionLog[] @relation("adhoc_branch")
 
   @@map("branches")
 }
@@ -175,6 +178,7 @@ model User {
   sessionsAsTeacher  Session[] @relation("teacher")
   sessionLogsAsActualTeacher SessionLog[] @relation("actual_teacher")
   sessionLogsAsScheduledTeacher SessionLog[] @relation("scheduled_teacher")
+  reviewedSessionLogs SessionLog[] @relation("reviewed_by")
   attendances        Attendance[] @relation("recorded_by")
   progressLogs       ProgressLog[] @relation("recorded_by")
   commissions        Commission[]
@@ -239,6 +243,7 @@ model Subject {
   studentSubjects       StudentSubject[]
   progressLogs          ProgressLog[]
   commissionDetails     CommissionDetail[]
+  adHocSessionLogs      SessionLog[] @relation("adhoc_subject")
 
   @@map("subjects")
 }
@@ -388,25 +393,44 @@ model SessionStudent {
 
 model SessionLog {
   id                String   @id @default(cuid())
-  sessionId         String
+  sessionId         String?  // Null for ad-hoc sessions
   sessionDate       DateTime @db.Date
-  scheduledTeacherId String  // Original teacher (from Session)
+  scheduledTeacherId String  // Original teacher (from Session, or same as actualTeacherId for ad-hoc)
   actualTeacherId   String   // Teacher who actually taught (can be substitution)
   isReplacement     Boolean  @default(false)
   substitutionReason String? // Optional: reason for substitution
   status            SessionLogStatus @default(SCHEDULED)
+
+  // Ad-hoc session fields
+  isAdHoc           Boolean  @default(false)
+  adHocBranchId     String?  // Branch for ad-hoc session
+  adHocSubjectId    String?  // Subject for ad-hoc session
+  adHocStartTime    String?  // HH:mm for ad-hoc session
+  adHocDuration     Int?     // Duration in minutes for ad-hoc
+  adHocNotes        String?  // Teacher's notes for ad-hoc session
+
+  // Approval fields (for ad-hoc)
+  reviewedById      String?
+  reviewedAt        DateTime?
+  rejectionReason   String?
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   // Relations
-  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session           Session? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   scheduledTeacher  User     @relation("scheduled_teacher", fields: [scheduledTeacherId], references: [id])
   actualTeacher     User     @relation("actual_teacher", fields: [actualTeacherId], references: [id])
+  adHocBranch       Branch?  @relation("adhoc_branch", fields: [adHocBranchId], references: [id])
+  adHocSubject      Subject? @relation("adhoc_subject", fields: [adHocSubjectId], references: [id])
+  reviewedBy        User?    @relation("reviewed_by", fields: [reviewedById], references: [id])
   attendances       Attendance[]
   progressLogs      ProgressLog[]
   commissionDetails CommissionDetail[]
 
-  @@unique([sessionId, sessionDate])
+  @@index([sessionId, sessionDate])
+  @@index([isAdHoc, status])
+  @@index([adHocBranchId, status])
   @@map("session_logs")
 }
 

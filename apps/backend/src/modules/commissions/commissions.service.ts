@@ -23,18 +23,19 @@ export class CommissionsService {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
+    // Fetch both regular and approved ad-hoc session logs for this branch
     const sessionLogs = await this.prisma.sessionLog.findMany({
       where: {
         sessionDate: { gte: startDate, lt: endDate },
         status: 'COMPLETED',
-        session: { branchId },
+        OR: [
+          { isAdHoc: false, session: { branchId } },
+          { isAdHoc: true, adHocBranchId: branchId },
+        ],
       },
       include: {
-        session: {
-          include: {
-            subject: true,
-          },
-        },
+        session: { include: { subject: true } },
+        adHocSubject: true,
         actualTeacher: true,
         attendances: {
           where: { status: 'HADIR' },
@@ -64,13 +65,17 @@ export class CommissionsService {
       let totalCommission = 0
 
       for (const log of logs) {
+        // Resolve subjectId: regular sessions use session.subjectId, ad-hoc use adHocSubjectId
+        const subjectId = log.isAdHoc ? log.adHocSubjectId : log.session?.subjectId
+        if (!subjectId) continue
+
         // For each student that attended (HADIR), compute commission
         for (const attendance of log.attendances) {
           // Get student's SPP rate and subject's commission percentage
           const studentSubject = await this.prisma.studentSubject.findFirst({
             where: {
               studentId: attendance.studentId,
-              subjectId: log.session.subjectId,
+              subjectId,
               isActive: true,
             },
             include: { sppRate: true, subject: true },
@@ -79,11 +84,14 @@ export class CommissionsService {
           if (!studentSubject || !studentSubject.sppRate) continue
 
           // Total sessions in month for this student in this subject
-          const totalSessionsInMonth = await this.prisma.sessionLog.count({
+          // Counts both: regular sessions the student is enrolled in, and approved ad-hoc sessions they attended
+          const regularSessionCount = await this.prisma.sessionLog.count({
             where: {
               sessionDate: { gte: startDate, lt: endDate },
+              status: 'COMPLETED',
+              isAdHoc: false,
               session: {
-                subjectId: log.session.subjectId,
+                subjectId,
                 studentSessions: {
                   some: { studentId: attendance.studentId, isActive: true },
                 },
@@ -91,7 +99,19 @@ export class CommissionsService {
             },
           })
 
-          // Sessions actually attended by this student in this subject
+          const adHocSessionCount = await this.prisma.sessionLog.count({
+            where: {
+              sessionDate: { gte: startDate, lt: endDate },
+              status: 'COMPLETED',
+              isAdHoc: true,
+              adHocSubjectId: subjectId,
+              attendances: { some: { studentId: attendance.studentId } },
+            },
+          })
+
+          const totalSessionsInMonth = regularSessionCount + adHocSessionCount
+
+          // Sessions actually attended by this student in this subject (with this teacher)
           const sessionsAttended = await this.prisma.attendance.count({
             where: {
               studentId: attendance.studentId,
@@ -99,7 +119,10 @@ export class CommissionsService {
               sessionLog: {
                 sessionDate: { gte: startDate, lt: endDate },
                 actualTeacherId: teacherId,
-                session: { subjectId: log.session.subjectId },
+                OR: [
+                  { isAdHoc: false, session: { subjectId } },
+                  { isAdHoc: true, adHocSubjectId: subjectId },
+                ],
               },
             },
           })
@@ -118,7 +141,7 @@ export class CommissionsService {
             _dupKey: dupKey,
             sessionLogId: log.id,
             studentId: attendance.studentId,
-            subjectId: log.session.subjectId,
+            subjectId,
             sppAmount,
             totalSessionsInMonth,
             sessionsAttended,
@@ -318,7 +341,7 @@ export class CommissionsService {
           subjectId: d.subjectId,
           subjectName: d.subject.name,
           subjectCode: d.subject.code,
-          sessionType: d.sessionLog.session.type,
+          sessionType: d.sessionLog.session?.type ?? 'REGULAR',
           students: new Map<string, any>(),
           subtotal: 0,
         })

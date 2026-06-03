@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { sessionApi, branchApi, usersApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
-import { Clock, Users, CheckCircle, AlertCircle, Check, Search, MapPin } from 'lucide-react'
+import { Clock, Users, CheckCircle, AlertCircle, Check, Search, MapPin, Plus, History } from 'lucide-react'
 
 export default function PresensiListPage() {
   const router = useRouter()
@@ -165,9 +165,27 @@ export default function PresensiListPage() {
   return (
     <div className="px-4 py-4 space-y-6 mb-20">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Presensi Siswa</h1>
-        <p className="text-sm text-gray-600 mt-0.5">{dateStr}</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Presensi Siswa</h1>
+          <p className="text-sm text-gray-600 mt-0.5">{dateStr}</p>
+        </div>
+        <div className="flex flex-col gap-2 items-end">
+          <Link
+            href="/guru/presensi/darurat"
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-sm transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Sesi Darurat
+          </Link>
+          <Link
+            href="/guru/presensi/darurat/riwayat"
+            className="flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1.5 rounded-lg transition"
+          >
+            <History className="w-3 h-3" />
+            Riwayat Darurat
+          </Link>
+        </div>
       </div>
 
       {/* My Sessions */}

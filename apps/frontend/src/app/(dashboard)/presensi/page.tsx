@@ -26,6 +26,11 @@ import {
   Eye,
   Clock,
   ChevronRight,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 interface SessionWithAttendance {
@@ -143,6 +148,50 @@ export default function AttendancePage() {
       isLoading: sessionsLoading,
     })
 
+  // --- Ad-hoc pending approvals ---
+  const [adHocExpanded, setAdHocExpanded] = useState(true)
+  const [rejectModalId, setRejectModalId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [adHocActionLoading, setAdHocActionLoading] = useState<string | null>(null)
+
+  const {
+    data: pendingAdHocData,
+    isLoading: loadingPendingAdHoc,
+    refetch: refetchPendingAdHoc,
+  } = useQuery({
+    queryKey: ['adhoc-pending', filters.branchId],
+    queryFn: () => attendanceApi.getAdHocPending(filters.branchId || undefined),
+  })
+
+  const pendingAdHocLogs = pendingAdHocData?.data?.data || []
+
+  const handleApproveAdHoc = async (id: string) => {
+    try {
+      setAdHocActionLoading(id)
+      await attendanceApi.approveAdHoc(id)
+      await refetchPendingAdHoc()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menyetujui sesi darurat')
+    } finally {
+      setAdHocActionLoading(null)
+    }
+  }
+
+  const handleRejectAdHoc = async () => {
+    if (!rejectModalId || !rejectReason.trim()) return
+    try {
+      setAdHocActionLoading(rejectModalId)
+      await attendanceApi.rejectAdHoc(rejectModalId, rejectReason)
+      setRejectModalId(null)
+      setRejectReason('')
+      await refetchPendingAdHoc()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menolak sesi darurat')
+    } finally {
+      setAdHocActionLoading(null)
+    }
+  }
+
   // Reset page to 1 when any filter changes
   useEffect(() => {
     setPage(1)
@@ -197,6 +246,145 @@ export default function AttendancePage() {
           </p>
         </div>
       </div>
+
+      {/* ===== AD-HOC PENDING APPROVALS ===== */}
+      <div className="bg-white rounded-lg border-2 border-orange-200 shadow-sm overflow-hidden">
+        {/* Collapsible Header */}
+        <button
+          onClick={() => setAdHocExpanded(!adHocExpanded)}
+          className="w-full flex items-center justify-between px-5 py-3 bg-orange-50 hover:bg-orange-100 transition"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <span className="font-semibold text-orange-900">Sesi Darurat — Menunggu Persetujuan</span>
+            {pendingAdHocLogs.length > 0 && (
+              <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                {pendingAdHocLogs.length}
+              </span>
+            )}
+          </div>
+          {adHocExpanded ? <ChevronUp className="w-4 h-4 text-orange-600" /> : <ChevronDown className="w-4 h-4 text-orange-600" />}
+        </button>
+
+        {adHocExpanded && (
+          <div className="p-4">
+            {loadingPendingAdHoc ? (
+              <div className="space-y-2">
+                {[1, 2].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />)}
+              </div>
+            ) : pendingAdHocLogs.length === 0 ? (
+              <div className="text-center py-6 text-gray-500">
+                <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-600">Tidak ada sesi darurat yang menunggu persetujuan</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pendingAdHocLogs.map((log: any) => (
+                  <div key={log.id} className="border border-orange-100 rounded-lg p-4 bg-orange-50/30 space-y-3">
+                    {/* Log Header */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-gray-900">{log.subjectName}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {log.sessionDate}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {log.startTime} ({log.durationMinutes}m)
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" />
+                            {log.hadirCount}/{log.studentCount} hadir
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Guru: <strong>{log.teacherName}</strong> · Cabang: {log.branchName}
+                        </p>
+                        {log.notes && (
+                          <p className="text-xs text-gray-500 mt-1 italic">"{log.notes}"</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Attendance summary */}
+                    {log.attendances && log.attendances.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {log.attendances.map((att: any) => (
+                          <span
+                            key={att.studentId}
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              att.status === 'HADIR' ? 'bg-green-100 text-green-700' :
+                              att.status === 'ABSEN' ? 'bg-red-100 text-red-600' :
+                              att.status === 'IZIN' ? 'bg-amber-100 text-amber-700' :
+                              'bg-purple-100 text-purple-700'
+                            }`}
+                          >
+                            {att.studentName} — {att.status}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApproveAdHoc(log.id)}
+                        disabled={adHocActionLoading === log.id}
+                        className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        {adHocActionLoading === log.id ? 'Memproses...' : 'Setujui'}
+                      </button>
+                      <button
+                        onClick={() => { setRejectModalId(log.id); setRejectReason('') }}
+                        disabled={adHocActionLoading === log.id}
+                        className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Tolak
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Reject Modal */}
+      {rejectModalId && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Tolak Sesi Darurat</h3>
+            <p className="text-sm text-gray-600">Berikan alasan penolakan yang jelas agar guru dapat menindaklanjuti.</p>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="Contoh: Tidak ada bukti sesi berlangsung / jadwal belum dikonfirmasi..."
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setRejectModalId(null); setRejectReason('') }}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleRejectAdHoc}
+                disabled={!rejectReason.trim() || adHocActionLoading === rejectModalId}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition disabled:opacity-50"
+              >
+                {adHocActionLoading === rejectModalId ? 'Memproses...' : 'Tolak Sesi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filter Section */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">

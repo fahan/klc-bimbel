@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger'
 import { AttendanceService } from './attendance.service'
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
+import { SubmitAdHocAttendanceDto, RejectAdHocDto } from './dto/submit-adhoc-attendance.dto'
 import { AttendanceResponseDto } from './dto/attendance-response.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
@@ -85,5 +86,100 @@ export class AttendanceController {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 10,
     })
+  }
+
+  // ========== AD-HOC ATTENDANCE ENDPOINTS ==========
+
+  @Post('adhoc')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG', 'GURU')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Submit ad-hoc (darurat) attendance',
+    description:
+      'Guru submits attendance for a session that is not in the regular schedule. Creates a session log with PENDING_APPROVAL status awaiting admin review before being counted in commission.',
+  })
+  @ApiResponse({ status: 201, description: 'Ad-hoc attendance submitted, pending admin approval' })
+  async submitAdHoc(
+    @Body() dto: SubmitAdHocAttendanceDto,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.submitAdHocAttendance(dto, user.id)
+  }
+
+  @Get('log/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get a session log by ID (supports both regular and ad-hoc)',
+    description: 'Returns session log details including subject info and attendance list. Used by progress input pages.',
+  })
+  async getSessionLogById(@Param('id') id: string): Promise<any> {
+    return this.attendanceService.getSessionLogById(id)
+  }
+
+  @Get('adhoc/pending')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get pending ad-hoc sessions awaiting approval',
+    description: 'Returns all ad-hoc session logs with status PENDING_APPROVAL. Filter by branchId for ADMIN_CABANG.',
+  })
+  async getAdHocPending(@Query('branchId') branchId?: string): Promise<any> {
+    return this.attendanceService.getAdHocPending(branchId)
+  }
+
+  @Get('adhoc/my-history')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current teacher\'s ad-hoc submission history' })
+  async getMyAdHocHistory(@CurrentUser() user: any): Promise<any> {
+    return this.attendanceService.getMyAdHocHistory(user.id)
+  }
+
+  @Get('adhoc/eligible-students')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get students eligible for ad-hoc session',
+    description: 'Returns students enrolled in a given subject at a given branch.',
+  })
+  async getEligibleStudents(
+    @Query('branchId') branchId: string,
+    @Query('subjectId') subjectId: string,
+  ): Promise<any> {
+    return this.attendanceService.getEligibleStudents(branchId, subjectId)
+  }
+
+  @Patch('adhoc/:id/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Approve an ad-hoc session',
+    description: 'Admin approves a PENDING_APPROVAL ad-hoc session. Status changes to COMPLETED and will be included in commission calculation.',
+  })
+  async approveAdHoc(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.approveAdHoc(id, user.id)
+  }
+
+  @Patch('adhoc/:id/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Reject an ad-hoc session',
+    description: 'Admin rejects a PENDING_APPROVAL ad-hoc session with a reason. Status changes to REJECTED and will NOT be counted in commission.',
+  })
+  async rejectAdHoc(
+    @Param('id') id: string,
+    @Body() dto: RejectAdHocDto,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.rejectAdHoc(id, user.id, dto.reason)
   }
 }
