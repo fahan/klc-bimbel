@@ -140,6 +140,13 @@ export default function PresensiListPage() {
                   </p>
                 )}
                 {!isSubstitution && <p className="text-xs text-gray-500 mt-1">{session.branchName}</p>}
+                {/* Nama siswa — reguler */}
+                {!isSubstitution && session.students && session.students.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {session.students.map((s: any) => s.studentName).join(', ')}
+                  </p>
+                )}
+                {/* Nama siswa — substitusi */}
                 {isSubstitution && session.studentList && (
                   <p className="text-xs text-gray-500 mt-1">Siswa: {session.studentList.join(', ')}</p>
                 )}
