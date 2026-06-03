@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { invoiceApi, paymentApi, branchApi, studentApi } from '@/lib/api/endpoints'
 import {
@@ -15,6 +15,7 @@ import {
   Clock,
   Copy,
   X,
+  ChevronDown,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -53,6 +54,11 @@ export default function InvoiceTagihanPage() {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
 
+  // Searchable student dropdown state
+  const [studentSearch, setStudentSearch] = useState('')
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
+  const studentDropdownRef = useRef<HTMLDivElement>(null)
+
   // Payment modal state
   const [paymentInvoice, setPaymentInvoice] = useState<any>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -89,6 +95,25 @@ export default function InvoiceTagihanPage() {
   const metrics = metricsData?.data?.data
   const students = studentsData?.data?.data || []
   const branches = branchesData?.data?.data || []
+
+  // Close student dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (studentDropdownRef.current && !studentDropdownRef.current.contains(e.target as Node)) {
+        setStudentDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filteredStudents = useMemo(
+    () =>
+      students.filter((s: any) =>
+        s.name.toLowerCase().includes(studentSearch.toLowerCase()),
+      ),
+    [students, studentSearch],
+  )
 
   const filteredInvoices = useMemo(
     () =>
@@ -459,23 +484,82 @@ Mohon segera dilunasi. Terima kasih 🙏`
               </button>
             </div>
 
-            {/* Student Select */}
-            <div className="mb-3">
+            {/* Student Searchable Select */}
+            <div className="mb-3" ref={studentDropdownRef}>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Siswa <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formStudentId}
-                onChange={(e) => setFormStudentId(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">-- Pilih siswa --</option>
-                {students.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setStudentDropdownOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left"
+                >
+                  <span className={formStudentId ? 'text-gray-900' : 'text-gray-400'}>
+                    {formStudentId
+                      ? students.find((s: any) => s.id === formStudentId)?.name || '-- Pilih siswa --'
+                      : '-- Pilih siswa --'}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                </button>
+
+                {studentDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+                    <div className="p-2 border-b border-gray-100">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-gray-400" />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Cari nama siswa..."
+                          value={studentSearch}
+                          onChange={(e) => setStudentSearch(e.target.value)}
+                          className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <ul className="max-h-48 overflow-y-auto py-1">
+                      {filteredStudents.length === 0 ? (
+                        <li className="px-3 py-2 text-xs text-gray-500 text-center">
+                          Siswa tidak ditemukan
+                        </li>
+                      ) : (
+                        filteredStudents.map((s: any) => (
+                          <li
+                            key={s.id}
+                            onClick={() => {
+                              setFormStudentId(s.id)
+                              setStudentSearch('')
+                              setStudentDropdownOpen(false)
+                            }}
+                            className={`px-3 py-2 text-sm cursor-pointer transition ${
+                              formStudentId === s.id
+                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                : 'text-gray-800 hover:bg-gray-50'
+                            }`}
+                          >
+                            {s.name}
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                    {formStudentId && (
+                      <div className="border-t border-gray-100 p-1">
+                        <button
+                          onClick={() => {
+                            setFormStudentId('')
+                            setStudentSearch('')
+                            setStudentDropdownOpen(false)
+                          }}
+                          className="w-full text-xs text-gray-500 hover:text-red-600 py-1 rounded hover:bg-red-50 transition"
+                        >
+                          Hapus pilihan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Period Select (SPP only) */}
