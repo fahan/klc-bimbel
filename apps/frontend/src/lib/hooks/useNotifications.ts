@@ -36,7 +36,7 @@ export function useNotifications(branchId?: string) {
 
   const { data: registrationData } = useQuery({
     queryKey: ['notifications-registrations'],
-    queryFn: () => landingApi.getRegistrations({ status: 'PENDING', limit: 100 }),
+    queryFn: () => landingApi.getRegistrations({ status: 'NEW', limit: 100 }),
     staleTime: 60_000,
   })
 
