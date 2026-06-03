@@ -59,7 +59,7 @@ export class DashboardService {
         orderBy: { name: 'asc' },
       }),
       this.prisma.subject.count({ where: { isActive: true } }),
-      this.prisma.sppRate.count({ where: { isActive: true } }),
+      this.prisma.sppRate.count(),
       this.prisma.curriculumModule.count(),
 
       // Invoice status counts for current month
@@ -242,7 +242,7 @@ export class DashboardService {
       startTime: s.startTime,
       durationMinutes: s.durationMinutes,
       dayOfWeek: s.dayOfWeek,
-      capacity: { current: s.studentSessions.length, max: s.maxStudents },
+      capacity: { current: s.studentSessions.length, max: s.maxCapacity },
     }))
 
     // Format students
