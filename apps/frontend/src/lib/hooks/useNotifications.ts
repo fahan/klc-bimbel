@@ -22,8 +22,9 @@ export function useNotifications(branchId?: string) {
     staleTime: 60_000,
   })
 
+  // Same queryKey as dashboard/page.tsx so React Query deduplicates the request
   const { data: invoiceData } = useQuery({
-    queryKey: ['notifications-invoice', month, year, branchId],
+    queryKey: ['invoice-metrics', month, year, branchId],
     queryFn: () => invoiceApi.getMetrics({ branchId, month, year }),
     staleTime: 60_000,
   })
