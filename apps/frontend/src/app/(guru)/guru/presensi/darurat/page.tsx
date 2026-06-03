@@ -34,6 +34,9 @@ export default function SesDaruratPage() {
   const [showDropdown, setShowDropdown] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
 
+  // Filter for enrolled student list
+  const [filterName, setFilterName] = useState('')
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -82,6 +85,7 @@ export default function SesDaruratPage() {
     setAttendances({})
     setManualStudents([])
     setSearchQuery('')
+    setFilterName('')
   }, [branchId, subjectId])
 
   // Close dropdown when clicking outside
@@ -112,6 +116,14 @@ export default function SesDaruratPage() {
 
   const branches = branchesData?.data?.data || []
   const subjects = subjectsData?.data?.data || []
+
+  // Filter displayed students by name
+  const filteredStudents = filterName.trim()
+    ? allStudents.filter(s =>
+        s.studentName.toLowerCase().includes(filterName.toLowerCase()) ||
+        (s as any).fullName?.toLowerCase().includes(filterName.toLowerCase())
+      )
+    : allStudents
 
   // Search results for manual addition dropdown
   const searchResults: any[] = (searchData?.data?.data || []).filter(
@@ -332,6 +344,25 @@ export default function SesDaruratPage() {
             )}
           </div>
 
+          {/* Filter input */}
+          {!loadingStudents && allStudents.length > 3 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Cari nama siswa..."
+                value={filterName}
+                onChange={e => setFilterName(e.target.value)}
+                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+              {filterName && (
+                <button onClick={() => setFilterName('')} className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Enrolled students loading skeleton */}
           {loadingStudents ? (
             <div className="space-y-2">
@@ -353,8 +384,16 @@ export default function SesDaruratPage() {
                 </div>
               )}
 
+              {/* Filter empty state */}
+              {filterName && filteredStudents.length === 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <p className="text-sm text-gray-500">Tidak ada siswa dengan nama "<strong>{filterName}</strong>"</p>
+                  <button onClick={() => setFilterName('')} className="text-xs text-blue-500 mt-1">Hapus filter</button>
+                </div>
+              )}
+
               {/* Student cards */}
-              {allStudents.map(student => {
+              {filteredStudents.map(student => {
                 const status = attendances[student.studentId]
                 return (
                   <div key={student.studentId} className={`bg-white border rounded-lg p-3 shadow-sm ${student.isManual ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'}`}>
@@ -442,6 +481,9 @@ export default function SesDaruratPage() {
               {allStudents.length > 0 && (
                 <p className="text-xs text-gray-500 text-center">
                   {Object.keys(attendances).length}/{allStudents.length} siswa sudah ditandai
+                  {filterName && filteredStudents.length < allStudents.length && (
+                    <span className="ml-1 text-orange-500">(tampil {filteredStudents.length} dari {allStudents.length})</span>
+                  )}
                 </p>
               )}
             </div>
