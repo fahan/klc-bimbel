@@ -12,146 +12,109 @@ export class FinanceService {
   async getOverview(branchId: string | undefined, month: number, year: number) {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
-
     const branchFilter = branchId ? { branchId } : {}
 
-    // ===== INCOME =====
-    // SPP from invoices (paid)
-    const sppPayments = await this.prisma.payment.findMany({
-      where: {
-        ...branchFilter,
-        paidAt: { gte: startDate, lt: endDate },
-        invoice: { type: 'SPP' },
-      },
+    // Build 6-month trend date ranges upfront
+    const trendRanges = Array.from({ length: 6 }, (_, i) => {
+      const tDate = new Date(year, month - 1 - (5 - i), 1)
+      const tYear = tDate.getFullYear()
+      const tMonth = tDate.getMonth() + 1
+      return { year: tYear, month: tMonth, start: tDate, end: new Date(tYear, tMonth, 1) }
     })
-    const sppIncome = sppPayments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0)
 
-    // Registration from invoices (paid)
-    const regPayments = await this.prisma.payment.findMany({
-      where: {
-        ...branchFilter,
-        paidAt: { gte: startDate, lt: endDate },
-        invoice: { type: 'REGISTRATION' },
-      },
-    })
-    const regIncome = regPayments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0)
+    // Fire ALL queries in parallel: 6 current-month + 4×6 trend = 30 total
+    const [
+      sppAgg,
+      regAgg,
+      salesAgg,
+      commissionAgg,
+      stockIn,
+      unpaidInvoices,
+      ...trendResults
+    ] = await Promise.all([
+      // Current month income (aggregate — no row fetch needed)
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'SPP' } },
+      }),
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'REGISTRATION' } },
+      }),
+      this.prisma.sale.aggregate({
+        _sum: { totalAmount: true },
+        where: { ...branchFilter, createdAt: { gte: startDate, lt: endDate } },
+      }),
+      // Current month commission expense (aggregate)
+      this.prisma.commission.aggregate({
+        _sum: { totalAmount: true },
+        where: { ...branchFilter, month, year, status: 'APPROVED' },
+      }),
+      // Stock IN mutations (need price per product for multiplication)
+      this.prisma.stockMutation.findMany({
+        where: { ...branchFilter, type: 'IN', createdAt: { gte: startDate, lt: endDate } },
+        select: { quantity: true, product: { select: { price: true } } },
+      }),
+      // Unpaid invoices (need per-row diff for amount + unique student count)
+      this.prisma.invoice.findMany({
+        where: { ...branchFilter, status: { in: ['UNPAID', 'PARTIAL'] }, type: 'SPP' },
+        select: { studentId: true, totalAmount: true, paidAmount: true },
+      }),
+      // Trend: 6 months × 4 parallel aggregate queries = 24 total
+      ...trendRanges.flatMap(r => [
+        this.prisma.payment.aggregate({
+          _sum: { amount: true },
+          where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
+        }),
+        this.prisma.payment.aggregate({
+          _sum: { amount: true },
+          where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'REGISTRATION' } },
+        }),
+        this.prisma.sale.aggregate({
+          _sum: { totalAmount: true },
+          where: { ...branchFilter, createdAt: { gte: r.start, lt: r.end } },
+        }),
+        this.prisma.commission.aggregate({
+          _sum: { totalAmount: true },
+          where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
+        }),
+      ]),
+    ])
 
-    // Store sales
-    const sales = await this.prisma.sale.findMany({
-      where: {
-        ...branchFilter,
-        createdAt: { gte: startDate, lt: endDate },
-      },
-    })
-    const storeIncome = sales.reduce((sum, s) => sum + parseFloat(s.totalAmount.toString()), 0)
-
+    // Current month calculations
+    const sppIncome = parseFloat((sppAgg._sum.amount || 0).toString())
+    const regIncome = parseFloat((regAgg._sum.amount || 0).toString())
+    const storeIncome = parseFloat((salesAgg._sum.totalAmount || 0).toString())
     const totalIncome = sppIncome + regIncome + storeIncome
 
-    // ===== EXPENSES =====
-    // Teacher commissions (only approved)
-    const commissions = await this.prisma.commission.findMany({
-      where: {
-        ...branchFilter,
-        month,
-        year,
-        status: 'APPROVED',
-      },
-    })
-    const commissionExpense = commissions.reduce(
-      (sum, c) => sum + parseFloat(c.totalAmount.toString()),
-      0,
-    )
-
-    // Stock purchases (IN mutations)
-    const stockIn = await this.prisma.stockMutation.findMany({
-      where: {
-        ...branchFilter,
-        type: 'IN',
-        createdAt: { gte: startDate, lt: endDate },
-      },
-      include: { product: true },
-    })
+    const commissionExpense = parseFloat((commissionAgg._sum.totalAmount || 0).toString())
     const stockExpense = stockIn.reduce(
       (sum, m) => sum + m.quantity * parseFloat(m.product.price.toString()),
       0,
     )
-
     const totalExpense = commissionExpense + stockExpense
-
     const netBalance = totalIncome - totalExpense
 
-    // ===== UNPAID SPP =====
-    const unpaidInvoices = await this.prisma.invoice.findMany({
-      where: {
-        ...branchFilter,
-        status: { in: ['UNPAID', 'PARTIAL'] },
-        type: 'SPP',
-      },
-    })
     const unpaidAmount = unpaidInvoices.reduce(
-      (sum, i) =>
-        sum + (parseFloat(i.totalAmount.toString()) - parseFloat(i.paidAmount.toString())),
+      (sum, i) => sum + parseFloat(i.totalAmount.toString()) - parseFloat(i.paidAmount.toString()),
       0,
     )
     const uniqueStudents = new Set(unpaidInvoices.map(i => i.studentId)).size
 
-    // ===== TREND (6 months) =====
-    const trend: Array<{ month: number; year: number; income: number; expense: number; net: number }> = []
-    for (let i = 5; i >= 0; i--) {
-      const tMonth = month - i
-      const tDate = new Date(year, tMonth - 1, 1)
-      const tYear = tDate.getFullYear()
-      const tMonthFinal = tDate.getMonth() + 1
-      const tStart = tDate
-      const tEnd = new Date(tYear, tMonthFinal, 1)
-
-      const tSpp = await this.prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          ...branchFilter,
-          paidAt: { gte: tStart, lt: tEnd },
-          invoice: { type: 'SPP' },
-        },
-      })
-      const tReg = await this.prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: {
-          ...branchFilter,
-          paidAt: { gte: tStart, lt: tEnd },
-          invoice: { type: 'REGISTRATION' },
-        },
-      })
-      const tSales = await this.prisma.sale.aggregate({
-        _sum: { totalAmount: true },
-        where: {
-          ...branchFilter,
-          createdAt: { gte: tStart, lt: tEnd },
-        },
-      })
-      const tCommissions = await this.prisma.commission.aggregate({
-        _sum: { totalAmount: true },
-        where: {
-          ...branchFilter,
-          month: tMonthFinal,
-          year: tYear,
-          status: 'APPROVED',
-        },
-      })
-
+    // Parse trend results (trendResults = 24 items in groups of 4 per month)
+    const trend = trendRanges.map((r, i) => {
+      const base = i * 4
+      const tSpp = trendResults[base] as { _sum: { amount: any } }
+      const tReg = trendResults[base + 1] as { _sum: { amount: any } }
+      const tSales = trendResults[base + 2] as { _sum: { totalAmount: any } }
+      const tComm = trendResults[base + 3] as { _sum: { totalAmount: any } }
       const tIncome =
         parseFloat((tSpp._sum.amount || 0).toString()) +
         parseFloat((tReg._sum.amount || 0).toString()) +
         parseFloat((tSales._sum.totalAmount || 0).toString())
-      const tExpense = parseFloat((tCommissions._sum.totalAmount || 0).toString())
-
-      trend.push({
-        month: tMonthFinal,
-        year: tYear,
-        income: tIncome,
-        expense: tExpense,
-        net: tIncome - tExpense,
-      })
-    }
+      const tExpense = parseFloat((tComm._sum.totalAmount || 0).toString())
+      return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
+    })
 
     return {
       success: true,
@@ -165,15 +128,8 @@ export class FinanceService {
           unpaidStudentsCount: uniqueStudents,
         },
         breakdown: {
-          income: {
-            spp: sppIncome,
-            registration: regIncome,
-            store: storeIncome,
-          },
-          expense: {
-            commission: commissionExpense,
-            stock: stockExpense,
-          },
+          income: { spp: sppIncome, registration: regIncome, store: storeIncome },
+          expense: { commission: commissionExpense, stock: stockExpense },
         },
         trend,
       },
@@ -183,34 +139,33 @@ export class FinanceService {
   async getRecentTransactions(branchId: string | undefined, limit: number = 20) {
     const branchFilter = branchId ? { branchId } : {}
 
-    // Get recent payments + sales (combined ordered by date)
-    const payments = await this.prisma.payment.findMany({
-      where: branchFilter,
-      include: {
-        invoice: { include: { student: true } },
-        recordedBy: true,
-      },
-      orderBy: { paidAt: 'desc' },
-      take: limit,
-    })
-
-    const sales = await this.prisma.sale.findMany({
-      where: branchFilter,
-      include: {
-        student: true,
-        createdBy: true,
-        saleItems: { include: { product: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    })
-
-    const commissions = await this.prisma.commission.findMany({
-      where: { ...branchFilter, status: 'APPROVED' },
-      include: { teacher: true, approvedBy: true },
-      orderBy: { approvedAt: 'desc' },
-      take: limit,
-    })
+    const [payments, sales, commissions] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: branchFilter,
+        include: {
+          invoice: { include: { student: true } },
+          recordedBy: true,
+        },
+        orderBy: { paidAt: 'desc' },
+        take: limit,
+      }),
+      this.prisma.sale.findMany({
+        where: branchFilter,
+        include: {
+          student: true,
+          createdBy: true,
+          saleItems: { include: { product: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+      this.prisma.commission.findMany({
+        where: { ...branchFilter, status: 'APPROVED' },
+        include: { teacher: true, approvedBy: true },
+        orderBy: { approvedAt: 'desc' },
+        take: limit,
+      }),
+    ])
 
     // Combine + sort by date
     const transactions: any[] = []
