@@ -22,17 +22,8 @@ export class FinanceService {
       return { year: tYear, month: tMonth, start: tDate, end: new Date(tYear, tMonth, 1) }
     })
 
-    // Fire ALL queries in parallel: 6 current-month + 4×6 trend = 30 total
-    const [
-      sppAgg,
-      regAgg,
-      salesAgg,
-      commissionAgg,
-      stockIn,
-      unpaidInvoices,
-      ...trendResults
-    ] = await Promise.all([
-      // Current month income (aggregate — no row fetch needed)
+    // Phase 1: current month — 6 queries parallel (max concurrent = 6)
+    const [sppAgg, regAgg, salesAgg, commissionAgg, stockIn, unpaidInvoices] = await Promise.all([
       this.prisma.payment.aggregate({
         _sum: { amount: true },
         where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'SPP' } },
@@ -45,41 +36,49 @@ export class FinanceService {
         _sum: { totalAmount: true },
         where: { ...branchFilter, createdAt: { gte: startDate, lt: endDate } },
       }),
-      // Current month commission expense (aggregate)
       this.prisma.commission.aggregate({
         _sum: { totalAmount: true },
         where: { ...branchFilter, month, year, status: 'APPROVED' },
       }),
-      // Stock IN mutations (need price per product for multiplication)
       this.prisma.stockMutation.findMany({
         where: { ...branchFilter, type: 'IN', createdAt: { gte: startDate, lt: endDate } },
         select: { quantity: true, product: { select: { price: true } } },
       }),
-      // Unpaid invoices (need per-row diff for amount + unique student count)
       this.prisma.invoice.findMany({
         where: { ...branchFilter, status: { in: ['UNPAID', 'PARTIAL'] }, type: 'SPP' },
         select: { studentId: true, totalAmount: true, paidAmount: true },
       }),
-      // Trend: 6 months × 4 parallel aggregate queries = 24 total
-      ...trendRanges.flatMap(r => [
-        this.prisma.payment.aggregate({
-          _sum: { amount: true },
-          where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
-        }),
-        this.prisma.payment.aggregate({
-          _sum: { amount: true },
-          where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'REGISTRATION' } },
-        }),
-        this.prisma.sale.aggregate({
-          _sum: { totalAmount: true },
-          where: { ...branchFilter, createdAt: { gte: r.start, lt: r.end } },
-        }),
-        this.prisma.commission.aggregate({
-          _sum: { totalAmount: true },
-          where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
-        }),
-      ]),
     ])
+
+    // Phase 2: trend — each month runs 4 queries in parallel, 6 months concurrently (max = 4)
+    const trend = await Promise.all(
+      trendRanges.map(async r => {
+        const [tSpp, tReg, tSales, tComm] = await Promise.all([
+          this.prisma.payment.aggregate({
+            _sum: { amount: true },
+            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
+          }),
+          this.prisma.payment.aggregate({
+            _sum: { amount: true },
+            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'REGISTRATION' } },
+          }),
+          this.prisma.sale.aggregate({
+            _sum: { totalAmount: true },
+            where: { ...branchFilter, createdAt: { gte: r.start, lt: r.end } },
+          }),
+          this.prisma.commission.aggregate({
+            _sum: { totalAmount: true },
+            where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
+          }),
+        ])
+        const tIncome =
+          parseFloat((tSpp._sum.amount || 0).toString()) +
+          parseFloat((tReg._sum.amount || 0).toString()) +
+          parseFloat((tSales._sum.totalAmount || 0).toString())
+        const tExpense = parseFloat((tComm._sum.totalAmount || 0).toString())
+        return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
+      }),
+    )
 
     // Current month calculations
     const sppIncome = parseFloat((sppAgg._sum.amount || 0).toString())
@@ -100,21 +99,6 @@ export class FinanceService {
       0,
     )
     const uniqueStudents = new Set(unpaidInvoices.map(i => i.studentId)).size
-
-    // Parse trend results (trendResults = 24 items in groups of 4 per month)
-    const trend = trendRanges.map((r, i) => {
-      const base = i * 4
-      const tSpp = trendResults[base] as { _sum: { amount: any } }
-      const tReg = trendResults[base + 1] as { _sum: { amount: any } }
-      const tSales = trendResults[base + 2] as { _sum: { totalAmount: any } }
-      const tComm = trendResults[base + 3] as { _sum: { totalAmount: any } }
-      const tIncome =
-        parseFloat((tSpp._sum.amount || 0).toString()) +
-        parseFloat((tReg._sum.amount || 0).toString()) +
-        parseFloat((tSales._sum.totalAmount || 0).toString())
-      const tExpense = parseFloat((tComm._sum.totalAmount || 0).toString())
-      return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
-    })
 
     return {
       success: true,
