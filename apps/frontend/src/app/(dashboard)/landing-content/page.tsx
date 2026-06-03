@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { landingApi } from '@/lib/api/endpoints'
-import { Globe, Save, Plus, Trash2, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Globe, Save, Plus, Trash2, RefreshCw, ExternalLink, ChevronDown, ChevronUp, UserPlus } from 'lucide-react'
 import ImageUpload from '@/components/ui/ImageUpload'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -470,9 +471,20 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 }
 
 function RegistrationsTab() {
+  const router = useRouter()
   const [filterStatus, setFilterStatus] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const qc = useQueryClient()
+
+  const handleJadiSiswa = (reg: any) => {
+    const params = new URLSearchParams()
+    if (reg.childName) params.set('name', reg.childName)
+    if (reg.parentName) params.set('parentName', reg.parentName)
+    if (reg.phone) params.set('parentPhone', reg.phone)
+    if (reg.grade) params.set('classLevel', reg.grade)
+    if (reg.branchCode) params.set('branchCode', reg.branchCode)
+    router.push(`/master-data/students/create?${params.toString()}`)
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['landing-registrations', filterStatus],
@@ -565,6 +577,13 @@ function RegistrationsTab() {
                     WhatsApp
                     <ExternalLink className="w-3 h-3" />
                   </a>
+                  <button
+                    onClick={() => handleJadiSiswa(reg)}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <UserPlus className="w-3 h-3" />
+                    Jadikan Siswa
+                  </button>
                 </div>
               </div>
             </div>

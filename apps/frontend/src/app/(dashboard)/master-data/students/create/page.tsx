@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useCallback, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { studentApi, branchApi, subjectApi } from '@/lib/api/endpoints'
 import EnrollmentStepper from '@/components/enrollment/EnrollmentStepper'
@@ -41,6 +41,7 @@ interface SelectedSession {
 
 export default function StudentEnrollmentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const [currentStep, setCurrentStep] = useState(1)
   const [studentData, setStudentData] = useState<Partial<StudentData>>({})
@@ -54,6 +55,25 @@ export default function StudentEnrollmentPage() {
     queryKey: ['branches'],
     queryFn: () => branchApi.getAll(),
   })
+
+  // Pre-fill from query params (from "Jadikan Siswa" on landing registrations)
+  useEffect(() => {
+    const name = searchParams.get('name')
+    if (!name) return
+
+    const branches: any[] = branchesData?.data?.data ?? []
+    const branchCode = searchParams.get('branchCode')
+    const matchedBranch = branchCode ? branches.find((b) => b.code === branchCode) : null
+
+    setStudentData((prev) => ({
+      ...prev,
+      name: name ?? prev.name,
+      parentName: searchParams.get('parentName') ?? prev.parentName ?? null,
+      parentPhone: searchParams.get('parentPhone') ?? prev.parentPhone ?? null,
+      classLevel: searchParams.get('classLevel') ?? prev.classLevel ?? null,
+      branchId: matchedBranch?.id ?? prev.branchId ?? '',
+    }))
+  }, [searchParams, branchesData])
 
   // Get subjects for step 2
   const { data: subjectsData } = useQuery({
@@ -157,12 +177,19 @@ export default function StudentEnrollmentPage() {
     'Konfirmasi',
   ]
 
+  const fromLanding = !!searchParams.get('name')
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Topbar */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <h1 className="text-2xl font-semibold text-gray-900">Pendaftaran Siswa Baru</h1>
+          {fromLanding && (
+            <p className="text-sm text-blue-600 mt-1">
+              Data diisi otomatis dari pendaftar landing page. Periksa dan lengkapi sebelum menyimpan.
+            </p>
+          )}
         </div>
       </div>
 
