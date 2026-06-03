@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
@@ -33,7 +33,7 @@ const PREDICATE_OPTIONS: { value: Predicate; label: string; color: string }[] = 
   { value: 'MEMUASKAN',       label: 'Memuaskan',       color: 'bg-teal-100 text-teal-700 border-teal-300' },
 ]
 
-export default function DaruratProgressPage() {
+function DaruratProgressContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionLogId = searchParams.get('sessionLogId')
@@ -380,5 +380,17 @@ export default function DaruratProgressPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function DaruratProgressPage() {
+  return (
+    <Suspense fallback={
+      <div className="px-4 py-4 space-y-3">
+        {[1, 2, 3].map(i => <div key={i} className="bg-white rounded-lg p-4 animate-pulse h-16" />)}
+      </div>
+    }>
+      <DaruratProgressContent />
+    </Suspense>
   )
 }
