@@ -77,14 +77,28 @@ export default function DashboardPage() {
   })
 
   // ===== Operational Data Queries =====
-  const { data: studentsData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students', branchId],
-    queryFn: () => studentApi.getAll(1, 1000, branchId),
+  // Count only — no row data needed for the metric card
+  const { data: studentsCountData, isLoading: studentsLoading } = useQuery({
+    queryKey: ['students-count', branchId],
+    queryFn: () => studentApi.getAll(1, 1, branchId),
   })
 
+  // Recent 4 students for the list card
+  const { data: studentsData } = useQuery({
+    queryKey: ['students-recent', branchId],
+    queryFn: () => studentApi.getAll(1, 4, branchId),
+  })
+
+  // Count only for teachers metric card
+  const { data: teachersCountData } = useQuery({
+    queryKey: ['teachers-count', branchId],
+    queryFn: () => teacherApi.getAll(1, 1, branchId),
+  })
+
+  // Top 4 teachers for activity card
   const { data: teachersData } = useQuery({
-    queryKey: ['teachers', branchId],
-    queryFn: () => teacherApi.getAll(1, 1000, branchId),
+    queryKey: ['teachers-top4', branchId],
+    queryFn: () => teacherApi.getAll(1, 4, branchId),
   })
 
   const { data: sessionsData } = useQuery({
@@ -113,7 +127,9 @@ export default function DashboardPage() {
   const subjects = subjectsData?.data?.data || []
   const sppRates = sppRatesData?.data?.data || []
   const curriculumModules = curriculumData?.data?.data || []
+  const totalActiveStudents = studentsCountData?.data?.pagination?.total ?? 0
   const students = studentsData?.data?.data || []
+  const totalTeachers = teachersCountData?.data?.pagination?.total ?? 0
   const teachers = teachersData?.data?.data || []
   const todaySessions = sessionsData?.data?.data || []
   const invoiceMetrics = invoiceMetricsData?.data?.data
@@ -121,8 +137,7 @@ export default function DashboardPage() {
   const recentTransactions = recentTxData?.data?.data || []
 
   // Top metric values
-  const totalActiveStudents = students.length
-  const totalSessions = todaySessions.length // sessions today
+  const totalSessions = todaySessions.length
   const sppCollected = financeOverview?.breakdown?.income?.spp || 0
   const totalCommission = financeOverview?.metrics?.totalExpense || 0
 
@@ -134,14 +149,8 @@ export default function DashboardPage() {
     curriculumModules: curriculumModules.length,
   }
 
-  // Recent students (last 4 created)
-  const recentStudents = useMemo(
-    () =>
-      [...students]
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 4),
-    [students],
-  )
+  // API already returns 4 most recent students (orderBy: createdAt desc, limit=4)
+  const recentStudents = students
 
   // Payment status from invoice metrics
   const paymentStatus = useMemo(() => {
@@ -179,20 +188,13 @@ export default function DashboardPage() {
     ]
   }, [invoiceMetrics])
 
-  // Teacher attendance summary (top 4 by total sessions)
-  const teacherAttendance = useMemo(
-    () =>
-      [...teachers]
-        .sort((a: any, b: any) => (b.totalSessions || 0) - (a.totalSessions || 0))
-        .slice(0, 4)
-        .map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          totalSessions: t.totalSessions || 0,
-          branchCount: t.branches?.length || 0,
-        })),
-    [teachers],
-  )
+  // API already returns 4 teachers (limit=4)
+  const teacherAttendance = teachers.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    totalSessions: t.totalSessions || 0,
+    branchCount: t.branches?.length || 0,
+  }))
 
   // Helper: determine session status (today)
   const getSessionStatus = (session: any) => {
@@ -279,7 +281,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-4">
-              {teachers.length} guru aktif
+              {totalTeachers} guru aktif
             </p>
           </div>
 
@@ -733,7 +735,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 text-sm">Guru Aktif</span>
-                <span className="font-bold text-lg text-gray-900">{teachers.length}</span>
+                <span className="font-bold text-lg text-gray-900">{totalTeachers}</span>
               </div>
             </div>
           </Card>
