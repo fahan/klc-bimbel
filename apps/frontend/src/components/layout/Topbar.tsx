@@ -2,20 +2,23 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Bell, ChevronDown, LogOut, Globe, Lock, User } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, Globe, Lock, User, AlertTriangle, FileText, Package, UserPlus } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
-import { useBranch } from '@/lib/branch-context'
+import { useBranch, useApiBranchId } from '@/lib/branch-context'
+import { useNotifications } from '@/lib/hooks/useNotifications'
 
 export default function Topbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { selectedBranchId, branches, canSwitchBranch, canViewAllBranches, isRestrictedToBranch, setSelectedBranchId } =
     useBranch()
+  const branchId = useApiBranchId()
   const [showBranchDropdown, setShowBranchDropdown] = useState(false)
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [userName, setUserName] = useState('')
   const [userRole, setUserRole] = useState('')
+  const { notifications, unreadCount } = useNotifications(branchId)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -221,7 +224,11 @@ export default function Topbar() {
               className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-full transition"
             >
               <Bell className="w-6 h-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              {unreadCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
             {showNotifications && (
               <>
@@ -230,28 +237,49 @@ export default function Topbar() {
                   onClick={() => setShowNotifications(false)}
                 />
                 <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                  <div className="px-4 py-3 border-b border-gray-200">
+                  <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-900">Notifikasi</p>
+                    {unreadCount > 0 && (
+                      <span className="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">
+                        {unreadCount} baru
+                      </span>
+                    )}
                   </div>
                   <div className="max-h-96 overflow-y-auto">
-                    <div className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer">
-                      <p className="text-sm font-medium text-gray-900">Presensi Dikonfirmasi</p>
-                      <p className="text-xs text-gray-500 mt-1">Sesi "Matematika - Senin 10:00" telah dikonfirmasi</p>
-                      <p className="text-xs text-gray-400 mt-1">2 jam yang lalu</p>
-                    </div>
-                    <div className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer">
-                      <p className="text-sm font-medium text-gray-900">Laporan Progress Tersedia</p>
-                      <p className="text-xs text-gray-500 mt-1">Laporan minggu ini untuk "AHE - Aritmatika" sudah siap</p>
-                      <p className="text-xs text-gray-400 mt-1">1 hari yang lalu</p>
-                    </div>
-                    <div className="px-4 py-3 hover:bg-gray-50 transition cursor-pointer">
-                      <p className="text-sm font-medium text-gray-900">Siswa Baru Terdaftar</p>
-                      <p className="text-xs text-gray-500 mt-1">Ada 1 siswa baru yang terdaftar untuk cabang Bandung</p>
-                      <p className="text-xs text-gray-400 mt-1">3 hari yang lalu</p>
-                    </div>
-                  </div>
-                  <div className="px-4 py-2 border-t border-gray-200 text-center">
-                    <p className="text-xs text-blue-600 hover:text-blue-700 cursor-pointer font-medium">Lihat semua notifikasi</p>
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center">
+                        <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">Tidak ada notifikasi</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => {
+                        const iconMap = {
+                          adhoc: <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />,
+                          invoice: <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />,
+                          stock: <Package className="w-4 h-4 text-orange-500 flex-shrink-0" />,
+                          registration: <UserPlus className="w-4 h-4 text-blue-500 flex-shrink-0" />,
+                        }
+                        const bgMap = {
+                          danger: 'bg-red-50 border-l-4 border-red-400',
+                          warning: 'bg-amber-50 border-l-4 border-amber-400',
+                          info: 'bg-blue-50 border-l-4 border-blue-400',
+                        }
+                        return (
+                          <Link
+                            key={notif.id}
+                            href={notif.href}
+                            onClick={() => setShowNotifications(false)}
+                            className={`flex items-start gap-3 px-4 py-3 border-b border-gray-100 hover:brightness-95 transition ${bgMap[notif.severity]}`}
+                          >
+                            <div className="mt-0.5">{iconMap[notif.type]}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">{notif.title}</p>
+                              <p className="text-xs text-gray-600 mt-0.5">{notif.description}</p>
+                            </div>
+                          </Link>
+                        )
+                      })
+                    )}
                   </div>
                 </div>
               </>
