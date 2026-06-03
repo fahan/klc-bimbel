@@ -67,7 +67,8 @@ export class ProgressService {
       throw new BadRequestException('moduleProgress required for MODULE_BASED tracking')
     }
 
-    const subjectId = sessionLog.session.subjectId
+    const subjectId = sessionLog.isAdHoc ? sessionLog.adHocSubjectId : sessionLog.session?.subjectId
+    if (!subjectId) throw new BadRequestException('Tidak dapat menentukan mata pelajaran untuk sesi ini')
     const recordedAt = new Date()
 
     // Create progress logs and update student_module_progress
@@ -185,7 +186,8 @@ export class ProgressService {
       throw new BadRequestException('topic required for FREE_MATERIAL tracking')
     }
 
-    const subjectId = sessionLog.session.subjectId
+    const subjectId = sessionLog.isAdHoc ? sessionLog.adHocSubjectId : sessionLog.session?.subjectId
+    if (!subjectId) throw new BadRequestException('Tidak dapat menentukan mata pelajaran untuk sesi ini')
     const recordedAt = new Date()
 
     for (const fp of submitDto.freeMaterialProgress) {
