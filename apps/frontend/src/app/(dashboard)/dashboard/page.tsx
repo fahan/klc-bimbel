@@ -58,22 +58,22 @@ export default function DashboardPage() {
   const month = today.getMonth() + 1
   const year = today.getFullYear()
 
-  // ===== Master Data Queries =====
+  // ===== Master Data Queries (limit=1 — only pagination.total is needed) =====
   const { data: branchesData } = useQuery({
     queryKey: ['branches'],
     queryFn: () => branchApi.getAll(),
   })
   const { data: subjectsData } = useQuery({
-    queryKey: ['subjects'],
-    queryFn: () => subjectApi.getAll(),
+    queryKey: ['subjects-count'],
+    queryFn: () => subjectApi.getAll(1, 1),
   })
   const { data: sppRatesData } = useQuery({
-    queryKey: ['spp-rates'],
-    queryFn: () => sppRateApi.getAll(),
+    queryKey: ['spp-rates-count'],
+    queryFn: () => sppRateApi.getAll(1, 1),
   })
   const { data: curriculumData } = useQuery({
-    queryKey: ['curriculum-modules'],
-    queryFn: () => curriculumModuleApi.getAll(),
+    queryKey: ['curriculum-modules-count'],
+    queryFn: () => curriculumModuleApi.getAll(1, 1),
   })
 
   // ===== Operational Data Queries =====
@@ -104,7 +104,7 @@ export default function DashboardPage() {
   const { data: sessionsData } = useQuery({
     queryKey: ['sessions-today', branchId],
     queryFn: () =>
-      sessionApi.getAll(1, 100, { branchId, dayOfWeek: todayDow }),
+      sessionApi.getAll(1, 10, { branchId, dayOfWeek: todayDow }),
   })
 
   const { data: invoiceMetricsData } = useQuery({
@@ -124,9 +124,6 @@ export default function DashboardPage() {
 
   // ===== Derived Data =====
   const branches = branchesData?.data?.data || []
-  const subjects = subjectsData?.data?.data || []
-  const sppRates = sppRatesData?.data?.data || []
-  const curriculumModules = curriculumData?.data?.data || []
   const totalActiveStudents = studentsCountData?.data?.pagination?.total ?? 0
   const students = studentsData?.data?.data || []
   const totalTeachers = teachersCountData?.data?.pagination?.total ?? 0
@@ -141,12 +138,12 @@ export default function DashboardPage() {
   const sppCollected = financeOverview?.breakdown?.income?.spp || 0
   const totalCommission = financeOverview?.metrics?.totalExpense || 0
 
-  // Master data stats
+  // Master data stats — read from pagination.total (limit=1 queries)
   const masterDataStats = {
     branches: branches.length,
-    subjects: subjects.length,
-    sppRates: sppRates.length,
-    curriculumModules: curriculumModules.length,
+    subjects: subjectsData?.data?.pagination?.total ?? 0,
+    sppRates: sppRatesData?.data?.pagination?.total ?? 0,
+    curriculumModules: curriculumData?.data?.pagination?.total ?? 0,
   }
 
   // API already returns 4 most recent students (orderBy: createdAt desc, limit=4)
@@ -727,7 +724,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 text-sm">Mata Pelajaran</span>
-                <span className="font-bold text-lg text-gray-900">{subjects.length}</span>
+                <span className="font-bold text-lg text-gray-900">{masterDataStats.subjects}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 text-sm">Siswa Terdaftar</span>
