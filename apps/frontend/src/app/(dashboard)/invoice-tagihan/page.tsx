@@ -56,8 +56,11 @@ export default function InvoiceTagihanPage() {
 
   // Searchable student dropdown state
   const [studentSearch, setStudentSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
+  const [selectedStudentObj, setSelectedStudentObj] = useState<any>(null)
   const studentDropdownRef = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Payment modal state
   const [paymentInvoice, setPaymentInvoice] = useState<any>(null)
@@ -81,9 +84,12 @@ export default function InvoiceTagihanPage() {
       invoiceApi.getMetrics({ month: today.getMonth() + 1, year: today.getFullYear() }),
   })
 
-  const { data: studentsData } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => studentApi.getAll(),
+  // Server-side student search — only runs when dropdown is open
+  const { data: studentsData, isFetching: studentsLoading } = useQuery({
+    queryKey: ['students-search', debouncedSearch],
+    queryFn: () => studentApi.getAll(1, 20, undefined, debouncedSearch || undefined),
+    enabled: studentDropdownOpen,
+    staleTime: 30_000,
   })
 
   const { data: branchesData } = useQuery({
@@ -93,8 +99,15 @@ export default function InvoiceTagihanPage() {
 
   const invoices = invoicesData?.data?.data || []
   const metrics = metricsData?.data?.data
-  const students = studentsData?.data?.data || []
+  const studentResults: any[] = studentsData?.data?.data || []
   const branches = branchesData?.data?.data || []
+
+  // Debounce student search input
+  const handleStudentSearchChange = (value: string) => {
+    setStudentSearch(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(value), 350)
+  }
 
   // Close student dropdown on outside click
   useEffect(() => {
@@ -106,14 +119,6 @@ export default function InvoiceTagihanPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const filteredStudents = useMemo(
-    () =>
-      students.filter((s: any) =>
-        s.name.toLowerCase().includes(studentSearch.toLowerCase()),
-      ),
-    [students, studentSearch],
-  )
 
   const filteredInvoices = useMemo(
     () =>
@@ -127,11 +132,10 @@ export default function InvoiceTagihanPage() {
   )
 
   const selectedInvoice = invoices.find((inv: any) => inv.id === selectedInvoiceId)
-  const selectedStudent = students.find((s: any) => s.id === formStudentId)
 
   // Generate Preview Data
   const previewData = useMemo(() => {
-    if (!selectedStudent) return null
+    if (!selectedStudentObj) return null
 
     if (formType === 'REGISTRATION') {
       return {
@@ -142,7 +146,7 @@ export default function InvoiceTagihanPage() {
     }
 
     const items =
-      selectedStudent.subjects?.map((s: any) => ({
+      selectedStudentObj.subjects?.map((s: any) => ({
         name: s.subjectName,
         type: s.type,
         sessionCount: s.type === 'REGULAR' ? 12 : 8,
@@ -150,7 +154,7 @@ export default function InvoiceTagihanPage() {
       })) || []
     const total = items.reduce((sum: number, i: any) => sum + i.amount, 0)
     return { type: 'SPP', items, total }
-  }, [selectedStudent, formType])
+  }, [selectedStudentObj, formType])
 
   const handleGenerate = async () => {
     if (!formStudentId) {
@@ -169,6 +173,9 @@ export default function InvoiceTagihanPage() {
 
       await invoiceApi.create(payload)
       setFormStudentId('')
+      setSelectedStudentObj(null)
+      setStudentSearch('')
+      setDebouncedSearch('')
       refetch()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal generate invoice')
@@ -496,9 +503,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
                   className="w-full flex items-center justify-between px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left"
                 >
                   <span className={formStudentId ? 'text-gray-900' : 'text-gray-400'}>
-                    {formStudentId
-                      ? students.find((s: any) => s.id === formStudentId)?.name || '-- Pilih siswa --'
-                      : '-- Pilih siswa --'}
+                    {selectedStudentObj?.name || '-- Pilih siswa --'}
                   </span>
                   <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
                 </button>
@@ -511,25 +516,31 @@ Mohon segera dilunasi. Terima kasih 🙏`
                         <input
                           type="text"
                           autoFocus
-                          placeholder="Cari nama siswa..."
+                          placeholder="Ketik nama siswa..."
                           value={studentSearch}
-                          onChange={(e) => setStudentSearch(e.target.value)}
+                          onChange={(e) => handleStudentSearchChange(e.target.value)}
                           className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                       </div>
                     </div>
                     <ul className="max-h-48 overflow-y-auto py-1">
-                      {filteredStudents.length === 0 ? (
+                      {studentsLoading ? (
+                        <li className="px-3 py-3 text-xs text-gray-500 text-center">
+                          Mencari siswa...
+                        </li>
+                      ) : studentResults.length === 0 ? (
                         <li className="px-3 py-2 text-xs text-gray-500 text-center">
-                          Siswa tidak ditemukan
+                          {debouncedSearch ? 'Siswa tidak ditemukan' : 'Ketik nama untuk mencari'}
                         </li>
                       ) : (
-                        filteredStudents.map((s: any) => (
+                        studentResults.map((s: any) => (
                           <li
                             key={s.id}
                             onClick={() => {
                               setFormStudentId(s.id)
+                              setSelectedStudentObj(s)
                               setStudentSearch('')
+                              setDebouncedSearch('')
                               setStudentDropdownOpen(false)
                             }}
                             className={`px-3 py-2 text-sm cursor-pointer transition ${
@@ -539,6 +550,9 @@ Mohon segera dilunasi. Terima kasih 🙏`
                             }`}
                           >
                             {s.name}
+                            {s.branchName && (
+                              <span className="ml-1 text-xs text-gray-400">· {s.branchName}</span>
+                            )}
                           </li>
                         ))
                       )}
@@ -548,7 +562,9 @@ Mohon segera dilunasi. Terima kasih 🙏`
                         <button
                           onClick={() => {
                             setFormStudentId('')
+                            setSelectedStudentObj(null)
                             setStudentSearch('')
+                            setDebouncedSearch('')
                             setStudentDropdownOpen(false)
                           }}
                           className="w-full text-xs text-gray-500 hover:text-red-600 py-1 rounded hover:bg-red-50 transition"
@@ -601,7 +617,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
                   <div className="text-[10px] font-mono opacity-90">PREVIEW</div>
                 </div>
                 <div className="p-3">
-                  <p className="text-sm font-semibold text-gray-900">{selectedStudent?.name}</p>
+                  <p className="text-sm font-semibold text-gray-900">{selectedStudentObj?.name}</p>
                   {formType === 'SPP' && (
                     <p className="text-xs text-gray-500">
                       {MONTHS[formMonth - 1]} {formYear}
