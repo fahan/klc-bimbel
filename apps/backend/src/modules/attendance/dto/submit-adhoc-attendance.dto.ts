@@ -45,3 +45,22 @@ export class RejectAdHocDto {
   @IsString()
   reason!: string
 }
+
+export class ApproveAdHocDto {
+  @ApiProperty({
+    required: false,
+    description: 'If true, attempt to create a recurring session schedule based on this ad-hoc session',
+    example: false,
+  })
+  @IsOptional()
+  generateSchedule?: boolean
+
+  @ApiProperty({
+    required: false,
+    enum: ['REGULAR', 'PRIVATE'],
+    description: 'Session type for the generated schedule (defaults to REGULAR)',
+  })
+  @IsOptional()
+  @IsString()
+  sessionType?: 'REGULAR' | 'PRIVATE'
+}

@@ -31,6 +31,7 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
+  Check,
 } from 'lucide-react'
 
 interface SessionWithAttendance {
@@ -153,6 +154,10 @@ export default function AttendancePage() {
   const [rejectModalId, setRejectModalId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [adHocActionLoading, setAdHocActionLoading] = useState<string | null>(null)
+  const [approveModalLog, setApproveModalLog] = useState<any | null>(null)
+  const [generateSchedule, setGenerateSchedule] = useState(false)
+  const [scheduleType, setScheduleType] = useState<'REGULAR' | 'PRIVATE'>('REGULAR')
+  const [approveResult, setApproveResult] = useState<{ logId: string; scheduleResult: any } | null>(null)
 
   const {
     data: pendingAdHocData,
@@ -165,11 +170,28 @@ export default function AttendancePage() {
 
   const pendingAdHocLogs = pendingAdHocData?.data?.data || []
 
-  const handleApproveAdHoc = async (id: string) => {
+  const openApproveModal = (log: any) => {
+    setApproveModalLog(log)
+    setGenerateSchedule(false)
+    setScheduleType('REGULAR')
+    setApproveResult(null)
+  }
+
+  const handleApproveAdHoc = async () => {
+    if (!approveModalLog) return
     try {
-      setAdHocActionLoading(id)
-      await attendanceApi.approveAdHoc(id)
+      setAdHocActionLoading(approveModalLog.id)
+      const res = await attendanceApi.approveAdHoc(approveModalLog.id, {
+        generateSchedule,
+        sessionType: generateSchedule ? scheduleType : undefined,
+      })
+      const scheduleResult = res.data?.data?.scheduleResult ?? null
+      setApproveResult({ logId: approveModalLog.id, scheduleResult })
       await refetchPendingAdHoc()
+      if (!scheduleResult || scheduleResult.created) {
+        // Auto-close if no warning to show
+        setApproveModalLog(null)
+      }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Gagal menyetujui sesi darurat')
     } finally {
@@ -330,12 +352,12 @@ export default function AttendancePage() {
                     {/* Action Buttons */}
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleApproveAdHoc(log.id)}
+                        onClick={() => openApproveModal(log)}
                         disabled={adHocActionLoading === log.id}
                         className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
                       >
                         <CheckCircle className="w-4 h-4" />
-                        {adHocActionLoading === log.id ? 'Memproses...' : 'Setujui'}
+                        Setujui
                       </button>
                       <button
                         onClick={() => { setRejectModalId(log.id); setRejectReason('') }}
@@ -353,6 +375,93 @@ export default function AttendancePage() {
           </div>
         )}
       </div>
+
+      {/* Approve Modal */}
+      {approveModalLog && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4">
+
+            {/* Header */}
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Setujui Sesi Darurat</h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {approveModalLog.subjectName} · {approveModalLog.sessionDate} · {approveModalLog.startTime}
+              </p>
+            </div>
+
+            {/* Schedule conflict warning result */}
+            {approveResult !== null && approveResult.logId === approveModalLog.id && approveResult.scheduleResult && !approveResult.scheduleResult.created && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold">Sesi darurat disetujui ✓</p>
+                  <p className="mt-0.5">Namun jadwal gagal dibuat: <em>{approveResult.scheduleResult.conflictReason}</em></p>
+                </div>
+              </div>
+            )}
+
+            {/* Generate schedule option */}
+            {!approveResult && (
+              <>
+                <div
+                  onClick={() => setGenerateSchedule(!generateSchedule)}
+                  className={`flex items-start gap-3 border-2 rounded-lg p-3 cursor-pointer transition ${generateSchedule ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border-2 transition ${generateSchedule ? 'bg-blue-600 border-blue-600' : 'border-gray-400'}`}>
+                    {generateSchedule && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800 text-sm">Generate sebagai jadwal reguler</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Buat sesi berulang setiap hari {approveModalLog.sessionDate
+                        ? ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date(approveModalLog.sessionDate).getDay()]
+                        : '—'} jam {approveModalLog.startTime} ({approveModalLog.durationMinutes}m).
+                      Jika bentrok, approval tetap berhasil tapi jadwal tidak dibuat.
+                    </p>
+                  </div>
+                </div>
+
+                {generateSchedule && (
+                  <div className="pl-1">
+                    <label className="text-sm font-medium text-gray-700 mb-1.5 block">Tipe Sesi</label>
+                    <div className="flex gap-2">
+                      {(['REGULAR', 'PRIVATE'] as const).map(t => (
+                        <button
+                          key={t}
+                          onClick={() => setScheduleType(t)}
+                          className={`flex-1 py-2 rounded-lg text-sm font-medium transition border-2 ${scheduleType === t ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'}`}
+                        >
+                          {t === 'REGULAR' ? 'Reguler' : 'Privat'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Footer buttons */}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setApproveModalLog(null); setApproveResult(null) }}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+              >
+                {approveResult ? 'Tutup' : 'Batal'}
+              </button>
+              {!approveResult && (
+                <button
+                  onClick={handleApproveAdHoc}
+                  disabled={adHocActionLoading === approveModalLog.id}
+                  className="px-4 py-2 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  {adHocActionLoading === approveModalLog.id ? 'Memproses...' : 'Setujui'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject Modal */}
       {rejectModalId && (

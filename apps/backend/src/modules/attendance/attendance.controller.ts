@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@ne
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger'
 import { AttendanceService } from './attendance.service'
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
-import { SubmitAdHocAttendanceDto, RejectAdHocDto } from './dto/submit-adhoc-attendance.dto'
+import { SubmitAdHocAttendanceDto, RejectAdHocDto, ApproveAdHocDto } from './dto/submit-adhoc-attendance.dto'
 import { AttendanceResponseDto } from './dto/attendance-response.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
@@ -158,13 +158,20 @@ export class AttendanceController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Approve an ad-hoc session',
-    description: 'Admin approves a PENDING_APPROVAL ad-hoc session. Status changes to COMPLETED and will be included in commission calculation.',
+    description:
+      'Admin approves a PENDING_APPROVAL ad-hoc session. Status changes to COMPLETED. ' +
+      'Optionally pass generateSchedule:true to create a recurring session from this ad-hoc. ' +
+      'Schedule conflicts return a warning but approval always succeeds.',
   })
   async approveAdHoc(
     @Param('id') id: string,
+    @Body() dto: ApproveAdHocDto,
     @CurrentUser() user: any,
   ): Promise<any> {
-    return this.attendanceService.approveAdHoc(id, user.id)
+    return this.attendanceService.approveAdHoc(id, user.id, {
+      generateSchedule: dto.generateSchedule,
+      sessionType: dto.sessionType,
+    })
   }
 
   @Patch('adhoc/:id/reject')

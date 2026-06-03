@@ -174,7 +174,8 @@ export const attendanceApi = {
   getEligibleStudents: (branchId: string, subjectId: string) =>
     apiClient.get(`/attendance/adhoc/eligible-students?branchId=${branchId}&subjectId=${subjectId}`),
 
-  approveAdHoc: (id: string) => apiClient.patch(`/attendance/adhoc/${id}/approve`),
+  approveAdHoc: (id: string, options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE' }) =>
+    apiClient.patch(`/attendance/adhoc/${id}/approve`, options ?? {}),
 
   rejectAdHoc: (id: string, reason: string) =>
     apiClient.patch(`/attendance/adhoc/${id}/reject`, { reason }),

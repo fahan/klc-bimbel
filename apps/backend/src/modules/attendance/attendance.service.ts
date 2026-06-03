@@ -430,7 +430,11 @@ export class AttendanceService {
     }
   }
 
-  async approveAdHoc(sessionLogId: string, adminId: string) {
+  async approveAdHoc(
+    sessionLogId: string,
+    adminId: string,
+    options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE' },
+  ) {
     const log = await this.prisma.sessionLog.findUnique({ where: { id: sessionLogId } })
     if (!log) throw new NotFoundException('Session log tidak ditemukan')
     if (!log.isAdHoc) throw new BadRequestException('Hanya sesi darurat yang dapat di-approve di sini')
@@ -438,6 +442,7 @@ export class AttendanceService {
       throw new BadRequestException(`Status saat ini: ${log.status}. Hanya PENDING_APPROVAL yang bisa di-approve.`)
     }
 
+    // 1. Approve the session log
     const updated = await this.prisma.sessionLog.update({
       where: { id: sessionLogId },
       data: {
@@ -454,11 +459,142 @@ export class AttendanceService {
       },
     })
 
+    // 2. Optionally generate a recurring schedule
+    let scheduleResult: {
+      created: boolean
+      sessionId?: string
+      conflictReason?: string
+      dayOfWeek?: string
+    } | null = null
+
+    if (options?.generateSchedule && log.adHocBranchId && log.adHocSubjectId && log.adHocStartTime) {
+      scheduleResult = await this.tryCreateScheduleFromAdHoc(log, options.sessionType ?? 'REGULAR')
+    }
+
+    const baseMessage = 'Sesi darurat disetujui. Komisi akan terhitung saat kalkulasi bulan ini.'
+    const scheduleMessage = scheduleResult
+      ? scheduleResult.created
+        ? ` Jadwal reguler (${scheduleResult.dayOfWeek}) berhasil dibuat.`
+        : ` Jadwal tidak dibuat: ${scheduleResult.conflictReason}`
+      : ''
+
     return {
       success: true,
-      data: this.formatAdHocLog(updated),
-      message: 'Sesi darurat disetujui. Komisi akan terhitung saat kalkulasi bulan ini.',
+      data: {
+        ...this.formatAdHocLog(updated),
+        scheduleResult,
+      },
+      message: baseMessage + scheduleMessage,
     }
+  }
+
+  /** Attempt to create a recurring Session from an approved ad-hoc log. Never throws — returns result object. */
+  private async tryCreateScheduleFromAdHoc(
+    log: any,
+    sessionType: 'REGULAR' | 'PRIVATE',
+  ): Promise<{ created: boolean; sessionId?: string; conflictReason?: string; dayOfWeek?: string }> {
+    try {
+      const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
+      const sessionDate = new Date(log.sessionDate)
+      const dayOfWeek = days[sessionDate.getDay()] as any
+
+      const startTime: string = log.adHocStartTime   // HH:mm
+      const duration: number  = log.adHocDuration ?? 60
+
+      // --- Conflict check 1: exact duplicate ---
+      const duplicate = await this.prisma.session.findFirst({
+        where: {
+          branchId:  log.adHocBranchId,
+          subjectId: log.adHocSubjectId,
+          teacherId: log.actualTeacherId,
+          dayOfWeek,
+          startTime,
+          isActive: true,
+        },
+      })
+      if (duplicate) {
+        return {
+          created: false,
+          dayOfWeek,
+          conflictReason: `Jadwal identik sudah ada (${dayOfWeek} ${startTime}).`,
+        }
+      }
+
+      // --- Conflict check 2: time overlap for the same teacher on same day ---
+      const teacherSessions = await this.prisma.session.findMany({
+        where: { teacherId: log.actualTeacherId, dayOfWeek, isActive: true },
+      })
+
+      const newStart = this.adHocTimeToMinutes(startTime)
+      const newEnd   = newStart + duration
+
+      for (const s of teacherSessions) {
+        const eStart = this.adHocTimeToMinutes(s.startTime)
+        const eEnd   = eStart + s.durationMinutes
+        if (newStart < eEnd && newEnd > eStart) {
+          return {
+            created: false,
+            dayOfWeek,
+            conflictReason: `Guru sudah memiliki sesi di hari ${dayOfWeek} jam ${s.startTime} (durasi ${s.durationMinutes} menit) yang bentrok.`,
+          }
+        }
+      }
+
+      // --- Conflict check 3: same branch + day + overlapping time ---
+      const branchSessions = await this.prisma.session.findMany({
+        where: { branchId: log.adHocBranchId, dayOfWeek, isActive: true },
+      })
+
+      for (const s of branchSessions) {
+        const eStart = this.adHocTimeToMinutes(s.startTime)
+        const eEnd   = eStart + s.durationMinutes
+        if (newStart < eEnd && newEnd > eStart) {
+          return {
+            created: false,
+            dayOfWeek,
+            conflictReason: `Cabang sudah memiliki sesi di hari ${dayOfWeek} jam ${s.startTime} yang bentrok di ruangan yang sama.`,
+          }
+        }
+      }
+
+      // --- Fetch subject for capacity ---
+      const subject = await this.prisma.subject.findUnique({ where: { id: log.adHocSubjectId } })
+      const maxCapacity = sessionType === 'PRIVATE'
+        ? (subject?.maxCapacityPrivate ?? 1)
+        : (subject?.maxCapacityRegular ?? 3)
+
+      // --- Create session ---
+      const newSession = await this.prisma.session.create({
+        data: {
+          branchId:        log.adHocBranchId,
+          subjectId:       log.adHocSubjectId,
+          teacherId:       log.actualTeacherId,
+          type:            sessionType,
+          dayOfWeek,
+          startTime,
+          durationMinutes: duration,
+          maxCapacity,
+          currentEnrolled: 0,
+          createdReason:   'SINGLE',
+          status:          'ACTIVE',
+          isActive:        true,
+          notes:           `Dibuat otomatis dari sesi darurat (log ID: ${log.id})`,
+        },
+      })
+
+      return { created: true, sessionId: newSession.id, dayOfWeek }
+    } catch (err: any) {
+      // Never propagate — approval should still succeed
+      return {
+        created: false,
+        conflictReason: `Terjadi kesalahan saat membuat jadwal: ${err?.message ?? 'unknown error'}`,
+      }
+    }
+  }
+
+  private adHocTimeToMinutes(time: string): number {
+    const [h, m] = time.split(':').map(Number)
+    return h * 60 + m
   }
 
   async rejectAdHoc(sessionLogId: string, adminId: string, reason: string) {
