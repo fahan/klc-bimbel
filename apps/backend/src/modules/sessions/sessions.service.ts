@@ -198,7 +198,7 @@ export class SessionsService {
         teacher: { select: { id: true, name: true } },
         studentSessions: {
           where: { isActive: true },
-          include: { student: { select: { id: true, name: true } } },
+          include: { student: { select: { id: true, name: true, sureName: true } } },
         },
       },
       orderBy: [{ startTime: 'asc' }],
@@ -211,7 +211,7 @@ export class SessionsService {
         scheduledTeacherId: s.teacherId,
         scheduledTeacherName: s.teacher.name,
         studentCount: s.studentSessions.length,
-        studentList: s.studentSessions.map(ss => ss.student.name),
+        studentList: s.studentSessions.map(ss => ss.student.sureName?.trim() || ss.student.name),
       })),
     }
   }
