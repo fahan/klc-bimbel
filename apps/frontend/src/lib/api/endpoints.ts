@@ -1,5 +1,17 @@
 import apiClient from './client'
 
+// ===== DASHBOARD API =====
+export const dashboardApi = {
+  getAnalytics: (filters?: { branchId?: string; month?: number; year?: number }) => {
+    const params = new URLSearchParams()
+    if (filters?.branchId) params.append('branchId', filters.branchId)
+    if (filters?.month) params.append('month', String(filters.month))
+    if (filters?.year) params.append('year', String(filters.year))
+    const qs = params.toString()
+    return apiClient.get(`/dashboard/analytics${qs ? `?${qs}` : ''}`)
+  },
+}
+
 // ===== AUTH API =====
 export const authApi = {
   getMe: () => apiClient.get('/auth/me'),

@@ -20,6 +20,7 @@ import { FinanceModule } from './modules/finance/finance.module'
 import { StoreModule } from './modules/store/store.module'
 import { MailModule } from './modules/mail/mail.module'
 import { LandingModule } from './modules/landing/landing.module'
+import { DashboardModule } from './modules/dashboard/dashboard.module'
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { LandingModule } from './modules/landing/landing.module'
     StoreModule,
     MailModule,
     LandingModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

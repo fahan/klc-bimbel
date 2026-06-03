@@ -2,17 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  branchApi,
-  studentApi,
-  subjectApi,
-  sppRateApi,
-  curriculumModuleApi,
-  sessionApi,
-  invoiceApi,
-  financeApi,
-  teacherApi,
-} from '@/lib/api/endpoints'
+import { dashboardApi } from '@/lib/api/endpoints'
 import { useApiBranchId, useBranch } from '@/lib/branch-context'
 import { Card, SectionCard } from '@/components/ui/Card'
 import { StatusBadge } from '@/components/ui/Badge'
@@ -27,14 +17,11 @@ import {
   ArrowRight,
   Clock,
   MapPin,
-  CheckCircle,
   Building,
   FileText,
   GraduationCap,
 } from 'lucide-react'
 import Link from 'next/link'
-
-const DAYS = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
 
 function formatRupiah(amount: number | string) {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -54,108 +41,36 @@ export default function DashboardPage() {
   const branchId = useApiBranchId()
   const { selectedBranch, canViewAllBranches } = useBranch()
   const today = new Date()
-  const todayDow = DAYS[today.getDay()]
   const month = today.getMonth() + 1
   const year = today.getFullYear()
 
-  // ===== Master Data Queries (limit=1 — only pagination.total is needed) =====
-  const { data: branchesData } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => branchApi.getAll(),
-  })
-  const { data: subjectsData } = useQuery({
-    queryKey: ['subjects-count'],
-    queryFn: () => subjectApi.getAll(1, 1),
-  })
-  const { data: sppRatesData } = useQuery({
-    queryKey: ['spp-rates-count'],
-    queryFn: () => sppRateApi.getAll(1, 1),
-  })
-  const { data: curriculumData } = useQuery({
-    queryKey: ['curriculum-modules-count'],
-    queryFn: () => curriculumModuleApi.getAll(1, 1),
+  // Single API call — replaces 10 separate requests
+  const { data: analyticsData, isLoading } = useQuery({
+    queryKey: ['dashboard-analytics', branchId, month, year],
+    queryFn: () => dashboardApi.getAnalytics({ branchId, month, year }),
+    staleTime: 1000 * 60 * 2, // 2 minutes
   })
 
-  // ===== Operational Data Queries =====
-  // Count only — no row data needed for the metric card
-  const { data: studentsCountData, isLoading: studentsLoading } = useQuery({
-    queryKey: ['students-count', branchId],
-    queryFn: () => studentApi.getAll(1, 1, branchId),
-  })
+  const d = analyticsData?.data?.data
 
-  // Recent 4 students for the list card
-  const { data: studentsData } = useQuery({
-    queryKey: ['students-recent', branchId],
-    queryFn: () => studentApi.getAll(1, 4, branchId),
-  })
+  // ===== Derived values from single response =====
+  const metrics = d?.metrics
+  const masterData = d?.masterData
+  const invoiceMetrics = d?.invoiceMetrics
+  const financeBreakdown = d?.financeBreakdown
+  const todaySessions: any[] = d?.todaySessions ?? []
+  const recentStudents: any[] = d?.recentStudents ?? []
+  const topTeachers: any[] = d?.topTeachers ?? []
+  const recentTransactions: any[] = d?.recentTransactions ?? []
+  const branches: any[] = d?.branches ?? []
 
-  // Count only for teachers metric card
-  const { data: teachersCountData } = useQuery({
-    queryKey: ['teachers-count', branchId],
-    queryFn: () => teacherApi.getAll(1, 1, branchId),
-  })
-
-  // Top 4 teachers for activity card
-  const { data: teachersData } = useQuery({
-    queryKey: ['teachers-top4', branchId],
-    queryFn: () => teacherApi.getAll(1, 4, branchId),
-  })
-
-  const { data: sessionsData } = useQuery({
-    queryKey: ['sessions-today', branchId],
-    queryFn: () =>
-      sessionApi.getAll(1, 10, { branchId, dayOfWeek: todayDow }),
-  })
-
-  const { data: invoiceMetricsData } = useQuery({
-    queryKey: ['invoice-metrics', month, year, branchId],
-    queryFn: () => invoiceApi.getMetrics({ branchId, month, year }),
-  })
-
-  const { data: financeOverviewData } = useQuery({
-    queryKey: ['finance-overview', month, year, branchId],
-    queryFn: () => financeApi.getOverview(month, year, branchId),
-  })
-
-  const { data: recentTxData } = useQuery({
-    queryKey: ['recent-transactions', branchId],
-    queryFn: () => financeApi.getTransactions(branchId, 4),
-  })
-
-  // ===== Derived Data =====
-  const branches = branchesData?.data?.data || []
-  const totalActiveStudents = studentsCountData?.data?.pagination?.total ?? 0
-  const students = studentsData?.data?.data || []
-  const totalTeachers = teachersCountData?.data?.pagination?.total ?? 0
-  const teachers = teachersData?.data?.data || []
-  const todaySessions = sessionsData?.data?.data || []
-  const invoiceMetrics = invoiceMetricsData?.data?.data
-  const financeOverview = financeOverviewData?.data?.data
-  const recentTransactions = recentTxData?.data?.data || []
-
-  // Top metric values
-  const totalSessions = todaySessions.length
-  const sppCollected = financeOverview?.breakdown?.income?.spp || 0
-  const totalCommission = financeOverview?.metrics?.totalExpense || 0
-
-  // Master data stats — read from pagination.total (limit=1 queries)
-  const masterDataStats = {
-    branches: branches.length,
-    subjects: subjectsData?.data?.pagination?.total ?? 0,
-    sppRates: sppRatesData?.data?.pagination?.total ?? 0,
-    curriculumModules: curriculumData?.data?.pagination?.total ?? 0,
-  }
-
-  // API already returns 4 most recent students (orderBy: createdAt desc, limit=4)
-  const recentStudents = students
-
-  // Payment status from invoice metrics
+  // Payment status bars
   const paymentStatus = useMemo(() => {
     if (!invoiceMetrics) return []
     const total =
+      (invoiceMetrics.paidCount || 0) +
       (invoiceMetrics.unpaidCount || 0) +
-      (invoiceMetrics.partialCount || 0) +
-      (invoiceMetrics.paidCount || 0)
+      (invoiceMetrics.partialCount || 0)
     if (total === 0) return []
     return [
       {
@@ -185,60 +100,23 @@ export default function DashboardPage() {
     ]
   }, [invoiceMetrics])
 
-  // API already returns 4 teachers (limit=4)
-  const teacherAttendance = teachers.map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    totalSessions: t.totalSessions || 0,
-    branchCount: t.branches?.length || 0,
-  }))
-
-  // Helper: determine session status (today)
+  // Session status helper
   const getSessionStatus = (session: any) => {
     const now = new Date()
     const [h, m] = (session.startTime || '00:00').split(':').map(Number)
-    const start = new Date()
-    start.setHours(h, m, 0, 0)
+    const start = new Date(); start.setHours(h, m, 0, 0)
     const end = new Date(start.getTime() + (session.durationMinutes || 0) * 60_000)
     if (now > end) return 'selesai' as const
-    if (now >= start && now <= end) return 'asir' as const
+    if (now >= start && now <= end) return 'berlangsung' as const
     return 'mendatang' as const
   }
 
-  // Master Data cards config
+  // Master data cards config
   const masterDataCards = [
-    {
-      title: 'Branches',
-      icon: Building,
-      count: masterDataStats.branches,
-      href: '/master-data/branches',
-      color: 'from-blue-500 to-blue-600',
-      emoji: '🏢',
-    },
-    {
-      title: 'Subjects',
-      icon: BookOpen,
-      count: masterDataStats.subjects,
-      href: '/master-data/subjects',
-      color: 'from-green-500 to-green-600',
-      emoji: '📚',
-    },
-    {
-      title: 'SPP Rates',
-      icon: DollarSign,
-      count: masterDataStats.sppRates,
-      href: '/master-data/spp-rates',
-      color: 'from-purple-500 to-purple-600',
-      emoji: '💰',
-    },
-    {
-      title: 'Curriculum Modules',
-      icon: FileText,
-      count: masterDataStats.curriculumModules,
-      href: '/master-data/curriculum-modules',
-      color: 'from-orange-500 to-orange-600',
-      emoji: '📖',
-    },
+    { title: 'Branches', count: masterData?.branches ?? 0, href: '/master-data/branches', color: 'from-blue-500 to-blue-600', emoji: '🏢' },
+    { title: 'Subjects', count: masterData?.subjects ?? 0, href: '/master-data/subjects', color: 'from-green-500 to-green-600', emoji: '📚' },
+    { title: 'SPP Rates', count: masterData?.sppRates ?? 0, href: '/master-data/spp-rates', color: 'from-purple-500 to-purple-600', emoji: '💰' },
+    { title: 'Curriculum Modules', count: masterData?.curriculumModules ?? 0, href: '/master-data/curriculum-modules', color: 'from-orange-500 to-orange-600', emoji: '📖' },
   ]
 
   return (
@@ -263,7 +141,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Operational Metrics */}
-      {studentsLoading ? (
+      {isLoading ? (
         <SkeletonCard count={4} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -271,22 +149,20 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Total Siswa Aktif</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalActiveStudents}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{metrics?.totalStudents ?? 0}</p>
               </div>
               <div className="p-3 bg-blue-100 rounded-lg">
                 <Users className="w-6 h-6 text-blue-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4">
-              {totalTeachers} guru aktif
-            </p>
+            <p className="text-xs text-gray-500 mt-4">{metrics?.totalTeachers ?? 0} guru aktif</p>
           </div>
 
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium">Sesi Hari Ini</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalSessions}</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{metrics?.totalSessionsToday ?? 0}</p>
               </div>
               <div className="p-3 bg-green-100 rounded-lg">
                 <Calendar className="w-6 h-6 text-green-600" />
@@ -301,7 +177,9 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-gray-600 text-sm font-medium">SPP Terkumpul</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">{formatRupiah(sppCollected)}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-2">
+                  {formatRupiah(metrics?.sppCollectedThisMonth ?? 0)}
+                </p>
               </div>
               <div className="p-3 bg-purple-100 rounded-lg">
                 <DollarSign className="w-6 h-6 text-purple-600" />
@@ -315,7 +193,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-gray-600 text-sm font-medium">Total Komisi</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {formatRupiah(totalCommission)}
+                  {formatRupiah(metrics?.totalCommissionThisMonth ?? 0)}
                 </p>
               </div>
               <div className="p-3 bg-orange-100 rounded-lg">
@@ -335,9 +213,9 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Master Data Stats */}
+      {/* Master Data Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {masterDataCards.map((card) => (
+        {masterDataCards.map(card => (
           <Link key={card.href} href={card.href}>
             <div
               className={`bg-gradient-to-br ${card.color} rounded-lg shadow-md p-6 text-white hover:shadow-lg hover:scale-105 transition-all cursor-pointer`}
@@ -346,14 +224,14 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-semibold">{card.title}</h3>
                 <span className="text-3xl">{card.emoji}</span>
               </div>
-              <div className="text-3xl font-bold">{card.count}</div>
+              <div className="text-3xl font-bold">{isLoading ? '…' : card.count}</div>
               <p className="text-sm text-white/80 mt-2">Klik untuk kelola</p>
             </div>
           </Link>
         ))}
       </div>
 
-      {/* Operational Section Header */}
+      {/* Operational Section */}
       <div className="border-t-2 border-gray-200 pt-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">📊 Ringkasan Operasional</h2>
       </div>
@@ -367,15 +245,14 @@ export default function DashboardPage() {
             title="Sesi Hari Ini"
             description={`${todaySessions.length} sesi terjadwal pada ${today.toLocaleDateString('id-ID', { weekday: 'long' })}`}
             action={
-              <Link
-                href="/jadwal-sesi"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
+              <Link href="/jadwal-sesi" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 Lihat semua <ArrowRight className="w-4 h-4" />
               </Link>
             }
           >
-            {todaySessions.length === 0 ? (
+            {isLoading ? (
+              <SkeletonCard count={3} />
+            ) : todaySessions.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">Tidak ada sesi terjadwal hari ini</p>
@@ -386,7 +263,7 @@ export default function DashboardPage() {
                   const status = getSessionStatus(session)
                   const statusConfig = {
                     selesai: { bg: 'bg-green-100', text: 'text-green-700', label: 'Selesai' },
-                    asir: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Berlangsung' },
+                    berlangsung: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Berlangsung' },
                     mendatang: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Mendatang' },
                   }[status]
                   return (
@@ -407,18 +284,13 @@ export default function DashboardPage() {
                               <MapPin className="w-4 h-4" />
                               {session.branchName}
                             </div>
-                            <div className="text-gray-700">
-                              Guru: <span className="font-medium">{session.teacherName}</span>
-                            </div>
+                            <span>Guru: <span className="font-medium">{session.teacherName}</span></span>
                           </div>
                           <div className="mt-2 text-sm text-gray-600">
-                            <span className="font-medium">{session.capacity?.current || 0}</span>/
-                            {session.capacity?.max || 0} siswa
+                            <span className="font-medium">{session.capacity?.current || 0}</span>/{session.capacity?.max || 0} siswa
                           </div>
                         </div>
-                        <span
-                          className={`text-xs px-2 py-1 rounded-full font-medium ${statusConfig.bg} ${statusConfig.text}`}
-                        >
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusConfig.bg} ${statusConfig.text}`}>
                           {statusConfig.label}
                         </span>
                       </div>
@@ -434,28 +306,24 @@ export default function DashboardPage() {
             title="Status Pembayaran SPP"
             description={`Bulan ${today.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}`}
             action={
-              <Link
-                href="/invoice-tagihan"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
+              <Link href="/invoice-tagihan" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 Kelola invoice <ArrowRight className="w-4 h-4" />
               </Link>
             }
           >
-            {paymentStatus.length === 0 ? (
+            {isLoading ? (
+              <SkeletonCard count={2} />
+            ) : paymentStatus.length === 0 ? (
               <div className="text-center py-8">
                 <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">Belum ada invoice bulan ini</p>
-                <Link
-                  href="/invoice-tagihan"
-                  className="text-blue-600 hover:text-blue-700 text-xs font-medium mt-2 inline-block"
-                >
+                <Link href="/invoice-tagihan" className="text-blue-600 hover:text-blue-700 text-xs font-medium mt-2 inline-block">
                   Generate invoice pertama →
                 </Link>
               </div>
             ) : (
               <div className="space-y-4">
-                {paymentStatus.map((s) => (
+                {paymentStatus.map(s => (
                   <div key={s.id}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-gray-700">{s.name}</span>
@@ -464,10 +332,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${s.color}`}
-                        style={{ width: `${s.percentage}%` }}
-                      ></div>
+                      <div className={`h-2 rounded-full ${s.color}`} style={{ width: `${s.percentage}%` }} />
                     </div>
                   </div>
                 ))}
@@ -496,22 +361,18 @@ export default function DashboardPage() {
             title="Siswa Terbaru"
             description="4 siswa yang baru didaftarkan"
             action={
-              <Link
-                href="/master-data/students"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
+              <Link href="/master-data/students" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 Lihat semua <ArrowRight className="w-4 h-4" />
               </Link>
             }
           >
-            {recentStudents.length === 0 ? (
+            {isLoading ? (
+              <SkeletonCard count={3} />
+            ) : recentStudents.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">Belum ada siswa terdaftar</p>
-                <Link
-                  href="/master-data/students/create"
-                  className="text-blue-600 hover:text-blue-700 text-xs font-medium mt-2 inline-block"
-                >
+                <Link href="/master-data/students/create" className="text-blue-600 hover:text-blue-700 text-xs font-medium mt-2 inline-block">
                   Daftarkan siswa pertama →
                 </Link>
               </div>
@@ -525,18 +386,12 @@ export default function DashboardPage() {
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-9 h-9 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0">
-                        {student.name
-                          ?.split(' ')
-                          .map((n: string) => n[0])
-                          .join('')
-                          .slice(0, 2)
-                          .toUpperCase()}
+                        {student.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{student.name}</p>
                         <p className="text-xs text-gray-600 mt-0.5">
-                          {student.classLevel || 'Tanpa kelas'} ·{' '}
-                          {student.subjects?.length || 0} mapel
+                          {student.classLevel || 'Tanpa kelas'} · {student.subjectCount || 0} mapel
                         </p>
                       </div>
                     </div>
@@ -553,33 +408,17 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <SectionCard title="🚀 Aksi Cepat">
             <div className="space-y-2">
-              <Link
-                href="/master-data/students/create"
-                className="flex items-center gap-3 w-full p-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-medium text-sm border border-blue-200"
-              >
-                <Users className="w-5 h-5" />
-                Daftarkan Siswa
+              <Link href="/master-data/students/create" className="flex items-center gap-3 w-full p-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-medium text-sm border border-blue-200">
+                <Users className="w-5 h-5" /> Daftarkan Siswa
               </Link>
-              <Link
-                href="/invoice-tagihan"
-                className="flex items-center gap-3 w-full p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition font-medium text-sm border border-purple-200"
-              >
-                <DollarSign className="w-5 h-5" />
-                Generate Invoice
+              <Link href="/invoice-tagihan" className="flex items-center gap-3 w-full p-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition font-medium text-sm border border-purple-200">
+                <DollarSign className="w-5 h-5" /> Generate Invoice
               </Link>
-              <Link
-                href="/jadwal-sesi"
-                className="flex items-center gap-3 w-full p-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-medium text-sm border border-green-200"
-              >
-                <Calendar className="w-5 h-5" />
-                Lihat Jadwal
+              <Link href="/jadwal-sesi" className="flex items-center gap-3 w-full p-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition font-medium text-sm border border-green-200">
+                <Calendar className="w-5 h-5" /> Lihat Jadwal
               </Link>
-              <Link
-                href="/komisi-guru"
-                className="flex items-center gap-3 w-full p-3 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition font-medium text-sm border border-amber-200"
-              >
-                <TrendingUp className="w-5 h-5" />
-                Laporan Komisi
+              <Link href="/komisi-guru" className="flex items-center gap-3 w-full p-3 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition font-medium text-sm border border-amber-200">
+                <TrendingUp className="w-5 h-5" /> Laporan Komisi
               </Link>
             </div>
           </SectionCard>
@@ -589,52 +428,29 @@ export default function DashboardPage() {
             title="Transaksi Terbaru"
             description="Pembayaran & penjualan terkini"
             action={
-              <Link
-                href="/laporan-keuangan"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
+              <Link href="/laporan-keuangan" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 Lihat semua <ArrowRight className="w-4 h-4" />
               </Link>
             }
           >
-            {recentTransactions.length === 0 ? (
+            {isLoading ? (
+              <SkeletonCard count={2} />
+            ) : recentTransactions.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">Belum ada transaksi</p>
             ) : (
               <div className="space-y-2">
                 {recentTransactions.map((tx: any) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
+                  <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 text-sm truncate">{tx.description}</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        {new Date(tx.date).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'short',
-                        })}{' '}
-                        ·{' '}
-                        {tx.type === 'SPP'
-                          ? 'SPP'
-                          : tx.type === 'REGISTRATION'
-                          ? 'Registrasi'
-                          : tx.type === 'SALE'
-                          ? 'Penjualan'
-                          : tx.type === 'COMMISSION'
-                          ? 'Komisi'
-                          : tx.type}
+                        {new Date(tx.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} ·{' '}
+                        {{ SPP: 'SPP', REGISTRATION: 'Registrasi', SALE: 'Penjualan', COMMISSION: 'Komisi' }[tx.type as string] ?? tx.type}
                       </p>
                     </div>
-                    <div className="text-right ml-2">
-                      <p
-                        className={`font-semibold text-sm ${
-                          tx.direction === 'IN' ? 'text-green-700' : 'text-red-700'
-                        }`}
-                      >
-                        {tx.direction === 'IN' ? '+' : '−'}
-                        {formatRupiah(tx.amount)}
-                      </p>
-                    </div>
+                    <p className={`font-semibold text-sm ml-2 ${tx.direction === 'IN' ? 'text-green-700' : 'text-red-700'}`}>
+                      {tx.direction === 'IN' ? '+' : '−'}{formatRupiah(tx.amount)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -646,26 +462,22 @@ export default function DashboardPage() {
             title="Aktivitas Guru"
             description="Top guru berdasarkan jumlah sesi"
             action={
-              <Link
-                href="/master-data/teachers"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-              >
+              <Link href="/master-data/teachers" className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">
                 Lihat semua <ArrowRight className="w-4 h-4" />
               </Link>
             }
           >
-            {teacherAttendance.length === 0 ? (
+            {isLoading ? (
+              <SkeletonCard count={3} />
+            ) : topTeachers.length === 0 ? (
               <div className="text-center py-4">
                 <GraduationCap className="w-8 h-8 text-gray-300 mx-auto mb-1" />
                 <p className="text-sm text-gray-500">Belum ada guru</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {teacherAttendance.map((teacher: any) => {
-                  const maxSessions = Math.max(
-                    ...teacherAttendance.map((t: any) => t.totalSessions),
-                    1,
-                  )
+                {topTeachers.map((teacher: any) => {
+                  const maxSessions = Math.max(...topTeachers.map((t: any) => t.totalSessions), 1)
                   const pct = (teacher.totalSessions / maxSessions) * 100
                   return (
                     <Link
@@ -676,20 +488,14 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 text-sm truncate">{teacher.name}</p>
-                          <p className="text-xs text-gray-600">
-                            {teacher.branchCount} cabang
-                          </p>
+                          <p className="text-xs text-gray-600">{teacher.branchCount} cabang</p>
                         </div>
                         <span className="font-bold text-base text-gray-900 ml-2">
-                          {teacher.totalSessions}
-                          <span className="text-xs font-normal text-gray-500"> sesi</span>
+                          {teacher.totalSessions}<span className="text-xs font-normal text-gray-500"> sesi</span>
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className="h-1.5 rounded-full bg-blue-500"
-                          style={{ width: `${pct}%` }}
-                        ></div>
+                        <div className="h-1.5 rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
                       </div>
                     </Link>
                   )
@@ -698,7 +504,7 @@ export default function DashboardPage() {
             )}
           </SectionCard>
 
-          {/* Tips Card */}
+          {/* Tips */}
           <Card>
             <div className="flex gap-3">
               <div className="p-2 bg-amber-100 rounded-lg h-fit flex-shrink-0">
@@ -720,19 +526,19 @@ export default function DashboardPage() {
             <div className="space-y-3">
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 text-sm">Cabang Aktif</span>
-                <span className="font-bold text-lg text-gray-900">{branches.length}</span>
+                <span className="font-bold text-lg text-gray-900">{isLoading ? '…' : branches.length}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 text-sm">Mata Pelajaran</span>
-                <span className="font-bold text-lg text-gray-900">{masterDataStats.subjects}</span>
+                <span className="font-bold text-lg text-gray-900">{isLoading ? '…' : masterData?.subjects ?? 0}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-gray-200">
                 <span className="text-gray-600 text-sm">Siswa Terdaftar</span>
-                <span className="font-bold text-lg text-gray-900">{totalActiveStudents}</span>
+                <span className="font-bold text-lg text-gray-900">{isLoading ? '…' : metrics?.totalStudents ?? 0}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600 text-sm">Guru Aktif</span>
-                <span className="font-bold text-lg text-gray-900">{totalTeachers}</span>
+                <span className="font-bold text-lg text-gray-900">{isLoading ? '…' : metrics?.totalTeachers ?? 0}</span>
               </div>
             </div>
           </Card>
