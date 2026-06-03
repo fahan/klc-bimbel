@@ -342,23 +342,19 @@ export class AttendanceService {
     const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } })
     if (!subject) throw new NotFoundException('Mata pelajaran tidak ditemukan')
 
-    // Validate students are enrolled in this subject (at least at this branch)
+    // Validate all student IDs exist (basic existence check — enrollment not required for ad-hoc)
     const studentIds = dto.attendances.map(a => a.studentId)
-    const enrollments = await this.prisma.studentSubject.findMany({
-      where: {
-        studentId: { in: studentIds },
-        subjectId: dto.subjectId,
-        isActive: true,
-      },
-      select: { studentId: true },
+    const existingStudents = await this.prisma.student.findMany({
+      where: { id: { in: studentIds }, isActive: true },
+      select: { id: true },
     })
-    const enrolledIds = new Set(enrollments.map(e => e.studentId))
-    const notEnrolled = studentIds.filter(id => !enrolledIds.has(id))
-    if (notEnrolled.length > 0) {
-      throw new BadRequestException(
-        `${notEnrolled.length} siswa tidak terdaftar di mata pelajaran ini. Pastikan siswa sudah di-enroll.`
-      )
+    const existingIds = new Set(existingStudents.map(s => s.id))
+    const notFound = studentIds.filter(id => !existingIds.has(id))
+    if (notFound.length > 0) {
+      throw new BadRequestException(`${notFound.length} siswa tidak ditemukan di sistem.`)
     }
+    // Note: commission will only be calculated for students who have active enrollment (studentSubject).
+    // Non-enrolled students can attend ad-hoc sessions but won't generate commission.
 
     const sessionDate = new Date(dto.sessionDate)
     sessionDate.setHours(0, 0, 0, 0)

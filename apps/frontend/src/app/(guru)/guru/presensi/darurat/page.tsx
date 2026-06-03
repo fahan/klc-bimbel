@@ -1,13 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { attendanceApi, branchApi, subjectApi, usersApi } from '@/lib/api/endpoints'
-import { ArrowLeft, AlertTriangle, Clock, Users, BookOpen } from 'lucide-react'
+import { attendanceApi, branchApi, subjectApi, usersApi, studentApi } from '@/lib/api/endpoints'
+import { ArrowLeft, AlertTriangle, Users, BookOpen, Search, X, UserPlus } from 'lucide-react'
 
 type AttendanceStatus = 'HADIR' | 'ABSEN' | 'IZIN' | 'SAKIT'
+
+interface StudentEntry {
+  studentId: string
+  studentName: string
+  classLevel?: string
+  isManual?: boolean // tambahan manual (bukan dari enrollment)
+}
 
 export default function SesDaruratPage() {
   const router = useRouter()
@@ -20,6 +27,12 @@ export default function SesDaruratPage() {
   const [durationMinutes, setDurationMinutes] = useState(60)
   const [notes, setNotes] = useState('')
   const [attendances, setAttendances] = useState<{ [studentId: string]: AttendanceStatus }>({})
+
+  // Manual student addition
+  const [manualStudents, setManualStudents] = useState<StudentEntry[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -49,6 +62,13 @@ export default function SesDaruratPage() {
     enabled: !!branchId && !!subjectId,
   })
 
+  // Search students for manual addition
+  const { data: searchData } = useQuery({
+    queryKey: ['student-search-darurat', branchId, searchQuery],
+    queryFn: () => studentApi.getAll(1, 10, branchId, searchQuery),
+    enabled: !!branchId && searchQuery.length >= 2,
+  })
+
   // Auto-set primary branch
   useEffect(() => {
     const primaryBranchId = userMeData?.data?.data?.primaryBranchId
@@ -57,14 +77,62 @@ export default function SesDaruratPage() {
     }
   }, [userMeData?.data?.data?.primaryBranchId, branchId])
 
-  // Reset attendances when students change
+  // Reset attendances + manual students when branch or subject changes
   useEffect(() => {
     setAttendances({})
+    setManualStudents([])
+    setSearchQuery('')
   }, [branchId, subjectId])
 
-  const students = studentsData?.data?.data || []
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Enrolled students from API
+  const enrolledStudents: StudentEntry[] = (studentsData?.data?.data || []).map((s: any) => ({
+    studentId: s.studentId,
+    studentName: s.studentName,
+    classLevel: s.classLevel,
+    isManual: false,
+  }))
+
+  // Merged list: enrolled first, then manual additions (no duplicates)
+  const enrolledIds = new Set(enrolledStudents.map(s => s.studentId))
+  const allStudents: StudentEntry[] = [
+    ...enrolledStudents,
+    ...manualStudents.filter(s => !enrolledIds.has(s.studentId)),
+  ]
+
   const branches = branchesData?.data?.data || []
   const subjects = subjectsData?.data?.data || []
+
+  // Search results for manual addition dropdown
+  const searchResults: any[] = (searchData?.data?.data || []).filter(
+    (s: any) => !allStudents.some(a => a.studentId === s.id)
+  )
+
+  const addManualStudent = (s: any) => {
+    setManualStudents(prev => [...prev, {
+      studentId: s.id,
+      studentName: s.name,
+      classLevel: s.classLevel,
+      isManual: true,
+    }])
+    setSearchQuery('')
+    setShowDropdown(false)
+  }
+
+  const removeManualStudent = (studentId: string) => {
+    setManualStudents(prev => prev.filter(s => s.studentId !== studentId))
+    setAttendances(prev => { const next = { ...prev }; delete next[studentId]; return next })
+  }
 
   const setStatus = (studentId: string, status: AttendanceStatus) => {
     setAttendances(prev => ({ ...prev, [studentId]: status }))
@@ -72,7 +140,7 @@ export default function SesDaruratPage() {
 
   const markAll = (status: AttendanceStatus) => {
     const all: { [k: string]: AttendanceStatus } = {}
-    students.forEach((s: any) => { all[s.studentId] = status })
+    allStudents.forEach(s => { all[s.studentId] = status })
     setAttendances(all)
   }
 
@@ -93,7 +161,7 @@ export default function SesDaruratPage() {
       return setError('Pilih status presensi untuk minimal satu siswa')
     }
 
-    const unmarked = students.filter((s: any) => !attendances[s.studentId])
+    const unmarked = allStudents.filter(s => !attendances[s.studentId])
     if (unmarked.length > 0) {
       const ok = confirm(`${unmarked.length} siswa belum ditandai presensinya. Lanjutkan?`)
       if (!ok) return
@@ -243,29 +311,28 @@ export default function SesDaruratPage() {
       {/* Students Section */}
       {branchId && subjectId && (
         <div className="space-y-3">
+          {/* Header */}
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-gray-900 text-sm flex items-center gap-1.5">
               <Users className="w-4 h-4 text-gray-500" />
               Daftar Siswa
+              {allStudents.length > 0 && (
+                <span className="text-xs text-gray-400 font-normal">({allStudents.length})</span>
+              )}
             </h2>
-            {students.length > 0 && (
+            {allStudents.length > 0 && (
               <div className="flex gap-2">
-                <button
-                  onClick={() => markAll('HADIR')}
-                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium"
-                >
+                <button onClick={() => markAll('HADIR')} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
                   Semua Hadir
                 </button>
-                <button
-                  onClick={() => markAll('ABSEN')}
-                  className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium"
-                >
+                <button onClick={() => markAll('ABSEN')} className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium">
                   Semua Absen
                 </button>
               </div>
             )}
           </div>
 
+          {/* Enrolled students loading skeleton */}
           {loadingStudents ? (
             <div className="space-y-2">
               {[1, 2, 3].map(i => (
@@ -275,36 +342,44 @@ export default function SesDaruratPage() {
                 </div>
               ))}
             </div>
-          ) : students.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-              <BookOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">
-                Tidak ada siswa yang terdaftar di mata pelajaran ini untuk cabang ini
-              </p>
-            </div>
           ) : (
             <div className="space-y-2">
-              {students.map((student: any) => {
+              {/* Empty enrolled state */}
+              {enrolledStudents.length === 0 && manualStudents.length === 0 && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                  <BookOpen className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Tidak ada siswa terdaftar di mapel ini.</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Tambah siswa secara manual di bawah.</p>
+                </div>
+              )}
+
+              {/* Student cards */}
+              {allStudents.map(student => {
                 const status = attendances[student.studentId]
                 return (
-                  <div key={student.studentId} className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                  <div key={student.studentId} className={`bg-white border rounded-lg p-3 shadow-sm ${student.isManual ? 'border-blue-200 bg-blue-50/30' : 'border-gray-200'}`}>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-9 h-9 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-xs bg-gradient-to-br ${student.isManual ? 'from-blue-400 to-blue-600' : 'from-orange-400 to-orange-600'}`}>
                         {student.studentName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">{student.studentName}</p>
-                        {student.classLevel && (
-                          <p className="text-xs text-gray-400">{student.classLevel}</p>
-                        )}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-gray-900 text-sm">{student.studentName}</p>
+                          {student.isManual && (
+                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Manual</span>
+                          )}
+                        </div>
+                        {student.classLevel && <p className="text-xs text-gray-400">{student.classLevel}</p>}
                       </div>
+                      {student.isManual && (
+                        <button onClick={() => removeManualStudent(student.studentId)} className="text-gray-300 hover:text-red-400 transition p-1">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    {/* Status Buttons */}
                     <div className="grid grid-cols-2 gap-1.5">
                       {(['HADIR', 'ABSEN', 'IZIN', 'SAKIT'] as AttendanceStatus[]).map(s => (
-                        <button
-                          key={s}
-                          onClick={() => setStatus(student.studentId, s)}
+                        <button key={s} onClick={() => setStatus(student.studentId, s)}
                           className={`py-1.5 rounded-lg text-xs font-medium transition ${
                             status === s
                               ? s === 'HADIR' ? 'bg-green-600 text-white'
@@ -312,8 +387,7 @@ export default function SesDaruratPage() {
                                 : s === 'IZIN' ? 'bg-amber-500 text-white'
                                 : 'bg-purple-600 text-white'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
+                          }`}>
                           {s}
                         </button>
                       ))}
@@ -321,9 +395,55 @@ export default function SesDaruratPage() {
                   </div>
                 )
               })}
-              <p className="text-xs text-gray-500 text-center">
-                {Object.keys(attendances).length}/{students.length} siswa sudah ditandai
-              </p>
+
+              {/* Search to add student manually */}
+              <div ref={searchRef} className="relative">
+                <div className="flex items-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-2.5 hover:border-blue-400 transition">
+                  <UserPlus className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="Tambah siswa lain (cari nama...)"
+                    value={searchQuery}
+                    onChange={e => { setSearchQuery(e.target.value); setShowDropdown(true) }}
+                    onFocus={() => setShowDropdown(true)}
+                    className="flex-1 text-sm bg-transparent outline-none placeholder-gray-400"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => { setSearchQuery(''); setShowDropdown(false) }}>
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+                {/* Dropdown */}
+                {showDropdown && searchQuery.length >= 2 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-20 mt-1 max-h-48 overflow-y-auto">
+                    {searchResults.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-3">
+                        {searchQuery.length < 2 ? 'Ketik minimal 2 karakter' : 'Tidak ada siswa ditemukan'}
+                      </p>
+                    ) : (
+                      searchResults.map((s: any) => (
+                        <button key={s.id} onClick={() => addManualStudent(s)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50 transition text-left">
+                          <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-semibold text-xs flex-shrink-0">
+                            {s.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{s.name}</p>
+                            {s.classLevel && <p className="text-xs text-gray-400">{s.classLevel}</p>}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {allStudents.length > 0 && (
+                <p className="text-xs text-gray-500 text-center">
+                  {Object.keys(attendances).length}/{allStudents.length} siswa sudah ditandai
+                </p>
+              )}
             </div>
           )}
         </div>
