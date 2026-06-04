@@ -188,10 +188,11 @@ export default function AttendancePage() {
       const scheduleResult = res.data?.data?.scheduleResult ?? null
       setApproveResult({ logId: approveModalLog.id, scheduleResult })
       await refetchPendingAdHoc()
-      if (!scheduleResult || scheduleResult.created) {
-        // Auto-close if no warning to show
+      if (!scheduleResult) {
+        // No schedule requested — auto-close
         setApproveModalLog(null)
       }
+      // If schedule was requested (created or failed), keep modal open to show result
     } catch (err: any) {
       alert(err.response?.data?.message || 'Gagal menyetujui sesi darurat')
     } finally {
@@ -390,14 +391,32 @@ export default function AttendancePage() {
             </div>
 
             {/* Schedule conflict warning result */}
-            {approveResult !== null && approveResult.logId === approveModalLog.id && approveResult.scheduleResult && !approveResult.scheduleResult.created && (
-              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-amber-800">
-                  <p className="font-semibold">Sesi darurat disetujui ✓</p>
-                  <p className="mt-0.5">Namun jadwal gagal dibuat: <em>{approveResult.scheduleResult.conflictReason}</em></p>
+            {approveResult !== null && approveResult.logId === approveModalLog.id && approveResult.scheduleResult && (
+              approveResult.scheduleResult.created ? (
+                <div className="bg-green-50 border border-green-300 rounded-lg p-3 flex gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-green-800">
+                    <p className="font-semibold">Sesi darurat disetujui & jadwal berhasil dibuat ✓</p>
+                    <p className="mt-0.5">
+                      Jadwal reguler setiap hari <strong>{approveResult.scheduleResult.dayOfWeek}</strong> telah dibuat.
+                      {approveResult.scheduleResult.enrolledCount > 0
+                        ? ` ${approveResult.scheduleResult.enrolledCount} siswa otomatis di-enroll.`
+                        : ''}
+                      {approveResult.scheduleResult.skippedCount > 0
+                        ? ` ${approveResult.scheduleResult.skippedCount} siswa dilewati (belum enroll di mapel).`
+                        : ''}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 flex gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-semibold">Sesi darurat disetujui ✓</p>
+                    <p className="mt-0.5">Namun jadwal gagal dibuat: <em>{approveResult.scheduleResult.conflictReason}</em></p>
+                  </div>
+                </div>
+              )
             )}
 
             {/* Generate schedule option */}

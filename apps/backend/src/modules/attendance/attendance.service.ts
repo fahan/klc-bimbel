@@ -492,7 +492,7 @@ export class AttendanceService {
   private async tryCreateScheduleFromAdHoc(
     log: any,
     sessionType: 'REGULAR' | 'PRIVATE',
-  ): Promise<{ created: boolean; sessionId?: string; conflictReason?: string; dayOfWeek?: string }> {
+  ): Promise<{ created: boolean; sessionId?: string; conflictReason?: string; dayOfWeek?: string; enrolledCount?: number; skippedCount?: number }> {
     try {
       const days = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
       const sessionDate = new Date(log.sessionDate)
@@ -563,26 +563,70 @@ export class AttendanceService {
         ? (subject?.maxCapacityPrivate ?? 1)
         : (subject?.maxCapacityRegular ?? 3)
 
-      // --- Create session ---
-      const newSession = await this.prisma.session.create({
-        data: {
-          branchId:        log.adHocBranchId,
-          subjectId:       log.adHocSubjectId,
-          teacherId:       log.actualTeacherId,
-          type:            sessionType,
-          dayOfWeek,
-          startTime,
-          durationMinutes: duration,
-          maxCapacity,
-          currentEnrolled: 0,
-          createdReason:   'SINGLE',
-          status:          'ACTIVE',
-          isActive:        true,
-          notes:           `Dibuat otomatis dari sesi darurat (log ID: ${log.id})`,
-        },
+      // --- Fetch attendances for this ad-hoc log (all statuses) ---
+      const attendances = await this.prisma.attendance.findMany({
+        where: { sessionLogId: log.id },
+        select: { studentId: true },
+      })
+      const studentIds = attendances.map(a => a.studentId)
+
+      // --- Only enroll students who have active StudentSubject for this subject ---
+      // (guards against non-enrolled students added manually to ad-hoc)
+      const validEnrollments = studentIds.length > 0
+        ? await this.prisma.studentSubject.findMany({
+            where: {
+              studentId: { in: studentIds },
+              subjectId: log.adHocSubjectId,
+              isActive: true,
+            },
+            select: { studentId: true },
+          })
+        : []
+      const enrollableIds = validEnrollments.map(e => e.studentId)
+      const skippedCount  = studentIds.length - enrollableIds.length
+
+      // --- Create session + enroll students in a transaction ---
+      const newSession = await this.prisma.$transaction(async tx => {
+        const session = await tx.session.create({
+          data: {
+            branchId:        log.adHocBranchId,
+            subjectId:       log.adHocSubjectId,
+            teacherId:       log.actualTeacherId,
+            type:            sessionType,
+            dayOfWeek,
+            startTime,
+            durationMinutes: duration,
+            maxCapacity,
+            currentEnrolled: enrollableIds.length,
+            createdReason:   'SINGLE',
+            status:          'ACTIVE',
+            isActive:        true,
+            notes:           `Dibuat otomatis dari sesi darurat (log ID: ${log.id})`,
+          },
+        })
+
+        if (enrollableIds.length > 0) {
+          await tx.sessionStudent.createMany({
+            data: enrollableIds.map(studentId => ({
+              sessionId: session.id,
+              studentId,
+              joinedAt: new Date(),
+              isActive: true,
+            })),
+            skipDuplicates: true,
+          })
+        }
+
+        return session
       })
 
-      return { created: true, sessionId: newSession.id, dayOfWeek }
+      return {
+        created: true,
+        sessionId: newSession.id,
+        dayOfWeek,
+        enrolledCount: enrollableIds.length,
+        skippedCount,
+      }
     } catch (err: any) {
       // Never propagate — approval should still succeed
       return {
