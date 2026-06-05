@@ -22,7 +22,14 @@ export default function SesDaruratPage() {
   // Form state
   const [branchId, setBranchId] = useState('')
   const [subjectId, setSubjectId] = useState('')
-  const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [sessionDate, setSessionDate] = useState(() => {
+    // Use local date (not UTC) to avoid date shifting for WIB (UTC+7) users
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  })
   const [startTime, setStartTime] = useState('08:00')
   const [durationMinutes, setDurationMinutes] = useState(30)
   const [notes, setNotes] = useState('')
@@ -163,6 +170,10 @@ export default function SesDaruratPage() {
     if (!subjectId) return setError('Pilih mata pelajaran terlebih dahulu')
     if (!sessionDate) return setError('Pilih tanggal sesi')
     if (!startTime) return setError('Isi jam mulai sesi')
+    const [startHour] = startTime.split(':').map(Number)
+    if (startHour < 5 || startHour >= 22) {
+      return setError('Jam mulai tidak valid. Masukkan jam antara 05:00 – 22:00. Pastikan jam yang diinput adalah jam lokal (WIB), bukan UTC.')
+    }
 
     const attendanceList = Object.entries(attendances).map(([studentId, status]) => ({
       studentId,
@@ -271,7 +282,13 @@ export default function SesDaruratPage() {
             <input
               type="date"
               value={sessionDate}
-              max={new Date().toISOString().split('T')[0]}
+              max={(() => {
+                const now = new Date()
+                const y = now.getFullYear()
+                const m = String(now.getMonth() + 1).padStart(2, '0')
+                const d = String(now.getDate()).padStart(2, '0')
+                return `${y}-${m}-${d}`
+              })()}
               onChange={e => setSessionDate(e.target.value)}
               className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
             />
@@ -283,9 +300,21 @@ export default function SesDaruratPage() {
             <input
               type="time"
               value={startTime}
-              onChange={e => setStartTime(e.target.value)}
+              min="05:00"
+              max="22:00"
+              onChange={e => {
+                const val = e.target.value
+                const [h] = val.split(':').map(Number)
+                if (h < 5 || h >= 22) {
+                  setError(`Jam ${val} tidak valid. Gunakan format 24 jam — contoh: siang jam 2 ditulis 14:00, bukan 02:00.`)
+                } else {
+                  setError('')
+                }
+                setStartTime(val)
+              }}
               className="w-full border border-gray-300 rounded-lg p-2.5 text-sm"
             />
+            <p className="text-xs text-gray-400 mt-1">Format 24 jam · contoh: 08:00, 13:30, 16:00</p>
           </div>
         </div>
 

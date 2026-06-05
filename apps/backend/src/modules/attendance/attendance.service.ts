@@ -334,6 +334,15 @@ export class AttendanceService {
       throw new BadRequestException('Minimal satu siswa harus dicatat presensinya')
     }
 
+    // Validate startTime is within operational hours (05:00–22:00 WIB)
+    const [startHour] = dto.startTime.split(':').map(Number)
+    if (startHour < 5 || startHour >= 22) {
+      throw new BadRequestException(
+        `Jam mulai sesi (${dto.startTime}) tidak valid. Gunakan format 24 jam antara 05:00 – 22:00. ` +
+        `Contoh: jam 2 siang ditulis 14:00, bukan 02:00.`
+      )
+    }
+
     // Validate branch exists
     const branch = await this.prisma.branch.findUnique({ where: { id: dto.branchId } })
     if (!branch) throw new NotFoundException('Cabang tidak ditemukan')
