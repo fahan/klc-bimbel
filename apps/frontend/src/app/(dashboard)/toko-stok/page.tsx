@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { storeApi, studentApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
@@ -13,6 +13,8 @@ import {
   TrendingUp,
   X,
   RefreshCw,
+  ChevronDown,
+  User,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -52,6 +54,10 @@ export default function TokoStokPage() {
   // Sale form
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedStudentId, setSelectedStudentId] = useState('')
+  const [studentInputValue, setStudentInputValue] = useState('')
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false)
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState('')
+  const studentDropdownRef = useRef<HTMLDivElement>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'TRANSFER' | 'OTHER'>('CASH')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [selectedQty, setSelectedQty] = useState(1)
@@ -98,15 +104,34 @@ export default function TokoStokPage() {
     enabled: !!branchId,
   })
 
-  const { data: studentsData } = useQuery({
-    queryKey: ['students'],
-    queryFn: () => studentApi.getAll(),
+  // Debounce student search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedStudentSearch(studentInputValue), 300)
+    return () => clearTimeout(t)
+  }, [studentInputValue])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (studentDropdownRef.current && !studentDropdownRef.current.contains(e.target as Node)) {
+        setStudentDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const { data: studentSearchData, isFetching: studentSearchFetching } = useQuery({
+    queryKey: ['students-search', debouncedStudentSearch, branchId],
+    queryFn: () => studentApi.getAll(1, 20, branchId || undefined, debouncedStudentSearch || undefined),
+    enabled: studentDropdownOpen,
+    staleTime: 30_000,
   })
 
   const products = productsData?.data?.data || []
   const metrics = metricsData?.data?.data
   const lowStock = lowStockData?.data?.data || []
-  const students = studentsData?.data?.data || []
+  const studentSearchResults: any[] = studentSearchData?.data?.data || []
 
   const filteredProducts = useMemo(
     () =>
@@ -176,6 +201,7 @@ export default function TokoStokPage() {
       })
       setCart([])
       setSelectedStudentId('')
+      setStudentInputValue('')
       refreshAll()
       alert('Transaksi berhasil dicatat!')
     } catch (err: any) {
@@ -531,18 +557,96 @@ export default function TokoStokPage() {
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Pembeli (opsional)
               </label>
-              <select
-                value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Pelanggan umum</option>
-                {students.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative" ref={studentDropdownRef}>
+                <div className="relative">
+                  {selectedStudentId ? (
+                    <User className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-blue-500 pointer-events-none" />
+                  ) : (
+                    <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  )}
+                  <input
+                    type="text"
+                    value={studentInputValue}
+                    onChange={(e) => {
+                      setStudentInputValue(e.target.value)
+                      setSelectedStudentId('')
+                      setStudentDropdownOpen(true)
+                    }}
+                    onFocus={() => setStudentDropdownOpen(true)}
+                    placeholder="Cari siswa... (kosong = pelanggan umum)"
+                    className={`w-full pl-8 pr-8 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      selectedStudentId ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+                    }`}
+                  />
+                  <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5">
+                    {studentInputValue && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStudentInputValue('')
+                          setSelectedStudentId('')
+                          setStudentDropdownOpen(false)
+                        }}
+                        className="p-1 hover:bg-gray-200 text-gray-400 hover:text-gray-600 rounded"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setStudentDropdownOpen((v) => !v)}
+                      className="p-1 hover:bg-gray-200 text-gray-400 rounded"
+                    >
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${studentDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+                {studentDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    <div
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        setSelectedStudentId('')
+                        setStudentInputValue('')
+                        setStudentDropdownOpen(false)
+                      }}
+                      className={`px-3 py-2 text-sm cursor-pointer flex items-center gap-2 hover:bg-gray-50 ${
+                        !selectedStudentId ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-500'
+                      }`}
+                    >
+                      <User className="w-3.5 h-3.5 flex-shrink-0" />
+                      Pelanggan umum
+                    </div>
+                    {studentSearchFetching ? (
+                      <div className="px-3 py-2 text-xs text-gray-400 italic">Mencari...</div>
+                    ) : studentSearchResults.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-gray-400 italic">
+                        {debouncedStudentSearch ? `Tidak ada siswa "${debouncedStudentSearch}"` : 'Tidak ada siswa terdaftar'}
+                      </div>
+                    ) : (
+                      studentSearchResults.map((s: any) => (
+                        <div
+                          key={s.id}
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            setSelectedStudentId(s.id)
+                            setStudentInputValue(s.name)
+                            setStudentDropdownOpen(false)
+                          }}
+                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${
+                            selectedStudentId === s.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-800'
+                          }`}
+                        >
+                          <p className="font-medium">{s.name}</p>
+                          {s.classLevel && (
+                            <p className="text-[11px] text-gray-500">{s.classLevel}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Cart Items */}
