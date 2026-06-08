@@ -148,6 +148,11 @@ enum TrialRegistrationStatus {
   CANCELLED
 }
 
+enum ExpenseCategory {
+  OPERATIONAL
+  ASSET
+}
+
 // ===== 1. ORGANISASI (3 tabel) =====
 
 model Branch {
@@ -174,6 +179,7 @@ model Branch {
   progressReportLinks ProgressReportLink[]
   adHocSessionLogs   SessionLog[] @relation("adhoc_branch")
   teacherBonuses     TeacherBonus[]
+  expenses           Expense[]
 
   @@map("branches")
 }
@@ -208,6 +214,7 @@ model User {
   teacherBonuses     TeacherBonus[] @relation("teacher_bonuses")
   bonusApprovements  TeacherBonus[] @relation("bonus_approved_by")
   bonusesCreated     TeacherBonus[] @relation("bonus_created_by")
+  expensesRecorded   Expense[] @relation("expense_recorded_by")
 
   @@map("users")
 }
@@ -810,4 +817,26 @@ model FreeTrialRegistration {
   updatedAt   DateTime @updatedAt
 
   @@map("free_trial_registrations")
+}
+
+// ===== 9. PENGELUARAN =====
+
+model Expense {
+  id           String          @id @default(cuid())
+  branchId     String
+  category     ExpenseCategory
+  description  String
+  amount       Decimal         @db.Decimal(15, 2)
+  date         DateTime        @db.Date
+  notes        String?
+  recordedById String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations
+  branch       Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  recordedBy   User            @relation("expense_recorded_by", fields: [recordedById], references: [id])
+
+  @@index([branchId, date])
+  @@map("expenses")
 }

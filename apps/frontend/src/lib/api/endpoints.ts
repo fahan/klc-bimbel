@@ -503,3 +503,20 @@ export const landingApi = {
   deleteImage: (path: string) =>
     apiClient.delete('/landing/upload', { data: { path } }),
 }
+
+// ===== EXPENSES API =====
+export const expenseApi = {
+  getAll: (filters?: { branchId?: string; month?: number; year?: number; category?: string }) => {
+    const params = new URLSearchParams()
+    if (filters?.branchId) params.append('branchId', filters.branchId)
+    if (filters?.month) params.append('month', String(filters.month))
+    if (filters?.year) params.append('year', String(filters.year))
+    if (filters?.category) params.append('category', filters.category)
+    const qs = params.toString()
+    return apiClient.get(`/expenses${qs ? `?${qs}` : ''}`)
+  },
+  getOne: (id: string) => apiClient.get(`/expenses/${id}`),
+  create: (data: any) => apiClient.post('/expenses', data),
+  update: (id: string, data: any) => apiClient.patch(`/expenses/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/expenses/${id}`),
+}

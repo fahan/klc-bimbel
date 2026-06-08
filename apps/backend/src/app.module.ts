@@ -22,6 +22,7 @@ import { StoreModule } from './modules/store/store.module'
 import { MailModule } from './modules/mail/mail.module'
 import { LandingModule } from './modules/landing/landing.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module'
+import { ExpensesModule } from './modules/expenses/expenses.module'
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module'
     MailModule,
     LandingModule,
     DashboardModule,
+    ExpensesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

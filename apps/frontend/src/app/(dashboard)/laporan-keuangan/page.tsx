@@ -136,10 +136,12 @@ export default function LaporanKeuanganPage() {
     { label: 'Penjualan toko', value: breakdown.income.store, color: 'bg-amber-500' },
   ]
 
-  const expenseTotal = breakdown.expense.commission + breakdown.expense.stock
+  const expenseTotal = breakdown.expense.commission + breakdown.expense.stock + (breakdown.expense.operational || 0) + (breakdown.expense.asset || 0)
   const expenseBreakdown = [
     { label: 'Komisi guru', value: breakdown.expense.commission, color: 'bg-red-500' },
     { label: 'Pembelian stok', value: breakdown.expense.stock, color: 'bg-orange-500' },
+    { label: 'Operasional', value: breakdown.expense.operational || 0, color: 'bg-blue-500' },
+    { label: 'Aset', value: breakdown.expense.asset || 0, color: 'bg-purple-500' },
   ]
 
   return (
@@ -275,6 +277,18 @@ export default function LaporanKeuanganPage() {
             <p className="text-xs text-gray-600">Pembelian stok</p>
             <p className="font-bold text-red-700">−{formatRupiah(breakdown.expense.stock)}</p>
           </div>
+          {(breakdown.expense.operational || 0) > 0 && (
+            <div>
+              <p className="text-xs text-gray-600">Operasional</p>
+              <p className="font-bold text-red-700">−{formatRupiah(breakdown.expense.operational || 0)}</p>
+            </div>
+          )}
+          {(breakdown.expense.asset || 0) > 0 && (
+            <div>
+              <p className="text-xs text-gray-600">Aset</p>
+              <p className="font-bold text-red-700">−{formatRupiah(breakdown.expense.asset || 0)}</p>
+            </div>
+          )}
         </div>
         <div className="border-t border-blue-200 mt-3 pt-3 flex items-center justify-between">
           <p className="text-sm text-gray-700">

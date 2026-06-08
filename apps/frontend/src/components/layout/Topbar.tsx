@@ -71,6 +71,9 @@ export default function Topbar() {
     if (pathname === '/transfer-stok' || pathname.startsWith('/transfer-stok/')) {
       return 'Transfer Stok'
     }
+    if (pathname === '/pengeluaran' || pathname.startsWith('/pengeluaran/')) {
+      return 'Pengeluaran'
+    }
     if (pathname.startsWith('/master-data/')) {
       const segments = pathname.split('/').filter(Boolean)
       const lastSegment = segments[segments.length - 1]
