@@ -21,6 +21,7 @@ interface EnrollmentSummaryProps {
   studentData: Partial<StudentData>
   subjects: SelectedSubject[]
   registrationFee: number
+  onRegistrationFeeChange: (value: number) => void
   totalSppFirstMonth: number
   totalFirstBill: number
 }
@@ -29,6 +30,7 @@ export default function EnrollmentSummary({
   studentData,
   subjects,
   registrationFee,
+  onRegistrationFeeChange,
   totalSppFirstMonth,
   totalFirstBill,
 }: EnrollmentSummaryProps) {
@@ -78,11 +80,18 @@ export default function EnrollmentSummary({
 
         {/* Costs */}
         <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-700">Biaya Registrasi:</span>
-            <span className="font-medium text-gray-900">
-              Rp {registrationFee.toLocaleString('id-ID')}
-            </span>
+          <div className="flex justify-between items-center text-sm gap-3">
+            <span className="text-gray-700 shrink-0">Biaya Registrasi:</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500 text-xs">Rp</span>
+              <input
+                type="number"
+                min={0}
+                value={registrationFee}
+                onChange={(e) => onRegistrationFeeChange(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-28 text-right text-sm font-medium text-gray-900 border border-gray-200 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-700">SPP Bulan Pertama:</span>
