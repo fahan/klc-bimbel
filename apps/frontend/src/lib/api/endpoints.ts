@@ -426,6 +426,8 @@ export const studentApi = {
     apiClient.patch(`/students/${studentId}/subjects/${subjectId}/discount`, data),
   endSubjectEnrollment: (studentId: string, subjectId: string, data: { status: string; endDate?: string }) =>
     apiClient.patch(`/students/${studentId}/subjects/${subjectId}/end`, data),
+  updateSubjectSppRate: (studentId: string, subjectId: string, data: { sppRateId: string }) =>
+    apiClient.patch(`/students/${studentId}/subjects/${subjectId}/spp-rate`, data),
   removeSubject: (studentId: string, subjectId: string) =>
     apiClient.delete(`/students/${studentId}/subjects/${subjectId}`),
 }

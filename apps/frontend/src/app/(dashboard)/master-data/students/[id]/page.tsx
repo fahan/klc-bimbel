@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { studentApi, branchApi } from '@/lib/api/endpoints'
+import { studentApi, branchApi, sppRateApi } from '@/lib/api/endpoints'
 import {
   ArrowLeft,
   BookOpen,
@@ -21,6 +21,7 @@ import {
   Plus,
   Tag,
   X,
+  DollarSign,
 } from 'lucide-react'
 import { LoadingState } from '@/components/ui/States'
 import { StatusBadge } from '@/components/ui/Badge'
@@ -58,6 +59,10 @@ export default function StudentDetailPage() {
   const [discountAmount, setDiscountAmount] = useState('')
   const [discountNote, setDiscountNote] = useState('')
   const [savingDiscount, setSavingDiscount] = useState(false)
+  const [sppRateSubjectId, setSppRateSubjectId] = useState<string | null>(null)
+  const [sppRateSubjectType, setSppRateSubjectType] = useState<string>('')
+  const [selectedSppRateId, setSelectedSppRateId] = useState<string>('')
+  const [savingSppRate, setSavingSppRate] = useState(false)
 
   const { data: studentData, isLoading: loadingStudent, refetch } = useQuery({
     queryKey: ['student', studentId],
@@ -68,6 +73,12 @@ export default function StudentDetailPage() {
   const { data: branchesData } = useQuery({
     queryKey: ['branches'],
     queryFn: () => branchApi.getAll(),
+  })
+
+  const { data: sppRatesData } = useQuery({
+    queryKey: ['spp-rates-by-subject', sppRateSubjectId],
+    queryFn: () => sppRateApi.getBySubject(sppRateSubjectId!),
+    enabled: !!sppRateSubjectId,
   })
 
   const student = studentData?.data?.data
@@ -144,6 +155,7 @@ export default function StudentDetailPage() {
   }
 
   const openDiscountEditor = (subject: any) => {
+    setSppRateSubjectId(null)
     setDiscountSubjectId(subject.subjectId)
     setDiscountAmount(subject.discountAmount ? parseFloat(subject.discountAmount).toString() : '')
     setDiscountNote(subject.discountNote || '')
@@ -166,6 +178,28 @@ export default function StudentDetailPage() {
       alert(err.response?.data?.message || 'Gagal menyimpan diskon')
     } finally {
       setSavingDiscount(false)
+    }
+  }
+
+  const openSppRateEditor = (subject: any) => {
+    setSppRateSubjectId(subject.subjectId)
+    setSppRateSubjectType(subject.type)
+    setSelectedSppRateId(subject.sppRateId || '')
+    setDiscountSubjectId(null)
+  }
+
+  const handleSaveSppRate = async () => {
+    if (!sppRateSubjectId || !selectedSppRateId) return
+    try {
+      setSavingSppRate(true)
+      await studentApi.updateSubjectSppRate(studentId, sppRateSubjectId, { sppRateId: selectedSppRateId })
+      setSppRateSubjectId(null)
+      setSelectedSppRateId('')
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal memperbarui tarif SPP')
+    } finally {
+      setSavingSppRate(false)
     }
   }
 
@@ -202,6 +236,8 @@ export default function StudentDetailPage() {
   }
 
   const branchName = branches.find((b: any) => b.id === student.branchId)?.name || '-'
+  const allSppRates: any[] = sppRatesData?.data?.data || []
+  const filteredSppRates = allSppRates.filter((r: any) => r.type === sppRateSubjectType)
   const totalSubjects = student.subjects?.length || 0
   const totalSPP = student.subjects?.reduce(
     (sum: number, s: any) => sum + parseFloat(s.sppAmount || '0'),
@@ -549,6 +585,7 @@ export default function StudentDetailPage() {
               const subjectDiscount = parseFloat(subject.discountAmount || '0')
               const netAmount = Math.max(0, sppAmount - subjectDiscount)
               const isEditingDiscount = discountSubjectId === subject.subjectId
+              const isEditingSppRate = sppRateSubjectId === subject.subjectId
 
               return (
                 <div
@@ -607,6 +644,20 @@ export default function StudentDetailPage() {
                           Diskon
                         </button>
                         <button
+                          onClick={() => {
+                            if (isEditingSppRate) { setSppRateSubjectId(null) }
+                            else { openSppRateEditor(subject) }
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium transition ${
+                            isEditingSppRate
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-orange-50 hover:bg-orange-100 text-orange-700'
+                          }`}
+                        >
+                          <DollarSign className="w-3 h-3 inline mr-1" />
+                          Tarif SPP
+                        </button>
+                        <button
                           onClick={() => setEditingSubjectId(subject.subjectId)}
                           className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs font-medium transition"
                         >
@@ -627,6 +678,55 @@ export default function StudentDetailPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Inline SPP rate editor */}
+                  {isEditingSppRate && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 bg-orange-50 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-orange-800 flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        Ganti Tarif SPP Terkunci
+                      </p>
+                      <p className="text-[10px] text-orange-700">
+                        Pilih tarif SPP yang akan digunakan untuk enrollment ini. Hanya tarif dengan tipe {sppRateSubjectType === 'REGULAR' ? 'Reguler' : 'Private'} yang ditampilkan.
+                      </p>
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-600 mb-1">Pilih Tarif SPP</label>
+                        <select
+                          value={selectedSppRateId}
+                          onChange={(e) => setSelectedSppRateId(e.target.value)}
+                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-orange-500"
+                        >
+                          <option value="">-- Pilih tarif --</option>
+                          {filteredSppRates.map((rate: any) => (
+                            <option key={rate.id} value={rate.id}>
+                              Rp {parseFloat(rate.amount).toLocaleString('id-ID')}/bln
+                              {' · '}Berlaku: {new Date(rate.effectiveFrom).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              {rate.effectiveUntil ? ` s/d ${new Date(rate.effectiveUntil).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}` : ' (aktif)'}
+                              {rate.id === subject.sppRateId ? ' ✓ Saat ini' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        {filteredSppRates.length === 0 && (
+                          <p className="text-[10px] text-gray-400 mt-1">Tidak ada tarif SPP tersedia untuk tipe ini</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveSppRate}
+                          disabled={savingSppRate || !selectedSppRateId || selectedSppRateId === subject.sppRateId}
+                          className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded transition disabled:opacity-50"
+                        >
+                          {savingSppRate ? 'Menyimpan...' : 'Simpan'}
+                        </button>
+                        <button
+                          onClick={() => setSppRateSubjectId(null)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
+                        >
+                          <X className="w-3 h-3 inline" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Inline discount editor */}
                   {isEditingDiscount && (

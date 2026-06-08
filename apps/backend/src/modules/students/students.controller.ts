@@ -18,7 +18,7 @@ import { StudentsService } from './students.service'
 import { CreateStudentDto } from './dto/create-student.dto'
 import { UpdateStudentDto } from './dto/update-student.dto'
 import { StudentResponseDto } from './dto/student-response.dto'
-import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto, EndEnrollmentDto, UpdateSubjectDiscountDto } from './dto/enrollment.dto'
+import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto, EndEnrollmentDto, UpdateSubjectDiscountDto, UpdateSubjectSppRateDto } from './dto/enrollment.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
 import { Roles } from '@/common/decorators/roles.decorator'
@@ -297,6 +297,25 @@ export class StudentsController {
       dto.discountAmount !== undefined ? (dto.discountAmount ?? null) : null,
       dto.discountNote !== undefined ? (dto.discountNote ?? null) : null,
     )
+  }
+
+  @Patch(':id/subjects/:subjectId/spp-rate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Ganti tarif SPP yang dikunci pada enrollment mata pelajaran',
+    description: 'Override sppRateId pada enrollment siswa. Tipe SPP rate harus sesuai dengan tipe enrollment (REGULAR/PRIVATE).',
+  })
+  @ApiResponse({ status: 200, description: 'Tarif SPP berhasil diperbarui' })
+  @ApiResponse({ status: 400, description: 'SPP rate tidak sesuai subjek/tipe' })
+  @ApiResponse({ status: 404, description: 'Enrollment atau SPP rate tidak ditemukan' })
+  async updateSubjectSppRate(
+    @Param('id') studentId: string,
+    @Param('subjectId') subjectId: string,
+    @Body() dto: UpdateSubjectSppRateDto,
+  ): Promise<any> {
+    return this.studentsService.updateSubjectSppRate(studentId, subjectId, dto.sppRateId)
   }
 
   @Patch(':id/subjects/:subjectId/end')

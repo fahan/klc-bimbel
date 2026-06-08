@@ -803,6 +803,44 @@ export class StudentsService {
   }
 
   // Helper: format student for response
+  async updateSubjectSppRate(studentId: string, subjectId: string, sppRateId: string) {
+    const studentSubject = await this.prisma.studentSubject.findFirst({
+      where: { studentId, subjectId, isActive: true },
+      include: { subject: true },
+    })
+    if (!studentSubject) {
+      throw new NotFoundException('Subject enrollment not found')
+    }
+
+    const sppRate = await this.prisma.sppRate.findUnique({ where: { id: sppRateId } })
+    if (!sppRate) {
+      throw new NotFoundException('SPP rate not found')
+    }
+
+    if (sppRate.subjectId !== subjectId) {
+      throw new BadRequestException('SPP rate does not belong to this subject')
+    }
+
+    if (sppRate.type !== studentSubject.type) {
+      throw new BadRequestException(`SPP rate type (${sppRate.type}) tidak sesuai dengan tipe enrollment (${studentSubject.type})`)
+    }
+
+    await this.prisma.studentSubject.update({
+      where: { id: studentSubject.id },
+      data: { sppRateId },
+    })
+
+    return {
+      success: true,
+      data: {
+        subjectName: studentSubject.subject.name,
+        sppRateId,
+        newAmount: sppRate.amount.toString(),
+      },
+      message: 'Tarif SPP berhasil diperbarui',
+    }
+  }
+
   private formatStudent(student: any) {
     return {
       id: student.id,
@@ -824,6 +862,7 @@ export class StudentsService {
         subjectId: ss.subject.id,
         subjectName: ss.subject.name,
         type: ss.type,
+        sppRateId: ss.sppRateId,
         sppAmount: ss.sppRate?.amount.toString(),
         discountAmount: ss.discountAmount?.toString() || null,
         discountNote: ss.discountNote || null,

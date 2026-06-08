@@ -176,6 +176,13 @@ export class UpdateSubjectDiscountDto {
   discountNote?: string | null
 }
 
+// ===== UPDATE SUBJECT SPP RATE =====
+export class UpdateSubjectSppRateDto {
+  @ApiProperty({ example: 'spp_rate_id_123', description: 'ID tarif SPP yang akan dikunci untuk enrollment ini' })
+  @IsString()
+  sppRateId!: string
+}
+
 // ===== END SUBJECT ENROLLMENT =====
 export class EndEnrollmentDto {
   @ApiProperty({
