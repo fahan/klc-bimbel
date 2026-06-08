@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState } from 'react'
-import { X, Plus, Check } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { X, Plus, Check, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { subjectApi, sppRateApi } from '@/lib/api/endpoints'
 
@@ -21,70 +21,75 @@ interface EnrollmentStep2Props {
 export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep2Props) {
   const [selectedSubjects, setSelectedSubjects] = useState<SelectedSubject[]>(subjects)
   const [showSubjectPicker, setShowSubjectPicker] = useState(false)
+  const [loadingSubjectId, setLoadingSubjectId] = useState<string | null>(null)
+  // Cache rates per subjectId to avoid duplicate requests
+  const ratesCache = useRef<Record<string, any[]>>({})
 
   const { data: subjectsData } = useQuery({
     queryKey: ['subjects'],
     queryFn: () => subjectApi.getAll(),
   })
 
-  const { data: sppRatesData } = useQuery({
-    queryKey: ['spp-rates'],
-    queryFn: () => sppRateApi.getAll(),
-  })
-
   const availableSubjects = subjectsData?.data?.data || []
-  const allSppRates = sppRatesData?.data?.data || []
 
-  const getSppRate = (subjectId: string, type: 'REGULAR' | 'PRIVATE') => {
+  const fetchRatesForSubject = async (subjectId: string): Promise<any[]> => {
+    if (ratesCache.current[subjectId]) return ratesCache.current[subjectId]
+    const res = await sppRateApi.getBySubject(subjectId)
+    const rates = res.data?.data || []
+    ratesCache.current[subjectId] = rates
+    return rates
+  }
+
+  const findActiveRate = (rates: any[], type: 'REGULAR' | 'PRIVATE') => {
     const now = new Date()
-    return allSppRates.find(
+    return rates.find(
       (rate: any) =>
-        rate.subjectId === subjectId &&
         rate.type === type &&
         new Date(rate.effectiveFrom) <= now &&
         (!rate.effectiveUntil || new Date(rate.effectiveUntil) >= now)
     )
   }
 
-  const handleAddSubject = (subject: any) => {
-    const regularRate = getSppRate(subject.id, 'REGULAR')
-    if (!regularRate) {
-      alert('No active SPP rate for this subject')
-      return
+  const handleAddSubject = async (subject: any) => {
+    setLoadingSubjectId(subject.id)
+    try {
+      const rates = await fetchRatesForSubject(subject.id)
+      const regularRate = findActiveRate(rates, 'REGULAR')
+      if (!regularRate) {
+        alert('Tidak ada tarif SPP aktif untuk mata pelajaran ini')
+        return
+      }
+      setSelectedSubjects(prev => [
+        ...prev,
+        {
+          id: subject.id,
+          name: subject.name,
+          type: 'REGULAR',
+          sppRateId: regularRate.id,
+          sppAmount: parseFloat(regularRate.amount),
+        },
+      ])
+      setShowSubjectPicker(false)
+    } finally {
+      setLoadingSubjectId(null)
     }
-
-    const newSubject: SelectedSubject = {
-      id: subject.id,
-      name: subject.name,
-      type: 'REGULAR',
-      sppRateId: regularRate.id,
-      sppAmount: parseFloat(regularRate.amount),
-    }
-
-    setSelectedSubjects([...selectedSubjects, newSubject])
-    setShowSubjectPicker(false)
   }
 
   const handleRemoveSubject = (subjectId: string) => {
     setSelectedSubjects(selectedSubjects.filter(s => s.id !== subjectId))
   }
 
-  const handleChangeType = (subjectId: string, newType: 'REGULAR' | 'PRIVATE') => {
-    const newRate = getSppRate(subjectId, newType)
+  const handleChangeType = async (subjectId: string, newType: 'REGULAR' | 'PRIVATE') => {
+    const rates = await fetchRatesForSubject(subjectId)
+    const newRate = findActiveRate(rates, newType)
     if (!newRate) {
-      alert('No active SPP rate for this type')
+      alert('Tidak ada tarif SPP aktif untuk tipe ini')
       return
     }
-
-    setSelectedSubjects(
-      selectedSubjects.map(s =>
+    setSelectedSubjects(prev =>
+      prev.map(s =>
         s.id === subjectId
-          ? {
-              ...s,
-              type: newType,
-              sppRateId: newRate.id,
-              sppAmount: parseFloat(newRate.amount),
-            }
+          ? { ...s, type: newType, sppRateId: newRate.id, sppAmount: parseFloat(newRate.amount) }
           : s
       )
     )
@@ -165,9 +170,13 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
                   <button
                     key={subject.id}
                     onClick={() => handleAddSubject(subject)}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg transition"
+                    disabled={loadingSubjectId === subject.id}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-lg transition flex items-center justify-between disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {subject.name}
+                    <span>{subject.name}</span>
+                    {loadingSubjectId === subject.id && (
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                    )}
                   </button>
                 ))}
             </div>
