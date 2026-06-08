@@ -20,10 +20,10 @@ export class StudentsService {
       ...(activeFilter !== undefined && { isActive: activeFilter }),
       ...(branchId && { branchId }),
       ...(search && {
-        name: {
-          contains: search,
-          mode: 'insensitive',
-        },
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { sureName: { contains: search, mode: 'insensitive' } },
+        ],
       }),
     }
 
