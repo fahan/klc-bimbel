@@ -213,20 +213,29 @@ export class InvoicesService {
       const invoiceNumber = await this.generateInvoiceNumber('SPP', student.branch.code, yearMonth)
       const publicToken = this.generatePublicToken()
 
-      // Create items per enrolled subject
-      let totalAmount = 0
+      // Create items per enrolled subject — apply per-subject enrollment discounts
+      let subtotal = 0
+      let enrollmentDiscount = 0
       const items = student.studentSubjects.map((ss: any) => {
-        const sessionCount = ss.type === 'REGULAR' ? 12 : 8 // default sessions per month
+        const sessionCount = ss.type === 'REGULAR' ? 12 : 8
         const sppAmount = parseFloat(ss.sppRate?.amount?.toString() || '0')
-        totalAmount += sppAmount
+        const itemDiscount = parseFloat(ss.discountAmount?.toString() || '0')
+        const itemAmount = Math.max(0, sppAmount - itemDiscount)
+        subtotal += sppAmount
+        enrollmentDiscount += itemDiscount
         return {
           subjectId: ss.subjectId,
           type: 'SPP' as const,
           sppAmount,
           sessionCount,
-          amount: sppAmount,
+          discountAmount: itemDiscount,
+          amount: itemAmount,
         }
       })
+
+      const additionalDiscount = createDto.additionalDiscountAmount ?? 0
+      const totalDiscount = enrollmentDiscount + additionalDiscount
+      const totalAmount = Math.max(0, subtotal - totalDiscount)
 
       const invoice = await this.prisma.invoice.create({
         data: {
@@ -237,6 +246,8 @@ export class InvoicesService {
           month: createDto.month,
           year: createDto.year,
           totalAmount,
+          discountAmount: totalDiscount,
+          discountNote: createDto.discountNote || null,
           paidAmount: 0,
           status: 'UNPAID',
           generatedById: currentUserId,
@@ -351,6 +362,7 @@ export class InvoicesService {
   private formatInvoice(invoice: any, isPublic: boolean = false) {
     const total = parseFloat(invoice.totalAmount.toString())
     const paid = parseFloat(invoice.paidAmount.toString())
+    const discount = parseFloat(invoice.discountAmount?.toString() || '0')
     const remaining = total - paid
 
     return {
@@ -366,6 +378,8 @@ export class InvoicesService {
       month: invoice.month,
       year: invoice.year,
       totalAmount: total.toString(),
+      discountAmount: discount.toString(),
+      discountNote: invoice.discountNote || null,
       paidAmount: paid.toString(),
       remainingAmount: remaining.toString(),
       status: invoice.status,
@@ -382,6 +396,7 @@ export class InvoicesService {
         type: item.type,
         sppAmount: item.sppAmount?.toString(),
         sessionCount: item.sessionCount,
+        discountAmount: item.discountAmount?.toString() || '0',
         amount: item.amount?.toString(),
       })),
       payments: invoice.payments?.map((p: any) => ({

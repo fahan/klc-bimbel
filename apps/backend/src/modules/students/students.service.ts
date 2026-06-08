@@ -680,6 +680,38 @@ export class StudentsService {
     }
   }
 
+  // Update discount on a subject enrollment
+  async updateSubjectDiscount(studentId: string, subjectId: string, discountAmount: number | null, discountNote: string | null) {
+    const studentSubject = await this.prisma.studentSubject.findFirst({
+      where: { studentId, subjectId, isActive: true },
+      include: { subject: true },
+    })
+    if (!studentSubject) {
+      throw new NotFoundException('Subject enrollment not found')
+    }
+
+    const updated = await this.prisma.studentSubject.update({
+      where: { id: studentSubject.id },
+      data: {
+        discountAmount: discountAmount !== null ? discountAmount : null,
+        discountNote: discountNote || null,
+      },
+      include: { subject: true, sppRate: true },
+    })
+
+    return {
+      success: true,
+      data: {
+        studentSubjectId: updated.id,
+        subjectName: updated.subject.name,
+        sppAmount: updated.sppRate.amount.toString(),
+        discountAmount: updated.discountAmount?.toString() || null,
+        discountNote: updated.discountNote || null,
+      },
+      message: 'Diskon enrollment berhasil diperbarui',
+    }
+  }
+
   // Remove subject enrollment (soft delete)
   async removeSubjectEnrollment(studentId: string, subjectId: string) {
     const student = await this.prisma.student.findUnique({
@@ -793,6 +825,8 @@ export class StudentsService {
         subjectName: ss.subject.name,
         type: ss.type,
         sppAmount: ss.sppRate?.amount.toString(),
+        discountAmount: ss.discountAmount?.toString() || null,
+        discountNote: ss.discountNote || null,
         enrolledAt: ss.enrolledAt.toISOString(),
         endDate: ss.endDate ? ss.endDate.toISOString().split('T')[0] : null,
         status: ss.status,

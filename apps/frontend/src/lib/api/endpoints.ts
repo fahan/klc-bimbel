@@ -422,6 +422,10 @@ export const studentApi = {
     apiClient.post(`/students/${studentId}/add-subject`, data),
   updateSubject: (studentId: string, subjectId: string, data: any) =>
     apiClient.put(`/students/${studentId}/subjects/${subjectId}`, data),
+  updateSubjectDiscount: (studentId: string, subjectId: string, data: { discountAmount: number | null; discountNote: string | null }) =>
+    apiClient.patch(`/students/${studentId}/subjects/${subjectId}/discount`, data),
+  endSubjectEnrollment: (studentId: string, subjectId: string, data: { status: string; endDate?: string }) =>
+    apiClient.patch(`/students/${studentId}/subjects/${subjectId}/end`, data),
   removeSubject: (studentId: string, subjectId: string) =>
     apiClient.delete(`/students/${studentId}/subjects/${subjectId}`),
 }

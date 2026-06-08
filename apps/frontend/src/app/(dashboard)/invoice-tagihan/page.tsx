@@ -52,6 +52,8 @@ export default function InvoiceTagihanPage() {
   const [formStudentId, setFormStudentId] = useState('')
   const [formMonth, setFormMonth] = useState(today.getMonth() + 1)
   const [formYear, setFormYear] = useState(today.getFullYear())
+  const [formAdditionalDiscount, setFormAdditionalDiscount] = useState('')
+  const [formDiscountNote, setFormDiscountNote] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
 
@@ -145,21 +147,34 @@ export default function InvoiceTagihanPage() {
     if (formType === 'REGISTRATION') {
       return {
         type: 'REGISTRATION',
-        items: [{ name: 'Biaya Pendaftaran', amount: 250000 }],
+        items: [{ name: 'Biaya Pendaftaran', amount: 250000, discount: 0 }],
+        subtotal: 250000,
+        enrollmentDiscount: 0,
+        additionalDiscount: 0,
         total: 250000,
       }
     }
 
     const items =
-      selectedStudentObj.subjects?.map((s: any) => ({
-        name: s.subjectName,
-        type: s.type,
-        sessionCount: s.type === 'REGULAR' ? 12 : 8,
-        amount: parseFloat(s.sppAmount || '0'),
-      })) || []
-    const total = items.reduce((sum: number, i: any) => sum + i.amount, 0)
-    return { type: 'SPP', items, total }
-  }, [selectedStudentObj, formType])
+      selectedStudentObj.subjects?.map((s: any) => {
+        const spp = parseFloat(s.sppAmount || '0')
+        const disc = parseFloat(s.discountAmount || '0')
+        return {
+          name: s.subjectName,
+          type: s.type,
+          sessionCount: s.type === 'REGULAR' ? 12 : 8,
+          sppAmount: spp,
+          discount: disc,
+          discountNote: s.discountNote || null,
+          amount: Math.max(0, spp - disc),
+        }
+      }) || []
+    const subtotal = items.reduce((sum: number, i: any) => sum + i.sppAmount, 0)
+    const enrollmentDiscount = items.reduce((sum: number, i: any) => sum + i.discount, 0)
+    const additionalDiscount = parseFloat(formAdditionalDiscount || '0') || 0
+    const total = Math.max(0, subtotal - enrollmentDiscount - additionalDiscount)
+    return { type: 'SPP', items, subtotal, enrollmentDiscount, additionalDiscount, total }
+  }, [selectedStudentObj, formType, formAdditionalDiscount])
 
   const handleGenerate = async () => {
     if (!formStudentId) {
@@ -175,12 +190,21 @@ export default function InvoiceTagihanPage() {
         payload.month = formMonth
         payload.year = formYear
       }
+      const additionalDiscount = parseFloat(formAdditionalDiscount || '0')
+      if (additionalDiscount > 0) {
+        payload.additionalDiscountAmount = additionalDiscount
+      }
+      if (formDiscountNote.trim()) {
+        payload.discountNote = formDiscountNote.trim()
+      }
 
       await invoiceApi.create(payload)
       setFormStudentId('')
       setSelectedStudentObj(null)
       setStudentSearch('')
       setDebouncedSearch('')
+      setFormAdditionalDiscount('')
+      setFormDiscountNote('')
       refetch()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal generate invoice')
@@ -658,19 +682,49 @@ Mohon segera dilunasi. Terima kasih 🙏`
                   <div className="border-t border-gray-200 my-2"></div>
                   <div className="space-y-1.5">
                     {previewData.items.map((it: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-xs">
-                        <div>
-                          <p className="font-medium text-gray-900">{it.name}</p>
-                          {it.sessionCount > 0 && (
-                            <p className="text-[10px] text-gray-500">
-                              {it.sessionCount} sesi · {it.type || ''}
-                            </p>
-                          )}
+                      <div key={idx} className="text-xs">
+                        <div className="flex justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">{it.name}</p>
+                            {it.sessionCount > 0 && (
+                              <p className="text-[10px] text-gray-500">
+                                {it.sessionCount} sesi · {it.type || ''}
+                              </p>
+                            )}
+                          </div>
+                          <p className={`font-semibold ${it.discount > 0 ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            {formatRupiah(it.sppAmount ?? it.amount)}
+                          </p>
                         </div>
-                        <p className="font-semibold text-gray-900">{formatRupiah(it.amount)}</p>
+                        {it.discount > 0 && (
+                          <div className="flex justify-between text-[10px] text-green-700 mt-0.5">
+                            <span>Diskon{it.discountNote ? ` (${it.discountNote})` : ''}</span>
+                            <span>- {formatRupiah(it.discount)}</span>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
+                  {(previewData.enrollmentDiscount > 0 || previewData.additionalDiscount > 0) && (
+                    <div className="border-t border-gray-200 mt-2 pt-2 space-y-1">
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Subtotal</span>
+                        <span>{formatRupiah(previewData.subtotal)}</span>
+                      </div>
+                      {previewData.enrollmentDiscount > 0 && (
+                        <div className="flex justify-between text-xs text-green-700">
+                          <span>Diskon Enrollment</span>
+                          <span>- {formatRupiah(previewData.enrollmentDiscount)}</span>
+                        </div>
+                      )}
+                      {previewData.additionalDiscount > 0 && (
+                        <div className="flex justify-between text-xs text-green-700">
+                          <span>Diskon Tambahan{formDiscountNote ? ` (${formDiscountNote})` : ''}</span>
+                          <span>- {formatRupiah(previewData.additionalDiscount)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between items-center">
                     <p className="text-xs font-semibold">Total</p>
                     <p className="text-base font-bold text-gray-900">
@@ -678,6 +732,39 @@ Mohon segera dilunasi. Terima kasih 🙏`
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Diskon Tambahan (SPP only) */}
+            {formType === 'SPP' && (
+              <div className="space-y-2 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Diskon Tambahan (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    min={0}
+                    value={formAdditionalDiscount}
+                    onChange={(e) => setFormAdditionalDiscount(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {parseFloat(formAdditionalDiscount || '0') > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Keterangan Diskon
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Diskon event khusus"
+                      value={formDiscountNote}
+                      onChange={(e) => setFormDiscountNote(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

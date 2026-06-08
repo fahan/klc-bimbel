@@ -252,37 +252,50 @@ export default function PublicInvoicePage() {
           </div>
           <div className="px-4 py-3">
             <div className="space-y-3">
-              {invoice.items?.map((item: any) => (
-                <div key={item.id} className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-sm">
-                        {item.subjectName || (item.type === 'REGISTRATION' ? 'Biaya Pendaftaran' : 'Item')}
-                      </p>
-                      {item.type === 'SPP' && item.subjectType && (
-                        <span
-                          className={`inline-block mt-1 px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                            item.sessionCount === 8
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {item.sessionCount === 8 ? 'Private' : 'Reguler'}
-                        </span>
-                      )}
-                      {item.sessionCount > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {item.sessionCount} sesi
-                          {invoice.month && invoice.year ? ` · ${MONTHS[invoice.month - 1]} ${invoice.year}` : ''}
+              {invoice.items?.map((item: any) => {
+                const itemDiscount = parseFloat(item.discountAmount || '0')
+                return (
+                  <div key={item.id} className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-sm">
+                          {item.subjectName || (item.type === 'REGISTRATION' ? 'Biaya Pendaftaran' : 'Item')}
                         </p>
-                      )}
+                        {item.type === 'SPP' && item.subjectType && (
+                          <span
+                            className={`inline-block mt-1 px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                              item.sessionCount === 8
+                                ? 'bg-purple-100 text-purple-700'
+                                : 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
+                            {item.sessionCount === 8 ? 'Private' : 'Reguler'}
+                          </span>
+                        )}
+                        {item.sessionCount > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {item.sessionCount} sesi
+                            {invoice.month && invoice.year ? ` · ${MONTHS[invoice.month - 1]} ${invoice.year}` : ''}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        {itemDiscount > 0 && (
+                          <p className="text-xs text-gray-400 line-through">{formatRupiah(item.sppAmount)}</p>
+                        )}
+                        <p className="font-bold text-gray-900 text-sm whitespace-nowrap">
+                          {formatRupiah(item.amount)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-bold text-gray-900 text-sm whitespace-nowrap">
-                      {formatRupiah(item.amount)}
-                    </p>
+                    {itemDiscount > 0 && (
+                      <p className="text-xs text-green-700 mt-1">
+                        Diskon: - {formatRupiah(itemDiscount)}
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -290,10 +303,22 @@ export default function PublicInvoicePage() {
         {/* Total Card */}
         <div className="mx-4 mt-4 border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-4 py-3 space-y-2 text-sm">
-            <div className="flex justify-between text-gray-600">
-              <span>Subtotal</span>
-              <span>{formatRupiah(totalAmount)}</span>
-            </div>
+            {parseFloat(invoice.discountAmount || '0') > 0 && (
+              <>
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal sebelum diskon</span>
+                  <span>{formatRupiah(totalAmount + parseFloat(invoice.discountAmount))}</span>
+                </div>
+                <div className="flex justify-between text-green-700">
+                  <span>Total Diskon{invoice.discountNote ? ` (${invoice.discountNote})` : ''}</span>
+                  <span>- {formatRupiah(invoice.discountAmount)}</span>
+                </div>
+                <div className="flex justify-between font-medium text-gray-800 border-t border-gray-100 pt-2">
+                  <span>Total tagihan</span>
+                  <span>{formatRupiah(totalAmount)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-600">Sudah dibayar</span>
               <span className={isPaid ? 'text-green-700 font-medium' : 'text-gray-900'}>

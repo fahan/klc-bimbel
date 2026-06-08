@@ -353,15 +353,17 @@ model Student {
 }
 
 model StudentSubject {
-  id           String           @id @default(cuid())
-  studentId    String
-  subjectId    String
-  sppRateId    String
-  type         SessionType
-  enrolledAt   DateTime
-  endDate      DateTime?
-  status       EnrollmentStatus @default(ACTIVE)
-  isActive     Boolean          @default(true)
+  id             String           @id @default(cuid())
+  studentId      String
+  subjectId      String
+  sppRateId      String
+  type           SessionType
+  enrolledAt     DateTime
+  endDate        DateTime?
+  status         EnrollmentStatus @default(ACTIVE)
+  isActive       Boolean          @default(true)
+  discountAmount Decimal?         @db.Decimal(12, 2)
+  discountNote   String?
 
   // Relations
   student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -647,21 +649,23 @@ model TeacherBonus {
 }
 
 model Invoice {
-  id            String   @id @default(cuid())
-  branchId      String
-  studentId     String
-  invoiceNumber String   @unique
-  type          InvoiceType
-  month         Int?
-  year          Int?
-  totalAmount   Decimal  @db.Decimal(12, 2)
-  paidAmount    Decimal  @db.Decimal(12, 2) @default(0)
-  status        InvoiceStatus @default(UNPAID)
-  generatedById String
-  publicToken   String   @unique
-  paidAt        DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  branchId               String
+  studentId              String
+  invoiceNumber          String   @unique
+  type                   InvoiceType
+  month                  Int?
+  year                   Int?
+  totalAmount            Decimal  @db.Decimal(12, 2)
+  paidAmount             Decimal  @db.Decimal(12, 2) @default(0)
+  discountAmount         Decimal  @db.Decimal(12, 2) @default(0)
+  discountNote           String?
+  status                 InvoiceStatus @default(UNPAID)
+  generatedById          String
+  publicToken            String   @unique
+  paidAt                 DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   // Relations
   branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
@@ -674,13 +678,14 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id        String   @id @default(cuid())
-  invoiceId String
-  subjectId String?
-  type      InvoiceType
-  sppAmount Decimal  @db.Decimal(12, 2)
-  sessionCount Int
-  amount    Decimal  @db.Decimal(12, 2)
+  id             String   @id @default(cuid())
+  invoiceId      String
+  subjectId      String?
+  type           InvoiceType
+  sppAmount      Decimal  @db.Decimal(12, 2)
+  sessionCount   Int
+  discountAmount Decimal  @db.Decimal(12, 2) @default(0)
+  amount         Decimal  @db.Decimal(12, 2)
 
   // Relations
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)

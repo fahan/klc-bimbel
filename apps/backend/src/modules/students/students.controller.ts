@@ -18,7 +18,7 @@ import { StudentsService } from './students.service'
 import { CreateStudentDto } from './dto/create-student.dto'
 import { UpdateStudentDto } from './dto/update-student.dto'
 import { StudentResponseDto } from './dto/student-response.dto'
-import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto, EndEnrollmentDto } from './dto/enrollment.dto'
+import { EnrollmentRequestDto, EnrollmentResponseDto, AddSubjectDto, AddSubjectResponseDto, UpdateSubjectDto, UpdateSubjectResponseDto, EndEnrollmentDto, UpdateSubjectDiscountDto } from './dto/enrollment.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
 import { Roles } from '@/common/decorators/roles.decorator'
@@ -274,6 +274,29 @@ export class StudentsController {
     @Body() updateSubjectDto: UpdateSubjectDto,
   ): Promise<any> {
     return this.studentsService.updateSubjectEnrollment(studentId, subjectId, updateSubjectDto)
+  }
+
+  @Patch(':id/subjects/:subjectId/discount')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Set diskon enrollment per mata pelajaran',
+    description: 'Set nominal diskon bulanan (Rp) untuk enrollment mata pelajaran tertentu. Diskon ini otomatis diterapkan saat generate invoice SPP. Kirim discountAmount: null untuk hapus diskon.',
+  })
+  @ApiResponse({ status: 200, description: 'Diskon berhasil diperbarui' })
+  @ApiResponse({ status: 404, description: 'Enrollment tidak ditemukan' })
+  async updateSubjectDiscount(
+    @Param('id') studentId: string,
+    @Param('subjectId') subjectId: string,
+    @Body() dto: UpdateSubjectDiscountDto,
+  ): Promise<any> {
+    return this.studentsService.updateSubjectDiscount(
+      studentId,
+      subjectId,
+      dto.discountAmount !== undefined ? (dto.discountAmount ?? null) : null,
+      dto.discountNote !== undefined ? (dto.discountNote ?? null) : null,
+    )
   }
 
   @Patch(':id/subjects/:subjectId/end')

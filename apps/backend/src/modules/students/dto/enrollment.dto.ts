@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsString, IsArray, IsEnum, ValidateNested, IsOptional, IsDateString } from 'class-validator'
+import { IsString, IsArray, IsEnum, ValidateNested, IsOptional, IsDateString, IsNumber, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class EnrollSubjectDto {
@@ -160,6 +160,20 @@ export class UpdateSubjectResponseDto {
 
   @ApiProperty({ required: false })
   message?: string
+}
+
+// ===== UPDATE SUBJECT DISCOUNT =====
+export class UpdateSubjectDiscountDto {
+  @ApiProperty({ example: 50000, required: false, description: 'Nominal diskon per bulan (Rp). Kosongkan untuk hapus diskon.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discountAmount?: number | null
+
+  @ApiProperty({ example: 'Diskon kakak-adik', required: false })
+  @IsOptional()
+  @IsString()
+  discountNote?: string | null
 }
 
 // ===== END SUBJECT ENROLLMENT =====

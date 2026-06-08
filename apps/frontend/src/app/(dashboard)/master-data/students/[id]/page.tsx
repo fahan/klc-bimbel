@@ -19,6 +19,8 @@ import {
   Trash2,
   Edit3,
   Plus,
+  Tag,
+  X,
 } from 'lucide-react'
 import { LoadingState } from '@/components/ui/States'
 import { StatusBadge } from '@/components/ui/Badge'
@@ -52,6 +54,10 @@ export default function StudentDetailPage() {
   const [success, setSuccess] = useState('')
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false)
   const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null)
+  const [discountSubjectId, setDiscountSubjectId] = useState<string | null>(null)
+  const [discountAmount, setDiscountAmount] = useState('')
+  const [discountNote, setDiscountNote] = useState('')
+  const [savingDiscount, setSavingDiscount] = useState(false)
 
   const { data: studentData, isLoading: loadingStudent, refetch } = useQuery({
     queryKey: ['student', studentId],
@@ -134,6 +140,32 @@ export default function StudentDetailPage() {
       } catch (err: any) {
         alert(err.response?.data?.message || 'Gagal menghapus siswa')
       }
+    }
+  }
+
+  const openDiscountEditor = (subject: any) => {
+    setDiscountSubjectId(subject.subjectId)
+    setDiscountAmount(subject.discountAmount ? parseFloat(subject.discountAmount).toString() : '')
+    setDiscountNote(subject.discountNote || '')
+  }
+
+  const handleSaveDiscount = async () => {
+    if (!discountSubjectId) return
+    try {
+      setSavingDiscount(true)
+      const amount = parseFloat(discountAmount || '0') || null
+      await studentApi.updateSubjectDiscount(studentId, discountSubjectId, {
+        discountAmount: amount && amount > 0 ? amount : null,
+        discountNote: discountNote.trim() || null,
+      })
+      setDiscountSubjectId(null)
+      setDiscountAmount('')
+      setDiscountNote('')
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menyimpan diskon')
+    } finally {
+      setSavingDiscount(false)
     }
   }
 
@@ -512,60 +544,157 @@ export default function StudentDetailPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {student.subjects.map((subject: any) => (
-              <div
-                key={subject.id}
-                className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{subject.subjectName}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          subject.type === 'REGULAR'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-purple-100 text-purple-700'
-                        }`}
-                      >
-                        {subject.type === 'REGULAR' ? 'Reguler' : 'Privat'}
-                      </span>
-                      <p className="text-xs text-gray-500">
-                        Terdaftar: {new Date(subject.enrolledAt).toLocaleDateString('id-ID')}
-                      </p>
+            {student.subjects.map((subject: any) => {
+              const sppAmount = parseFloat(subject.sppAmount || '0')
+              const subjectDiscount = parseFloat(subject.discountAmount || '0')
+              const netAmount = Math.max(0, sppAmount - subjectDiscount)
+              const isEditingDiscount = discountSubjectId === subject.subjectId
+
+              return (
+                <div
+                  key={subject.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{subject.subjectName}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            subject.type === 'REGULAR'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          {subject.type === 'REGULAR' ? 'Reguler' : 'Privat'}
+                        </span>
+                        <p className="text-xs text-gray-500">
+                          Terdaftar: {new Date(subject.enrolledAt).toLocaleDateString('id-ID')}
+                        </p>
+                        {subjectDiscount > 0 && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700 flex items-center gap-1">
+                            <Tag className="w-2.5 h-2.5" />
+                            Diskon Rp {subjectDiscount.toLocaleString('id-ID')}
+                            {subject.discountNote && ` · ${subject.discountNote}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right space-y-2">
+                      <div>
+                        {subjectDiscount > 0 ? (
+                          <>
+                            <p className="text-xs text-gray-400 line-through">
+                              Rp {sppAmount.toLocaleString('id-ID')}
+                            </p>
+                            <p className="font-semibold text-green-600">
+                              Rp {netAmount.toLocaleString('id-ID')}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-semibold text-blue-600">
+                            Rp {sppAmount.toLocaleString('id-ID')}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500">per bulan</p>
+                      </div>
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        <button
+                          onClick={() => openDiscountEditor(subject)}
+                          className="px-2 py-1 bg-green-50 hover:bg-green-100 text-green-700 rounded text-xs font-medium transition"
+                        >
+                          <Tag className="w-3 h-3 inline mr-1" />
+                          Diskon
+                        </button>
+                        <button
+                          onClick={() => setEditingSubjectId(subject.subjectId)}
+                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs font-medium transition"
+                        >
+                          <Edit3 className="w-3 h-3 inline mr-1" />
+                          Ubah
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Yakin ingin menghapus ${subject.subjectName}?`)) {
+                              studentApi.removeSubject(studentId, subject.subjectId).then(() => refetch())
+                            }
+                          }}
+                          className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-medium transition"
+                        >
+                          <Trash2 className="w-3 h-3 inline mr-1" />
+                          Hapus
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right space-y-2">
-                    <div>
-                      <p className="font-semibold text-blue-600">
-                        Rp {parseFloat(subject.sppAmount || '0').toLocaleString('id-ID')}
+
+                  {/* Inline discount editor */}
+                  {isEditingDiscount && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 bg-green-50 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-green-800 flex items-center gap-1">
+                        <Tag className="w-3 h-3" />
+                        Set Diskon Enrollment
                       </p>
-                      <p className="text-xs text-gray-500">per bulan</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Nominal Diskon (Rp)</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            min={0}
+                            value={discountAmount}
+                            onChange={(e) => setDiscountAmount(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Keterangan</label>
+                          <input
+                            type="text"
+                            placeholder="Misal: Diskon kakak-adik"
+                            value={discountNote}
+                            onChange={(e) => setDiscountNote(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveDiscount}
+                          disabled={savingDiscount}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition disabled:opacity-50"
+                        >
+                          {savingDiscount ? 'Menyimpan...' : 'Simpan'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (subjectDiscount > 0 && confirm('Yakin hapus diskon ini?')) {
+                              setSavingDiscount(true)
+                              studentApi.updateSubjectDiscount(studentId, subject.subjectId, {
+                                discountAmount: null,
+                                discountNote: null,
+                              }).then(() => { refetch(); setDiscountSubjectId(null) })
+                                .catch((e: any) => alert(e.response?.data?.message || 'Gagal'))
+                                .finally(() => setSavingDiscount(false))
+                            }
+                          }}
+                          disabled={savingDiscount || subjectDiscount === 0}
+                          className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded transition disabled:opacity-40"
+                        >
+                          Hapus Diskon
+                        </button>
+                        <button
+                          onClick={() => setDiscountSubjectId(null)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
+                        >
+                          <X className="w-3 h-3 inline" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setEditingSubjectId(subject.subjectId)}
-                        className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded text-xs font-medium transition"
-                      >
-                        <Edit3 className="w-3 h-3 inline mr-1" />
-                        Ubah
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Yakin ingin menghapus ${subject.subjectName}?`)) {
-                            studentApi.removeSubject(studentId, subject.subjectId).then(() => refetch())
-                          }
-                        }}
-                        className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-medium transition"
-                      >
-                        <Trash2 className="w-3 h-3 inline mr-1" />
-                        Hapus
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

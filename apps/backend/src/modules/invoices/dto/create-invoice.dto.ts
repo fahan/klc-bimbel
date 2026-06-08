@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsInt, Min, Max } from 'class-validator'
+import { IsString, IsEnum, IsOptional, IsInt, IsNumber, Min, Max } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export enum InvoiceType {
@@ -28,4 +28,15 @@ export class CreateInvoiceDto {
   @Min(2020)
   @Max(2100)
   year?: number
+
+  @ApiProperty({ example: 50000, required: false, description: 'Diskon tambahan manual (nominal Rp). Ditambahkan di atas diskon enrollment.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  additionalDiscountAmount?: number
+
+  @ApiProperty({ example: 'Diskon event khusus', required: false })
+  @IsOptional()
+  @IsString()
+  discountNote?: string
 }
