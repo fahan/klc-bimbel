@@ -9,11 +9,15 @@ import { PaginationMeta } from '@/common/dto/pagination.dto'
 export class StudentsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(page: number = 1, limit: number = 10, branchId?: string, search?: string) {
+  async findAll(page: number = 1, limit: number = 10, branchId?: string, search?: string, isActive?: string) {
     const skip = (page - 1) * limit
 
+    let activeFilter: boolean | undefined = true
+    if (isActive === 'all') activeFilter = undefined
+    else if (isActive === 'false') activeFilter = false
+
     const where: any = {
-      isActive: true,
+      ...(activeFilter !== undefined && { isActive: activeFilter }),
       ...(branchId && { branchId }),
       ...(search && {
         name: {

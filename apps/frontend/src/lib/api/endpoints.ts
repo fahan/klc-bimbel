@@ -396,12 +396,13 @@ export const storeApi = {
 
 // ===== STUDENTS API =====
 export const studentApi = {
-  getAll: (page?: number, limit?: number, branchId?: string, search?: string) => {
+  getAll: (page?: number, limit?: number, branchId?: string, search?: string, isActive?: string) => {
     const params = new URLSearchParams()
     if (page) params.append('page', String(page))
     if (limit) params.append('limit', String(limit))
     if (branchId) params.append('branchId', branchId)
     if (search) params.append('search', search)
+    if (isActive) params.append('isActive', isActive)
     const qs = params.toString()
     return apiClient.get(`/students${qs ? `?${qs}` : ''}`)
   },

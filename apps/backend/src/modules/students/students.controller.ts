@@ -36,9 +36,10 @@ export class StudentsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
   @ApiQuery({ name: 'branchId', required: false, type: String })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'isActive', required: false, enum: ['true', 'false', 'all'], description: 'Filter by active status. Default: true' })
   @ApiOperation({
     summary: 'List all students (paginated)',
-    description: 'Get paginated list of all active students. Optional filter by branchId and search by name. Returns student data with enrolled subjects.',
+    description: 'Get paginated list of students. Optional filter by branchId, search by name, and isActive status (true/false/all).',
   })
   @ApiResponse({
     status: 200,
@@ -54,8 +55,9 @@ export class StudentsController {
     @Query('limit') limit?: number,
     @Query('branchId') branchId?: string,
     @Query('search') search?: string,
+    @Query('isActive') isActive?: string,
   ): Promise<any> {
-    return this.studentsService.findAll(page || 1, limit || 10, branchId, search)
+    return this.studentsService.findAll(page || 1, limit || 10, branchId, search, isActive)
   }
 
   @Get(':id')
