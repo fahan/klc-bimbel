@@ -39,4 +39,10 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   discountNote?: string
+
+  @ApiProperty({ example: 100000, required: false, description: 'Nominal biaya pendaftaran untuk invoice REGISTRATION. Default 100.000.' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  registrationFee?: number
 }

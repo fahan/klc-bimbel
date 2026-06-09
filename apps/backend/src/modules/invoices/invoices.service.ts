@@ -3,7 +3,7 @@ import { PrismaService } from '@/prisma/prisma.service'
 import { CreateInvoiceDto, InvoiceType } from './dto/create-invoice.dto'
 import { randomBytes } from 'crypto'
 
-const REGISTRATION_FEE = 250000
+const DEFAULT_REGISTRATION_FEE = 100000
 
 @Injectable()
 export class InvoicesService {
@@ -272,6 +272,7 @@ export class InvoicesService {
       }
     } else {
       // REGISTRATION
+      const regFee = dto.registrationFee ?? DEFAULT_REGISTRATION_FEE
       const yearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`
       const invoiceNumber = await this.generateInvoiceNumber('REG', student.branch.code, yearMonth)
       const publicToken = this.generatePublicToken()
@@ -282,7 +283,7 @@ export class InvoicesService {
           studentId: student.id,
           invoiceNumber,
           type: 'REGISTRATION',
-          totalAmount: REGISTRATION_FEE,
+          totalAmount: regFee,
           paidAmount: 0,
           status: 'UNPAID',
           generatedById: currentUserId,
@@ -291,9 +292,9 @@ export class InvoicesService {
             create: [
               {
                 type: 'REGISTRATION',
-                sppAmount: REGISTRATION_FEE,
+                sppAmount: regFee,
                 sessionCount: 0,
-                amount: REGISTRATION_FEE,
+                amount: regFee,
               },
             ],
           },

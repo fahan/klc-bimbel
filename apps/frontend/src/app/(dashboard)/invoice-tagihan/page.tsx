@@ -54,6 +54,7 @@ export default function InvoiceTagihanPage() {
   const [formYear, setFormYear] = useState(today.getFullYear())
   const [formAdditionalDiscount, setFormAdditionalDiscount] = useState('')
   const [formDiscountNote, setFormDiscountNote] = useState('')
+  const [formRegistrationFee, setFormRegistrationFee] = useState(100000)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
 
@@ -147,11 +148,11 @@ export default function InvoiceTagihanPage() {
     if (formType === 'REGISTRATION') {
       return {
         type: 'REGISTRATION',
-        items: [{ name: 'Biaya Pendaftaran', amount: 250000, discount: 0 }],
-        subtotal: 250000,
+        items: [{ name: 'Biaya Pendaftaran', amount: formRegistrationFee, discount: 0 }],
+        subtotal: formRegistrationFee,
         enrollmentDiscount: 0,
         additionalDiscount: 0,
-        total: 250000,
+        total: formRegistrationFee,
       }
     }
 
@@ -174,7 +175,7 @@ export default function InvoiceTagihanPage() {
     const additionalDiscount = parseFloat(formAdditionalDiscount || '0') || 0
     const total = Math.max(0, subtotal - enrollmentDiscount - additionalDiscount)
     return { type: 'SPP', items, subtotal, enrollmentDiscount, additionalDiscount, total }
-  }, [selectedStudentObj, formType, formAdditionalDiscount])
+  }, [selectedStudentObj, formType, formAdditionalDiscount, formRegistrationFee])
 
   const handleGenerate = async () => {
     if (!formStudentId) {
@@ -189,13 +190,15 @@ export default function InvoiceTagihanPage() {
       if (formType === 'SPP') {
         payload.month = formMonth
         payload.year = formYear
-      }
-      const additionalDiscount = parseFloat(formAdditionalDiscount || '0')
-      if (additionalDiscount > 0) {
-        payload.additionalDiscountAmount = additionalDiscount
-      }
-      if (formDiscountNote.trim()) {
-        payload.discountNote = formDiscountNote.trim()
+        const additionalDiscount = parseFloat(formAdditionalDiscount || '0')
+        if (additionalDiscount > 0) {
+          payload.additionalDiscountAmount = additionalDiscount
+        }
+        if (formDiscountNote.trim()) {
+          payload.discountNote = formDiscountNote.trim()
+        }
+      } else {
+        payload.registrationFee = formRegistrationFee
       }
 
       await invoiceApi.create(payload)
@@ -205,6 +208,7 @@ export default function InvoiceTagihanPage() {
       setDebouncedSearch('')
       setFormAdditionalDiscount('')
       setFormDiscountNote('')
+      setFormRegistrationFee(100000)
       refetch()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal generate invoice')
@@ -732,6 +736,22 @@ Mohon segera dilunasi. Terima kasih 🙏`
                     </p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Biaya Pendaftaran (REGISTRATION only) */}
+            {formType === 'REGISTRATION' && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Biaya Pendaftaran (Rp)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formRegistrationFee}
+                  onChange={(e) => setFormRegistrationFee(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             )}
 
