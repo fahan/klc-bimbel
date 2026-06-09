@@ -272,7 +272,7 @@ export class InvoicesService {
       }
     } else {
       // REGISTRATION
-      const regFee = dto.registrationFee ?? DEFAULT_REGISTRATION_FEE
+      const regFee = createDto.registrationFee ?? DEFAULT_REGISTRATION_FEE
       const yearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}`
       const invoiceNumber = await this.generateInvoiceNumber('REG', student.branch.code, yearMonth)
       const publicToken = this.generatePublicToken()
