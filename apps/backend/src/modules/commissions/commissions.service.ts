@@ -145,6 +145,37 @@ export class CommissionsService {
       return sessionCountCache.get(key)!
     }
 
+    // ── Step 4.5: Warm up ALL caches in parallel BEFORE entering the main loop ─
+    // Collect every unique (subjectId|sessionType) and (studentId|subjectId) pair
+    // from the session logs, then fire all DB queries simultaneously.
+    // After this block, every getFormula() and getTotalSessions() call below is a
+    // synchronous cache hit — no sequential awaiting inside nested loops.
+    {
+      const pairKeys = new Set<string>()
+      const subjectTypeKeys = new Set<string>()
+
+      for (const log of sessionLogs) {
+        const subjectId = log.isAdHoc ? log.adHocSubjectId : log.session?.subjectId
+        if (!subjectId) continue
+        const sessionType = (log.session?.type as 'REGULAR' | 'PRIVATE') ?? 'REGULAR'
+        subjectTypeKeys.add(`${subjectId}|${sessionType}`)
+        for (const att of log.attendances) {
+          pairKeys.add(`${att.studentId}|${subjectId}`)
+        }
+      }
+
+      await Promise.all([
+        ...Array.from(subjectTypeKeys).map(key => {
+          const [subjectId, sessionType] = key.split('|')
+          return getFormula(subjectId, sessionType)
+        }),
+        ...Array.from(pairKeys).map(key => {
+          const [studentId, subjectId] = key.split('|')
+          return getTotalSessions(studentId, subjectId)
+        }),
+      ])
+    }
+
     // ── Step 5: Group logs by teacher & calculate commissions ─────────────────
     const teacherLogsMap = new Map<string, any[]>()
     for (const log of sessionLogs) {

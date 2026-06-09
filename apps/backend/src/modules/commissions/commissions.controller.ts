@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger'
 import { CommissionsService } from './commissions.service'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
@@ -12,19 +12,34 @@ export class CommissionsController {
   constructor(private commissionsService: CommissionsService) {}
 
   @Post('calculate')
+  @HttpCode(202)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Calculate commissions for given month',
+    summary: 'Calculate commissions for given month (async)',
     description:
-      'Run commission calculation for all teachers in a branch for given month. Formula: (SPP / total_sessions_in_month) × 40% × sessions_attended. Skips already-approved commissions.',
+      'Starts commission calculation in the background and returns 202 immediately. ' +
+      'Poll GET /commissions?branchId=&month=&year= to check updated results. ' +
+      'Skips already-approved commissions.',
   })
-  @ApiResponse({ status: 201, description: 'Commissions calculated' })
+  @ApiResponse({ status: 202, description: 'Calculation started in background' })
   async calculate(
     @Body() body: { branchId: string; month: number; year: number },
   ): Promise<any> {
-    return this.commissionsService.calculateForMonth(body.branchId, body.month, body.year)
+    // Fire-and-forget: respond immediately, run heavy calculation in the background.
+    // Node.js keeps the promise alive even after the HTTP response is sent.
+    void this.commissionsService
+      .calculateForMonth(body.branchId, body.month, body.year)
+      .catch(err =>
+        console.error(`[Commission] Background calculation error (${body.branchId} ${body.month}/${body.year}):`, err?.message ?? err),
+      )
+
+    return {
+      success: true,
+      data: null,
+      message: 'Kalkulasi komisi dimulai. Data akan diperbarui dalam beberapa detik.',
+    }
   }
 
   @Get()

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { commissionApi, teacherBonusApi, teacherApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
@@ -51,6 +51,10 @@ export default function KomisiGuruPage() {
   const [selectedCommissionId, setSelectedCommissionId] = useState<string | null>(null)
   const [calculating, setCalculating] = useState(false)
   const [approvingAll, setApprovingAll] = useState(false)
+  // Opsi B: track kalkulasi background + polling
+  const [bgCalculating, setBgCalculating] = useState(false)
+  const [calcDone, setCalcDone] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Bonus state
   const [showBonusModal, setShowBonusModal] = useState(false)
@@ -82,6 +86,16 @@ export default function KomisiGuruPage() {
     enabled: !!branchId,
   })
 
+  // Bersihkan interval polling saat component unmount atau bulan/cabang berubah
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+  }, [branchId, month, year])
+
   const commissions = commissionsData?.data?.data?.commissions || []
   const metrics = commissionsData?.data?.data?.metrics
   const detail = detailData?.data?.data
@@ -112,12 +126,34 @@ export default function KomisiGuruPage() {
   }
 
   const handleCalculate = async () => {
+    if (!branchId) return
+    // Hentikan polling lama jika ada
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
     try {
       setCalculating(true)
+      setCalcDone(false)
+      // Backend langsung return 202 — tidak perlu nunggu lama
       await commissionApi.calculate({ branchId, month, year })
-      refetch()
+      // Mulai polling tiap 2 detik, maks 8 kali (~16 detik)
+      setBgCalculating(true)
+      let pollCount = 0
+      pollRef.current = setInterval(async () => {
+        pollCount++
+        await refetch()
+        if (pollCount >= 8) {
+          clearInterval(pollRef.current!)
+          pollRef.current = null
+          setBgCalculating(false)
+          setCalcDone(true)
+          setTimeout(() => setCalcDone(false), 4000)
+        }
+      }, 2000)
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Gagal kalkulasi komisi')
+      alert(err.response?.data?.message || 'Gagal memulai kalkulasi komisi')
+      setBgCalculating(false)
     } finally {
       setCalculating(false)
     }
@@ -255,6 +291,29 @@ export default function KomisiGuruPage() {
           </button>
         </div>
       </div>
+
+      {/* Background Calculation Banner */}
+      {bgCalculating && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center gap-3">
+          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-900">
+              Kalkulasi berjalan di background...
+            </p>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Tabel akan diperbarui otomatis. Tidak perlu menunggu atau refresh manual.
+            </p>
+          </div>
+        </div>
+      )}
+      {calcDone && !bgCalculating && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-3">
+          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-green-800">
+            Kalkulasi selesai! Data komisi sudah diperbarui.
+          </p>
+        </div>
+      )}
 
       {/* No Branch Selected Notice */}
       {!branchId && canViewAllBranches && (
