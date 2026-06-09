@@ -158,23 +158,37 @@ export default function InvoiceTagihanPage() {
 
     const items =
       selectedStudentObj.subjects?.map((s: any) => {
-        const spp = parseFloat(s.sppAmount || '0')
-        const disc = parseFloat(s.discountAmount || '0')
+        const masterRate = parseFloat(s.sppAmount || '0')
+        // Use effectiveSppAmount (custom if set, master otherwise) — mirrors backend logic
+        const effectiveRate = s.effectiveSppAmount
+          ? parseFloat(s.effectiveSppAmount.toString())
+          : masterRate
+        const billingType: string = s.billingType || 'FLAT_MONTHLY'
+        const hasCustomSpp = s.customSppAmount != null
+        const isPersession = billingType === 'PER_SESSION'
+
         return {
           name: s.subjectName,
           type: s.type,
-          sessionCount: s.type === 'REGULAR' ? 12 : 8,
-          sppAmount: spp,
-          discount: disc,
-          discountNote: s.discountNote || null,
-          amount: Math.max(0, spp - disc),
+          billingType,
+          // PER_SESSION: session count unknown at preview (depends on actual attendance)
+          sessionCount: isPersession ? null : (s.type === 'REGULAR' ? 12 : 8),
+          masterRate,
+          sppAmount: effectiveRate,
+          hasCustomSpp,
+          customNote: s.customSppNote || null,
+          isPersession,
+          // PER_SESSION amount = 0 in preview (backend will calc from attendance)
+          amount: isPersession ? 0 : effectiveRate,
         }
       }) || []
-    const subtotal = items.reduce((sum: number, i: any) => sum + i.sppAmount, 0)
-    const enrollmentDiscount = items.reduce((sum: number, i: any) => sum + i.discount, 0)
+
+    const hasPerSession = items.some((i: any) => i.isPersession)
+    // Subtotal only includes FLAT_MONTHLY items; PER_SESSION billed by backend from attendance
+    const subtotal = items.reduce((sum: number, i: any) => sum + i.amount, 0)
     const additionalDiscount = parseFloat(formAdditionalDiscount || '0') || 0
-    const total = Math.max(0, subtotal - enrollmentDiscount - additionalDiscount)
-    return { type: 'SPP', items, subtotal, enrollmentDiscount, additionalDiscount, total }
+    const total = Math.max(0, subtotal - additionalDiscount)
+    return { type: 'SPP', items, subtotal, enrollmentDiscount: 0, additionalDiscount, total, hasPerSession }
   }, [selectedStudentObj, formType, formAdditionalDiscount, formRegistrationFee])
 
   const handleGenerate = async () => {
@@ -687,38 +701,65 @@ Mohon segera dilunasi. Terima kasih 🙏`
                   <div className="space-y-1.5">
                     {previewData.items.map((it: any, idx: number) => (
                       <div key={idx} className="text-xs">
-                        <div className="flex justify-between">
+                        <div className="flex justify-between items-start">
                           <div>
                             <p className="font-medium text-gray-900">{it.name}</p>
-                            {it.sessionCount > 0 && (
-                              <p className="text-[10px] text-gray-500">
-                                {it.sessionCount} sesi · {it.type || ''}
-                              </p>
+                            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                              {it.isPersession ? (
+                                <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded">Per Sesi</span>
+                              ) : (
+                                it.sessionCount && (
+                                  <span className="text-[10px] text-gray-500">{it.sessionCount} sesi</span>
+                                )
+                              )}
+                              {it.type && (
+                                <span className="text-[10px] text-gray-500">· {it.type}</span>
+                              )}
+                              {it.hasCustomSpp && (
+                                <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded">Custom SPP</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {it.isPersession ? (
+                              <div>
+                                <p className="text-[10px] text-amber-600 font-medium">{formatRupiah(it.sppAmount)}/sesi</p>
+                                <p className="text-[10px] text-gray-400">× sesi hadir</p>
+                              </div>
+                            ) : (
+                              <div>
+                                {it.hasCustomSpp && it.masterRate !== it.sppAmount && (
+                                  <p className="text-[10px] text-gray-400 line-through">{formatRupiah(it.masterRate)}</p>
+                                )}
+                                <p className={`font-semibold ${it.hasCustomSpp ? 'text-purple-700' : 'text-gray-900'}`}>
+                                  {formatRupiah(it.sppAmount)}
+                                </p>
+                              </div>
                             )}
                           </div>
-                          <p className={`font-semibold ${it.discount > 0 ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                            {formatRupiah(it.sppAmount ?? it.amount)}
-                          </p>
                         </div>
-                        {it.discount > 0 && (
-                          <div className="flex justify-between text-[10px] text-green-700 mt-0.5">
-                            <span>Diskon{it.discountNote ? ` (${it.discountNote})` : ''}</span>
-                            <span>- {formatRupiah(it.discount)}</span>
-                          </div>
+                        {it.hasCustomSpp && it.customNote && (
+                          <p className="text-[10px] text-purple-600 mt-0.5 ml-0">📝 {it.customNote}</p>
+                        )}
+                        {it.isPersession && (
+                          <p className="text-[10px] text-amber-600 mt-0.5 italic">
+                            Nominal dihitung otomatis saat generate berdasarkan kehadiran
+                          </p>
                         )}
                       </div>
                     ))}
                   </div>
-                  {(previewData.enrollmentDiscount > 0 || previewData.additionalDiscount > 0) && (
+                  {previewData.hasPerSession && (
+                    <div className="mt-2 p-1.5 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700">
+                      ⚠ Mapel Per Sesi tidak termasuk dalam subtotal preview. Total final akan berbeda.
+                    </div>
+                  )}
+                  {(previewData.additionalDiscount > 0 || previewData.subtotal > 0) && (
                     <div className="border-t border-gray-200 mt-2 pt-2 space-y-1">
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Subtotal</span>
-                        <span>{formatRupiah(previewData.subtotal)}</span>
-                      </div>
-                      {previewData.enrollmentDiscount > 0 && (
-                        <div className="flex justify-between text-xs text-green-700">
-                          <span>Diskon Enrollment</span>
-                          <span>- {formatRupiah(previewData.enrollmentDiscount)}</span>
+                      {previewData.hasPerSession && (
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Subtotal (Flat)</span>
+                          <span>{formatRupiah(previewData.subtotal)}</span>
                         </div>
                       )}
                       {previewData.additionalDiscount > 0 && (
@@ -730,9 +771,12 @@ Mohon segera dilunasi. Terima kasih 🙏`
                     </div>
                   )}
                   <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between items-center">
-                    <p className="text-xs font-semibold">Total</p>
-                    <p className="text-base font-bold text-gray-900">
-                      {formatRupiah(previewData.total)}
+                    <p className="text-xs font-semibold">
+                      {previewData.hasPerSession ? 'Total (estimasi)' : 'Total'}
+                    </p>
+                    <p className={`text-base font-bold ${previewData.hasPerSession ? 'text-amber-700' : 'text-gray-900'}`}>
+                      {previewData.hasPerSession ? '~' : ''}{formatRupiah(previewData.total)}
+                      {previewData.hasPerSession && <span className="text-[10px] font-normal ml-1">+ Per Sesi</span>}
                     </p>
                   </div>
                 </div>
