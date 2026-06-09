@@ -63,6 +63,12 @@ export default function StudentDetailPage() {
   const [sppRateSubjectType, setSppRateSubjectType] = useState<string>('')
   const [selectedSppRateId, setSelectedSppRateId] = useState<string>('')
   const [savingSppRate, setSavingSppRate] = useState(false)
+  // Custom SPP editor state
+  const [customSppSubjectId, setCustomSppSubjectId] = useState<string | null>(null)
+  const [customSppAmount, setCustomSppAmount] = useState('')
+  const [customSppNote, setCustomSppNote] = useState('')
+  const [discountAffectsCommission, setDiscountAffectsCommission] = useState(false)
+  const [savingCustomSpp, setSavingCustomSpp] = useState(false)
 
   const { data: studentData, isLoading: loadingStudent, refetch } = useQuery({
     queryKey: ['student', studentId],
@@ -186,6 +192,37 @@ export default function StudentDetailPage() {
     setSppRateSubjectType(subject.type)
     setSelectedSppRateId(subject.sppRateId || '')
     setDiscountSubjectId(null)
+    setCustomSppSubjectId(null)
+  }
+
+  const openCustomSppEditor = (subject: any) => {
+    setCustomSppSubjectId(subject.subjectId)
+    setCustomSppAmount(subject.customSppAmount ? parseFloat(subject.customSppAmount).toString() : '')
+    setCustomSppNote(subject.customSppNote || '')
+    setDiscountAffectsCommission(subject.discountAffectsCommission ?? false)
+    setDiscountSubjectId(null)
+    setSppRateSubjectId(null)
+  }
+
+  const handleSaveCustomSpp = async () => {
+    if (!customSppSubjectId) return
+    try {
+      setSavingCustomSpp(true)
+      const amount = customSppAmount ? parseFloat(customSppAmount) : null
+      await studentApi.updateSubjectDiscount(studentId, customSppSubjectId, {
+        customSppAmount: amount && amount > 0 ? amount : null,
+        customSppNote: customSppNote.trim() || null,
+        discountAffectsCommission,
+      })
+      setCustomSppSubjectId(null)
+      setCustomSppAmount('')
+      setCustomSppNote('')
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menyimpan tarif custom')
+    } finally {
+      setSavingCustomSpp(false)
+    }
   }
 
   const handleSaveSppRate = async () => {
@@ -237,6 +274,7 @@ export default function StudentDetailPage() {
 
   const branchName = branches.find((b: any) => b.id === student.branchId)?.name || '-'
   const allSppRates: any[] = sppRatesData?.data?.data || []
+  // Tampilkan semua rate dengan tipe sesi yang sama, dikelompokkan per billingType
   const filteredSppRates = allSppRates.filter((r: any) => r.type === sppRateSubjectType)
   const totalSubjects = student.subjects?.length || 0
   const totalSPP = student.subjects?.reduce(
@@ -581,11 +619,14 @@ export default function StudentDetailPage() {
         ) : (
           <div className="space-y-3">
             {student.subjects.map((subject: any) => {
-              const sppAmount = parseFloat(subject.sppAmount || '0')
+              const masterRate = parseFloat(subject.sppAmount || '0')
+              const effectiveRate = subject.customSppAmount ? parseFloat(subject.customSppAmount) : masterRate
               const subjectDiscount = parseFloat(subject.discountAmount || '0')
-              const netAmount = Math.max(0, sppAmount - subjectDiscount)
+              const netAmount = Math.max(0, effectiveRate - subjectDiscount)
+              const isPerSession = subject.billingType === 'PER_SESSION'
               const isEditingDiscount = discountSubjectId === subject.subjectId
               const isEditingSppRate = sppRateSubjectId === subject.subjectId
+              const isEditingCustomSpp = customSppSubjectId === subject.subjectId
 
               return (
                 <div
@@ -608,6 +649,16 @@ export default function StudentDetailPage() {
                         <p className="text-xs text-gray-500">
                           Terdaftar: {new Date(subject.enrolledAt).toLocaleDateString('id-ID')}
                         </p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          isPerSession ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {isPerSession ? 'Per Sesi' : 'Flat Bulanan'}
+                        </span>
+                        {subject.customSppAmount && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+                            Tarif Custom{subject.customSppNote ? ` · ${subject.customSppNote}` : ''}
+                          </span>
+                        )}
                         {subjectDiscount > 0 && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700 flex items-center gap-1">
                             <Tag className="w-2.5 h-2.5" />
@@ -622,18 +673,27 @@ export default function StudentDetailPage() {
                         {subjectDiscount > 0 ? (
                           <>
                             <p className="text-xs text-gray-400 line-through">
-                              Rp {sppAmount.toLocaleString('id-ID')}
+                              Rp {effectiveRate.toLocaleString('id-ID')}
                             </p>
                             <p className="font-semibold text-green-600">
                               Rp {netAmount.toLocaleString('id-ID')}
                             </p>
                           </>
+                        ) : subject.customSppAmount ? (
+                          <>
+                            <p className="text-xs text-gray-400 line-through">
+                              Rp {masterRate.toLocaleString('id-ID')}
+                            </p>
+                            <p className="font-semibold text-purple-600">
+                              Rp {effectiveRate.toLocaleString('id-ID')}
+                            </p>
+                          </>
                         ) : (
                           <p className="font-semibold text-blue-600">
-                            Rp {sppAmount.toLocaleString('id-ID')}
+                            Rp {effectiveRate.toLocaleString('id-ID')}
                           </p>
                         )}
-                        <p className="text-xs text-gray-500">per bulan</p>
+                        <p className="text-xs text-gray-500">{isPerSession ? 'per sesi' : 'per bulan'}</p>
                       </div>
                       <div className="flex gap-1 justify-end flex-wrap">
                         <button
@@ -642,6 +702,20 @@ export default function StudentDetailPage() {
                         >
                           <Tag className="w-3 h-3 inline mr-1" />
                           Diskon
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (isEditingCustomSpp) setCustomSppSubjectId(null)
+                            else openCustomSppEditor(subject)
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium transition ${
+                            isEditingCustomSpp
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-purple-50 hover:bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          <DollarSign className="w-3 h-3 inline mr-1" />
+                          Custom SPP
                         </button>
                         <button
                           onClick={() => {
@@ -699,7 +773,9 @@ export default function StudentDetailPage() {
                           <option value="">-- Pilih tarif --</option>
                           {filteredSppRates.map((rate: any) => (
                             <option key={rate.id} value={rate.id}>
-                              Rp {parseFloat(rate.amount).toLocaleString('id-ID')}/bln
+                              [{rate.billingType === 'PER_SESSION' ? 'Per Sesi' : 'Flat Bln'}]
+                              {' '}Rp {parseFloat(rate.amount).toLocaleString('id-ID')}
+                              {rate.billingType === 'PER_SESSION' ? '/sesi' : '/bln'}
                               {' · '}Berlaku: {new Date(rate.effectiveFrom).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                               {rate.effectiveUntil ? ` s/d ${new Date(rate.effectiveUntil).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}` : ' (aktif)'}
                               {rate.id === subject.sppRateId ? ' ✓ Saat ini' : ''}
@@ -785,6 +861,90 @@ export default function StudentDetailPage() {
                         </button>
                         <button
                           onClick={() => setDiscountSubjectId(null)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
+                        >
+                          <X className="w-3 h-3 inline" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Inline Custom SPP editor */}
+                  {isEditingCustomSpp && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 bg-purple-50 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-purple-800 flex items-center gap-1">
+                        <DollarSign className="w-3 h-3" />
+                        Tarif SPP Khusus Siswa Ini
+                      </p>
+                      <p className="text-[10px] text-purple-700">
+                        Override tarif master untuk siswa ini. Bisa lebih rendah (keringanan) atau lebih tinggi (premium). Kosongkan untuk kembali ke tarif master.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">
+                            Tarif Custom (Rp{isPerSession ? '/sesi' : '/bulan'})
+                          </label>
+                          <input
+                            type="number"
+                            placeholder={`master: ${masterRate.toLocaleString('id-ID')}`}
+                            min={0}
+                            value={customSppAmount}
+                            onChange={e => setCustomSppAmount(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Keterangan</label>
+                          <input
+                            type="text"
+                            placeholder="Misal: Tarif 1x/minggu"
+                            value={customSppNote}
+                            onChange={e => setCustomSppNote(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={discountAffectsCommission}
+                          onChange={e => setDiscountAffectsCommission(e.target.checked)}
+                          className="w-3 h-3 rounded"
+                        />
+                        <span className="text-[10px] text-gray-600">
+                          Gunakan tarif custom ini sebagai dasar komisi guru (default: komisi tetap dari tarif master)
+                        </span>
+                      </label>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveCustomSpp}
+                          disabled={savingCustomSpp}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition disabled:opacity-50"
+                        >
+                          {savingCustomSpp ? 'Menyimpan...' : 'Simpan'}
+                        </button>
+                        {subject.customSppAmount && (
+                          <button
+                            onClick={() => {
+                              if (confirm('Yakin hapus tarif custom? Akan kembali ke tarif master.')) {
+                                setSavingCustomSpp(true)
+                                studentApi.updateSubjectDiscount(studentId, subject.subjectId, {
+                                  customSppAmount: null,
+                                  customSppNote: null,
+                                  discountAffectsCommission: false,
+                                }).then(() => { refetch(); setCustomSppSubjectId(null) })
+                                  .catch((e: any) => alert(e.response?.data?.message || 'Gagal'))
+                                  .finally(() => setSavingCustomSpp(false))
+                              }
+                            }}
+                            disabled={savingCustomSpp}
+                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium rounded transition disabled:opacity-40"
+                          >
+                            Hapus Custom
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setCustomSppSubjectId(null)}
                           className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
                         >
                           <X className="w-3 h-3 inline" />

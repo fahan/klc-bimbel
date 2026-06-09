@@ -30,6 +30,7 @@ interface SelectedSubject {
   id: string
   name: string
   type: 'REGULAR' | 'PRIVATE'
+  billingType: 'FLAT_MONTHLY' | 'PER_SESSION'
   sppRateId: string
   sppAmount: number
 }
@@ -134,6 +135,7 @@ export default function StudentEnrollmentPage() {
         return {
           subjectId: subject.id,
           type: subject.type,
+          billingType: subject.billingType,
           sessionId: session?.sessionId,
         }
       })

@@ -15,6 +15,7 @@ interface AddSubjectModalProps {
 export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose, onSuccess }: AddSubjectModalProps) {
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [selectedType, setSelectedType] = useState<'REGULAR' | 'PRIVATE'>('REGULAR')
+  const [selectedBillingType, setSelectedBillingType] = useState<'FLAT_MONTHLY' | 'PER_SESSION'>('FLAT_MONTHLY')
   const [enrolledAt, setEnrolledAt] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,10 +27,10 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
   })
 
   const { data: sppRateData } = useQuery({
-    queryKey: ['spp-rate', selectedSubject, selectedType],
+    queryKey: ['spp-rate', selectedSubject, selectedType, selectedBillingType],
     queryFn: () => {
       if (!selectedSubject) return null
-      return sppRateApi.getActiveRate(selectedSubject, selectedType)
+      return sppRateApi.getActiveRate(selectedSubject, selectedType, selectedBillingType)
     },
     enabled: !!selectedSubject,
   })
@@ -59,6 +60,7 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
       await studentApi.addSubject(studentId, {
         subjectId: selectedSubject,
         type: selectedType,
+        billingType: selectedBillingType,
         ...(enrolledAt ? { enrolledAt } : {}),
       })
 
@@ -139,6 +141,36 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
             </div>
           )}
 
+          {/* Billing Type Selector */}
+          {selectedSubject && (
+            <div className="space-y-2 mb-4">
+              <label className="block text-sm font-medium text-gray-700">Model Billing</label>
+              <div className="flex gap-2">
+                {(['FLAT_MONTHLY', 'PER_SESSION'] as const).map(bt => (
+                  <button
+                    key={bt}
+                    onClick={() => {
+                      setSelectedBillingType(bt)
+                      setError(null)
+                    }}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                      selectedBillingType === bt
+                        ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {bt === 'FLAT_MONTHLY' ? 'Flat Bulanan' : 'Per Pertemuan'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">
+                {selectedBillingType === 'PER_SESSION'
+                  ? 'Tagihan = tarif/sesi × jumlah sesi hadir bulan itu'
+                  : 'Tagihan = nominal tetap per bulan'}
+              </p>
+            </div>
+          )}
+
           {/* Tanggal Masuk Aktual */}
           <div className="space-y-1 mb-4">
             <label className="block text-sm font-medium text-gray-700">
@@ -158,8 +190,15 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
           {/* SPP Rate Display */}
           {selectedSubject && sppAmount > 0 && (
             <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600">Tarif SPP per bulan</p>
-              <p className="text-lg font-semibold text-blue-700">Rp {sppAmount.toLocaleString('id-ID')}</p>
+              <p className="text-sm text-gray-600">
+                {selectedBillingType === 'PER_SESSION' ? 'Tarif SPP per sesi' : 'Tarif SPP per bulan'}
+              </p>
+              <p className="text-lg font-semibold text-blue-700">
+                Rp {sppAmount.toLocaleString('id-ID')}
+                <span className="text-sm font-normal text-gray-500 ml-1">
+                  {selectedBillingType === 'PER_SESSION' ? '/sesi' : '/bulan'}
+                </span>
+              </p>
               <p className="text-xs text-gray-500 mt-1">Tarif berlaku hari ini dan akan dikunci</p>
             </div>
           )}

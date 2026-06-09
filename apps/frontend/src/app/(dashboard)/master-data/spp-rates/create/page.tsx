@@ -12,6 +12,7 @@ import { sppRateApi, subjectApi } from '@/lib/api/endpoints'
 const rateSchema = z.object({
   subjectId: z.string().min(1, 'Subject is required'),
   type: z.enum(['REGULAR', 'PRIVATE']),
+  billingType: z.enum(['FLAT_MONTHLY', 'PER_SESSION']),
   amount: z.string().min(1, 'Amount is required').transform(v => parseInt(v)),
   effectiveFrom: z.string().min(1, 'Effective from date is required'),
   effectiveUntil: z.string().transform(v => v === '' ? null : v).nullable(),
@@ -41,6 +42,7 @@ export default function CreateSppRatePage() {
     resolver: zodResolver(rateSchema),
     defaultValues: {
       type: 'REGULAR',
+      billingType: 'FLAT_MONTHLY',
     },
   })
 
@@ -67,6 +69,7 @@ export default function CreateSppRatePage() {
       await sppRateApi.create({
         subjectId: data.subjectId,
         type: data.type,
+        billingType: data.billingType,
         amount: data.amount,
         effectiveFrom: data.effectiveFrom,
         effectiveUntil: data.effectiveUntil || null,
@@ -144,6 +147,25 @@ export default function CreateSppRatePage() {
               <option value="PRIVATE">Private Class</option>
             </select>
             {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type.message}</p>}
+          </div>
+
+          {/* Billing Type Field */}
+          <div>
+            <label htmlFor="billingType" className="block text-sm font-medium text-gray-700 mb-1">
+              Model Billing *
+            </label>
+            <select
+              id="billingType"
+              {...register('billingType')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={isLoading}
+            >
+              <option value="FLAT_MONTHLY">Flat Bulanan — nominal tetap per bulan</option>
+              <option value="PER_SESSION">Per Pertemuan — nominal × jumlah sesi hadir</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Per Pertemuan: nominal yang diinput adalah harga per sesi, bukan per bulan.
+            </p>
           </div>
 
           {/* Amount Field */}

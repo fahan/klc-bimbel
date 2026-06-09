@@ -129,6 +129,7 @@ export default function SppRatesPage() {
                   <tr>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Subject</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Type</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Billing</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Amount</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Effective From</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Until</th>
@@ -151,8 +152,20 @@ export default function SppRatesPage() {
                           {rate.type}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          (rate as any).billingType === 'PER_SESSION'
+                            ? 'bg-amber-100 text-amber-800'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {(rate as any).billingType === 'PER_SESSION' ? 'Per Sesi' : 'Flat Bulanan'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 font-semibold text-gray-900">
                         {formatCurrency(rate.amount)}
+                        <span className="text-xs font-normal text-gray-500 ml-1">
+                          {(rate as any).billingType === 'PER_SESSION' ? '/sesi' : '/bln'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600 text-sm">
                         {formatDate(rate.effectiveFrom)}

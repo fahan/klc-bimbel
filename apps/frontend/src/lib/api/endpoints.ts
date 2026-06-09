@@ -65,8 +65,10 @@ export const sppRateApi = {
   },
   getOne: (id: string) => apiClient.get(`/spp-rates/${id}`),
   getBySubject: (subjectId: string) => apiClient.get(`/spp-rates/by-subject/${subjectId}`),
-  getActiveRate: (subjectId: string, type: string) =>
-    apiClient.get(`/spp-rates/active/${subjectId}/${type}`),
+  getActiveRate: (subjectId: string, type: string, billingType?: string) => {
+    const qs = billingType ? `?billingType=${billingType}` : ''
+    return apiClient.get(`/spp-rates/active/${subjectId}/${type}${qs}`)
+  },
   create: (data: any) => apiClient.post('/spp-rates', data),
   update: (id: string, data: any) => apiClient.put(`/spp-rates/${id}`, data),
   delete: (id: string) => apiClient.delete(`/spp-rates/${id}`),
@@ -418,11 +420,17 @@ export const studentApi = {
   enroll: (id: string, data: any) => apiClient.post(`/students/${id}/enroll`, data),
   getAvailableSessions: (subjectId: string, branchId: string, type: 'REGULAR' | 'PRIVATE') =>
     apiClient.get(`/students/enrollment/sessions/${subjectId}`, { params: { branchId, type } }),
-  addSubject: (studentId: string, data: { subjectId: string; type: string }) =>
+  addSubject: (studentId: string, data: { subjectId: string; type: string; billingType?: string; enrolledAt?: string }) =>
     apiClient.post(`/students/${studentId}/add-subject`, data),
   updateSubject: (studentId: string, subjectId: string, data: any) =>
     apiClient.put(`/students/${studentId}/subjects/${subjectId}`, data),
-  updateSubjectDiscount: (studentId: string, subjectId: string, data: { discountAmount: number | null; discountNote: string | null }) =>
+  updateSubjectDiscount: (studentId: string, subjectId: string, data: {
+    discountAmount?: number | null
+    discountNote?: string | null
+    customSppAmount?: number | null
+    customSppNote?: string | null
+    discountAffectsCommission?: boolean
+  }) =>
     apiClient.patch(`/students/${studentId}/subjects/${subjectId}/discount`, data),
   endSubjectEnrollment: (studentId: string, subjectId: string, data: { status: string; endDate?: string }) =>
     apiClient.patch(`/students/${studentId}/subjects/${subjectId}/end`, data),

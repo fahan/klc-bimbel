@@ -9,6 +9,7 @@ interface SelectedSubject {
   id: string
   name: string
   type: 'REGULAR' | 'PRIVATE'
+  billingType: 'FLAT_MONTHLY' | 'PER_SESSION'
   sppRateId: string
   sppAmount: number
 }
@@ -40,11 +41,12 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
     return rates
   }
 
-  const findActiveRate = (rates: any[], type: 'REGULAR' | 'PRIVATE') => {
+  const findActiveRate = (rates: any[], type: 'REGULAR' | 'PRIVATE', billingType: 'FLAT_MONTHLY' | 'PER_SESSION') => {
     const now = new Date()
     return rates.find(
       (rate: any) =>
         rate.type === type &&
+        (rate.billingType ?? 'FLAT_MONTHLY') === billingType &&
         new Date(rate.effectiveFrom) <= now &&
         (!rate.effectiveUntil || new Date(rate.effectiveUntil) >= now)
     )
@@ -54,7 +56,7 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
     setLoadingSubjectId(subject.id)
     try {
       const rates = await fetchRatesForSubject(subject.id)
-      const regularRate = findActiveRate(rates, 'REGULAR')
+      const regularRate = findActiveRate(rates, 'REGULAR', 'FLAT_MONTHLY')
       if (!regularRate) {
         alert('Tidak ada tarif SPP aktif untuk mata pelajaran ini')
         return
@@ -65,6 +67,7 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
           id: subject.id,
           name: subject.name,
           type: 'REGULAR',
+          billingType: 'FLAT_MONTHLY',
           sppRateId: regularRate.id,
           sppAmount: parseFloat(regularRate.amount),
         },
@@ -80,16 +83,36 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
   }
 
   const handleChangeType = async (subjectId: string, newType: 'REGULAR' | 'PRIVATE') => {
+    const current = selectedSubjects.find(s => s.id === subjectId)
+    if (!current) return
     const rates = await fetchRatesForSubject(subjectId)
-    const newRate = findActiveRate(rates, newType)
+    const newRate = findActiveRate(rates, newType, current.billingType)
     if (!newRate) {
-      alert('Tidak ada tarif SPP aktif untuk tipe ini')
+      alert(`Tidak ada tarif SPP aktif untuk tipe ${newType} dengan model ${current.billingType}`)
       return
     }
     setSelectedSubjects(prev =>
       prev.map(s =>
         s.id === subjectId
           ? { ...s, type: newType, sppRateId: newRate.id, sppAmount: parseFloat(newRate.amount) }
+          : s
+      )
+    )
+  }
+
+  const handleChangeBillingType = async (subjectId: string, newBillingType: 'FLAT_MONTHLY' | 'PER_SESSION') => {
+    const current = selectedSubjects.find(s => s.id === subjectId)
+    if (!current) return
+    const rates = await fetchRatesForSubject(subjectId)
+    const newRate = findActiveRate(rates, current.type, newBillingType)
+    if (!newRate) {
+      alert(`Tidak ada tarif SPP aktif untuk model ${newBillingType === 'PER_SESSION' ? 'Per Pertemuan' : 'Flat Bulanan'}`)
+      return
+    }
+    setSelectedSubjects(prev =>
+      prev.map(s =>
+        s.id === subjectId
+          ? { ...s, billingType: newBillingType, sppRateId: newRate.id, sppAmount: parseFloat(newRate.amount) }
           : s
       )
     )
@@ -123,13 +146,13 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
               </button>
             </div>
 
-            {/* Type Toggle */}
-            <div className="ml-7 space-y-3">
-              <div className="flex gap-2">
-                {['REGULAR', 'PRIVATE'].map(type => (
+            {/* Type + BillingType Toggle */}
+            <div className="ml-7 space-y-2">
+              <div className="flex gap-2 flex-wrap">
+                {(['REGULAR', 'PRIVATE'] as const).map(type => (
                   <button
                     key={type}
-                    onClick={() => handleChangeType(subject.id, type as 'REGULAR' | 'PRIVATE')}
+                    onClick={() => handleChangeType(subject.id, type)}
                     className={`px-3 py-1 rounded-full text-sm font-medium transition ${
                       subject.type === type
                         ? 'bg-blue-100 text-blue-700 border border-blue-300'
@@ -141,8 +164,25 @@ export default function EnrollmentStep2({ subjects, onComplete }: EnrollmentStep
                 ))}
               </div>
 
+              <div className="flex gap-2 flex-wrap">
+                {(['FLAT_MONTHLY', 'PER_SESSION'] as const).map(bt => (
+                  <button
+                    key={bt}
+                    onClick={() => handleChangeBillingType(subject.id, bt)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                      subject.billingType === bt
+                        ? 'bg-amber-100 text-amber-700 border border-amber-300'
+                        : 'bg-gray-100 text-gray-500 border border-gray-300 hover:bg-gray-200'
+                    }`}
+                  >
+                    {bt === 'FLAT_MONTHLY' ? 'Flat Bulanan' : 'Per Pertemuan'}
+                  </button>
+                ))}
+              </div>
+
               <p className="text-sm text-gray-600">
-                Rp {subject.sppAmount.toLocaleString('id-ID')}/bulan · tarif berlaku hari ini
+                Rp {subject.sppAmount.toLocaleString('id-ID')}
+                {subject.billingType === 'PER_SESSION' ? '/sesi' : '/bulan'} · tarif berlaku hari ini
               </p>
             </div>
           </div>

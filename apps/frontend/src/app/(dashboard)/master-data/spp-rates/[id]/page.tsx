@@ -12,6 +12,7 @@ import { sppRateApi, subjectApi } from '@/lib/api/endpoints'
 const rateSchema = z.object({
   subjectId: z.string().optional(),
   type: z.enum(['REGULAR', 'PRIVATE']).optional(),
+  billingType: z.enum(['FLAT_MONTHLY', 'PER_SESSION']).optional(),
   amount: z.string().optional().transform(v => v ? parseInt(v) : undefined),
   effectiveFrom: z.string().optional(),
   effectiveUntil: z.string().transform(v => v === '' ? null : v).nullable(),
@@ -23,6 +24,7 @@ interface SppRate {
   id: string
   subjectId: string
   type: string
+  billingType: string
   amount: number
   effectiveFrom: string
   effectiveUntil?: string
@@ -86,6 +88,7 @@ export default function EditSppRatePage() {
         reset({
           subjectId: rateData.subjectId,
           type: rateData.type,
+          billingType: rateData.billingType ?? 'FLAT_MONTHLY',
           amount: rateData.amount.toString(),
           effectiveFrom: rateData.effectiveFrom.split('T')[0],
           effectiveUntil: rateData.effectiveUntil ? rateData.effectiveUntil.split('T')[0] : '',
@@ -115,6 +118,7 @@ export default function EditSppRatePage() {
       await sppRateApi.update(id, {
         subjectId: data.subjectId || rate?.subjectId,
         type: data.type || rate?.type,
+        billingType: data.billingType || rate?.billingType,
         amount: data.amount || rate?.amount,
         effectiveFrom: data.effectiveFrom || rate?.effectiveFrom,
         effectiveUntil: data.effectiveUntil || null,
@@ -212,6 +216,22 @@ export default function EditSppRatePage() {
               <option value="">-- Select Type --</option>
               <option value="REGULAR">Regular Class</option>
               <option value="PRIVATE">Private Class</option>
+            </select>
+          </div>
+
+          {/* Billing Type Field */}
+          <div>
+            <label htmlFor="billingType" className="block text-sm font-medium text-gray-700 mb-1">
+              Model Billing
+            </label>
+            <select
+              id="billingType"
+              {...register('billingType')}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={isLoading}
+            >
+              <option value="FLAT_MONTHLY">Flat Bulanan — nominal tetap per bulan</option>
+              <option value="PER_SESSION">Per Pertemuan — nominal × jumlah sesi hadir</option>
             </select>
           </div>
 
