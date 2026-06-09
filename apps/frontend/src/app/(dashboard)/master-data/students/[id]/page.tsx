@@ -69,6 +69,10 @@ export default function StudentDetailPage() {
   const [customSppNote, setCustomSppNote] = useState('')
   const [discountAffectsCommission, setDiscountAffectsCommission] = useState(false)
   const [savingCustomSpp, setSavingCustomSpp] = useState(false)
+  // Billing type editor state
+  const [billingTypeSubjectId, setBillingTypeSubjectId] = useState<string | null>(null)
+  const [billingTypeError, setBillingTypeError] = useState('')
+  const [savingBillingType, setSavingBillingType] = useState(false)
 
   const { data: studentData, isLoading: loadingStudent, refetch } = useQuery({
     queryKey: ['student', studentId],
@@ -162,6 +166,8 @@ export default function StudentDetailPage() {
 
   const openDiscountEditor = (subject: any) => {
     setSppRateSubjectId(null)
+    setCustomSppSubjectId(null)
+    setBillingTypeSubjectId(null)
     setDiscountSubjectId(subject.subjectId)
     setDiscountAmount(subject.discountAmount ? parseFloat(subject.discountAmount).toString() : '')
     setDiscountNote(subject.discountNote || '')
@@ -193,6 +199,7 @@ export default function StudentDetailPage() {
     setSelectedSppRateId(subject.sppRateId || '')
     setDiscountSubjectId(null)
     setCustomSppSubjectId(null)
+    setBillingTypeSubjectId(null)
   }
 
   const openCustomSppEditor = (subject: any) => {
@@ -202,6 +209,37 @@ export default function StudentDetailPage() {
     setDiscountAffectsCommission(subject.discountAffectsCommission ?? false)
     setDiscountSubjectId(null)
     setSppRateSubjectId(null)
+    setBillingTypeSubjectId(null)
+  }
+
+  const openBillingTypeEditor = (subject: any) => {
+    setBillingTypeSubjectId(subject.subjectId)
+    setBillingTypeError('')
+    setDiscountSubjectId(null)
+    setSppRateSubjectId(null)
+    setCustomSppSubjectId(null)
+  }
+
+  const handleChangeBillingType = async (subject: any, newBillingType: 'FLAT_MONTHLY' | 'PER_SESSION') => {
+    if (newBillingType === subject.billingType) return
+    try {
+      setSavingBillingType(true)
+      setBillingTypeError('')
+      // Find active SPP rate for this subject + session type + new billing type
+      const res = await sppRateApi.getActiveRate(subject.subjectId, subject.type, newBillingType)
+      const rate = res?.data?.data
+      if (!rate) {
+        setBillingTypeError(`Tidak ada tarif SPP aktif untuk ${newBillingType === 'PER_SESSION' ? 'Per Pertemuan' : 'Flat Bulanan'}. Tambahkan tarif terlebih dahulu di menu Master Data → Tarif SPP.`)
+        return
+      }
+      await studentApi.updateSubjectSppRate(studentId, subject.subjectId, { sppRateId: rate.id })
+      setBillingTypeSubjectId(null)
+      refetch()
+    } catch (err: any) {
+      setBillingTypeError(err.response?.data?.message || 'Gagal mengubah tipe billing')
+    } finally {
+      setSavingBillingType(false)
+    }
   }
 
   const handleSaveCustomSpp = async () => {
@@ -627,6 +665,7 @@ export default function StudentDetailPage() {
               const isEditingDiscount = discountSubjectId === subject.subjectId
               const isEditingSppRate = sppRateSubjectId === subject.subjectId
               const isEditingCustomSpp = customSppSubjectId === subject.subjectId
+              const isEditingBillingType = billingTypeSubjectId === subject.subjectId
 
               return (
                 <div
@@ -649,11 +688,19 @@ export default function StudentDetailPage() {
                         <p className="text-xs text-gray-500">
                           Terdaftar: {new Date(subject.enrolledAt).toLocaleDateString('id-ID')}
                         </p>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                          isPerSession ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {isPerSession ? 'Per Sesi' : 'Flat Bulanan'}
-                        </span>
+                        <button
+                          onClick={() => isEditingBillingType ? setBillingTypeSubjectId(null) : openBillingTypeEditor(subject)}
+                          title="Klik untuk ubah tipe billing"
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition border ${
+                            isEditingBillingType
+                              ? 'bg-amber-200 text-amber-800 border-amber-400'
+                              : isPerSession
+                                ? 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                          }`}
+                        >
+                          {isPerSession ? 'Per Sesi ✎' : 'Flat Bulanan ✎'}
+                        </button>
                         {subject.customSppAmount && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
                             Tarif Custom{subject.customSppNote ? ` · ${subject.customSppNote}` : ''}
@@ -862,6 +909,50 @@ export default function StudentDetailPage() {
                         <button
                           onClick={() => setDiscountSubjectId(null)}
                           className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
+                        >
+                          <X className="w-3 h-3 inline" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Inline Billing Type editor */}
+                  {isEditingBillingType && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 bg-amber-50 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-amber-800 flex items-center gap-1">
+                        Ubah Tipe Billing
+                      </p>
+                      <p className="text-[10px] text-amber-700">
+                        Sistem akan mencari tarif SPP aktif yang sesuai untuk tipe billing yang dipilih.
+                        Tarif baru akan dikunci menggantikan tarif lama.
+                      </p>
+                      <div className="flex gap-2">
+                        {(['FLAT_MONTHLY', 'PER_SESSION'] as const).map(bt => (
+                          <button
+                            key={bt}
+                            disabled={savingBillingType || bt === subject.billingType}
+                            onClick={() => handleChangeBillingType(subject, bt)}
+                            className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition border-2 disabled:cursor-not-allowed ${
+                              bt === subject.billingType
+                                ? 'border-amber-500 bg-amber-100 text-amber-800 opacity-60'
+                                : 'border-gray-300 bg-white text-gray-700 hover:border-amber-400 hover:bg-amber-50'
+                            }`}
+                          >
+                            {bt === 'FLAT_MONTHLY' ? '📅 Flat Bulanan' : '🔢 Per Pertemuan'}
+                            {bt === subject.billingType && ' (saat ini)'}
+                          </button>
+                        ))}
+                      </div>
+                      {billingTypeError && (
+                        <p className="text-[10px] text-red-600 bg-red-50 p-2 rounded">{billingTypeError}</p>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        {savingBillingType && (
+                          <p className="text-[10px] text-amber-700">Mencari tarif & menyimpan...</p>
+                        )}
+                        <button
+                          onClick={() => { setBillingTypeSubjectId(null); setBillingTypeError('') }}
+                          className="ml-auto px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
                         >
                           <X className="w-3 h-3 inline" />
                         </button>
