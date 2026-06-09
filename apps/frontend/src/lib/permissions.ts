@@ -33,6 +33,7 @@ export const featurePermissions: PermissionConfig = {
   'laporan-progress': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
   'toko-stok': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
   'transfer-stok': ['OWNER', 'ADMIN_GLOBAL'],
+  'pengeluaran': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
 
   // Administration
   'manajemen-user': ['OWNER', 'ADMIN_GLOBAL'],
