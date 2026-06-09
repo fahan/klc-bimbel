@@ -1,6 +1,6 @@
-import { IsString, IsEnum, IsNumber, IsDateString, IsOptional, Min, MinDate } from 'class-validator'
+import { IsString, IsEnum, IsNumber, IsDateString, IsOptional, Min } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
-import { SppRateType } from '@prisma/client'
+import { BillingType, SppRateType } from '@prisma/client'
 
 export class CreateSppRateDto {
   @ApiProperty({ example: '60db5e97-c2f8-4ab7-8c51-d3a3c4f1c5e2' })
@@ -11,7 +11,20 @@ export class CreateSppRateDto {
   @IsEnum(SppRateType)
   type!: SppRateType
 
-  @ApiProperty({ example: 500000 })
+  @ApiProperty({
+    enum: BillingType,
+    example: 'FLAT_MONTHLY',
+    required: false,
+    description: 'FLAT_MONTHLY = nominal/bulan (default). PER_SESSION = nominal/sesi × sesi hadir.',
+  })
+  @IsOptional()
+  @IsEnum(BillingType)
+  billingType?: BillingType
+
+  @ApiProperty({
+    example: 500000,
+    description: 'Untuk FLAT_MONTHLY: tarif per bulan. Untuk PER_SESSION: tarif per sesi.',
+  })
   @IsNumber()
   @Min(0)
   amount!: number

@@ -232,10 +232,12 @@ export class StudentsService {
       const enrollmentDate = enrollmentRequestDto.enrolledAt
         ? new Date(enrollmentRequestDto.enrolledAt)
         : new Date()
+      const billingType = subjectEnroll.billingType ?? 'FLAT_MONTHLY'
       const sppRate = await this.prisma.sppRate.findFirst({
         where: {
           subjectId: subjectEnroll.subjectId,
           type: subjectEnroll.type as any,
+          billingType: billingType as any,
           effectiveFrom: { lte: enrollmentDate },
           OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
         },
@@ -482,7 +484,7 @@ export class StudentsService {
   }
 
   // Add subject to existing student enrollment
-  async addSubjectEnrollment(studentId: string, subjectId: string, type: 'REGULAR' | 'PRIVATE', enrolledAt?: string) {
+  async addSubjectEnrollment(studentId: string, subjectId: string, type: 'REGULAR' | 'PRIVATE', enrolledAt?: string, billingType?: string) {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
     })
@@ -512,10 +514,12 @@ export class StudentsService {
 
     // Get SPP rate at enrollment date (supports historical data entry)
     const enrollmentDate = enrolledAt ? new Date(enrolledAt) : new Date()
+    const resolvedBillingType = billingType ?? 'FLAT_MONTHLY'
     const sppRate = await this.prisma.sppRate.findFirst({
       where: {
         subjectId,
         type: type as any,
+        billingType: resolvedBillingType as any,
         effectiveFrom: { lte: enrollmentDate },
         OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
       },
@@ -680,8 +684,16 @@ export class StudentsService {
     }
   }
 
-  // Update discount on a subject enrollment
-  async updateSubjectDiscount(studentId: string, subjectId: string, discountAmount: number | null, discountNote: string | null) {
+  // Update discount / custom SPP on a subject enrollment
+  async updateSubjectDiscount(
+    studentId: string,
+    subjectId: string,
+    discountAmount: number | null,
+    discountNote: string | null,
+    customSppAmount?: number | null,
+    customSppNote?: string | null,
+    discountAffectsCommission?: boolean,
+  ) {
     const studentSubject = await this.prisma.studentSubject.findFirst({
       where: { studentId, subjectId, isActive: true },
       include: { subject: true },
@@ -695,6 +707,9 @@ export class StudentsService {
       data: {
         discountAmount: discountAmount !== null ? discountAmount : null,
         discountNote: discountNote || null,
+        ...(customSppAmount !== undefined && { customSppAmount: customSppAmount !== null ? customSppAmount : null }),
+        ...(customSppNote !== undefined && { customSppNote: customSppNote || null }),
+        ...(discountAffectsCommission !== undefined && { discountAffectsCommission }),
       },
       include: { subject: true, sppRate: true },
     })
@@ -707,8 +722,11 @@ export class StudentsService {
         sppAmount: updated.sppRate.amount.toString(),
         discountAmount: updated.discountAmount?.toString() || null,
         discountNote: updated.discountNote || null,
+        customSppAmount: updated.customSppAmount?.toString() || null,
+        customSppNote: updated.customSppNote || null,
+        discountAffectsCommission: updated.discountAffectsCommission,
       },
-      message: 'Diskon enrollment berhasil diperbarui',
+      message: 'Tarif enrollment berhasil diperbarui',
     }
   }
 
@@ -863,7 +881,12 @@ export class StudentsService {
         subjectName: ss.subject.name,
         type: ss.type,
         sppRateId: ss.sppRateId,
+        billingType: ss.sppRate?.billingType ?? 'FLAT_MONTHLY',
         sppAmount: ss.sppRate?.amount.toString(),
+        effectiveSppAmount: ss.customSppAmount?.toString() ?? ss.sppRate?.amount.toString(),
+        customSppAmount: ss.customSppAmount?.toString() || null,
+        customSppNote: ss.customSppNote || null,
+        discountAffectsCommission: ss.discountAffectsCommission,
         discountAmount: ss.discountAmount?.toString() || null,
         discountNote: ss.discountNote || null,
         enrolledAt: ss.enrolledAt.toISOString(),

@@ -139,18 +139,37 @@ export class CommissionsService {
             },
           })
 
-          const sppAmount = parseFloat(studentSubject.sppRate.amount.toString())
+          const masterRate = parseFloat(studentSubject.sppRate.amount.toString())
+          const billingType: string = (studentSubject.sppRate as any).billingType ?? 'FLAT_MONTHLY'
+          // effectiveSppBase = nilai SPP yang dipakai sebagai basis kalkulasi komisi
+          let effectiveSppBase: number
+          let commissionAmount: number
 
-          // Guard: PER_SESSION needs at least 1 session
-          if (formula.formulaType === 'PER_SESSION' && totalSessionsInMonth === 0) continue
+          if (billingType === 'PER_SESSION') {
+            // Per-sesi: komisi langsung dari rate × sesi hadir siswa bersama guru ini
+            // Tidak menggunakan applyFormula — formulaType tidak relevan untuk model ini
+            effectiveSppBase = studentSubject.customSppAmount && studentSubject.discountAffectsCommission
+              ? parseFloat(studentSubject.customSppAmount.toString())
+              : masterRate
+            commissionAmount = effectiveSppBase * formula.commissionPercentage * sessionsAttended
+          } else {
+            // FLAT_MONTHLY — gunakan formula distribusi (MONTHLY_RATE / PER_SESSION)
+            // Tentukan basis SPP berdasarkan discountAffectsCommission
+            effectiveSppBase = studentSubject.customSppAmount && studentSubject.discountAffectsCommission
+              ? parseFloat(studentSubject.customSppAmount.toString())
+              : masterRate
 
-          const commissionAmount = this.applyFormula(
-            sppAmount,
-            formula.commissionPercentage,
-            sessionsAttended,
-            totalSessionsInMonth,
-            formula.formulaType,
-          )
+            // Guard: PER_SESSION formula needs at least 1 session
+            if (formula.formulaType === 'PER_SESSION' && totalSessionsInMonth === 0) continue
+
+            commissionAmount = this.applyFormula(
+              effectiveSppBase,
+              formula.commissionPercentage,
+              sessionsAttended,
+              totalSessionsInMonth,
+              formula.formulaType,
+            )
+          }
 
           const dupKey = `${log.id}-${attendance.studentId}`
           if (commissionDetails.some(c => c._dupKey === dupKey)) continue
@@ -160,7 +179,7 @@ export class CommissionsService {
             sessionLogId: log.id,
             studentId: attendance.studentId,
             subjectId,
-            sppAmount,
+            sppAmount: effectiveSppBase,
             totalSessionsInMonth,
             sessionsAttended,
             commissionAmount,

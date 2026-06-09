@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsString, IsArray, IsEnum, ValidateNested, IsOptional, IsDateString, IsNumber, Min } from 'class-validator'
+import { IsString, IsArray, IsEnum, ValidateNested, IsOptional, IsDateString, IsNumber, IsBoolean, Min } from 'class-validator'
 import { Type } from 'class-transformer'
 
 export class EnrollSubjectDto {
@@ -10,6 +10,16 @@ export class EnrollSubjectDto {
   @ApiProperty({ enum: ['REGULAR', 'PRIVATE'], example: 'REGULAR' })
   @IsEnum(['REGULAR', 'PRIVATE'])
   type!: string
+
+  @ApiProperty({
+    enum: ['FLAT_MONTHLY', 'PER_SESSION'],
+    example: 'FLAT_MONTHLY',
+    required: false,
+    description: 'Model billing. Default: FLAT_MONTHLY.',
+  })
+  @IsOptional()
+  @IsEnum(['FLAT_MONTHLY', 'PER_SESSION'])
+  billingType?: string
 
   @ApiProperty({ example: 'session_id_123' })
   @IsString()
@@ -98,6 +108,16 @@ export class AddSubjectDto {
   type!: string
 
   @ApiProperty({
+    enum: ['FLAT_MONTHLY', 'PER_SESSION'],
+    example: 'FLAT_MONTHLY',
+    required: false,
+    description: 'Model billing. Default: FLAT_MONTHLY.',
+  })
+  @IsOptional()
+  @IsEnum(['FLAT_MONTHLY', 'PER_SESSION'])
+  billingType?: string
+
+  @ApiProperty({
     example: '2024-01-15',
     description: 'Tanggal masuk aktual (untuk input data historis). Kosongkan untuk pakai tanggal hari ini.',
     required: false,
@@ -162,7 +182,7 @@ export class UpdateSubjectResponseDto {
   message?: string
 }
 
-// ===== UPDATE SUBJECT DISCOUNT =====
+// ===== UPDATE SUBJECT DISCOUNT / CUSTOM SPP =====
 export class UpdateSubjectDiscountDto {
   @ApiProperty({ example: 50000, required: false, description: 'Nominal diskon per bulan (Rp). Kosongkan untuk hapus diskon.' })
   @IsOptional()
@@ -174,6 +194,30 @@ export class UpdateSubjectDiscountDto {
   @IsOptional()
   @IsString()
   discountNote?: string | null
+
+  @ApiProperty({
+    example: 350000,
+    required: false,
+    description: 'Override tarif SPP khusus siswa ini (null = pakai master rate). Bisa lebih rendah ATAU lebih tinggi dari master rate.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  customSppAmount?: number | null
+
+  @ApiProperty({ example: 'Tarif khusus 1x/minggu', required: false })
+  @IsOptional()
+  @IsString()
+  customSppNote?: string | null
+
+  @ApiProperty({
+    example: false,
+    required: false,
+    description: 'Jika true, komisi guru dihitung dari customSppAmount. Jika false (default), komisi tetap dari master rate.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  discountAffectsCommission?: boolean
 }
 
 // ===== UPDATE SUBJECT SPP RATE =====

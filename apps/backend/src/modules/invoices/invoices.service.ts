@@ -216,9 +216,43 @@ export class InvoicesService {
       // Create items per enrolled subject — apply per-subject enrollment discounts
       let subtotal = 0
       let enrollmentDiscount = 0
-      const items = student.studentSubjects.map((ss: any) => {
-        const sessionCount = ss.type === 'REGULAR' ? 12 : 8
-        const sppAmount = parseFloat(ss.sppRate?.amount?.toString() || '0')
+      const items = await Promise.all(student.studentSubjects.map(async (ss: any) => {
+        const billingType: string = ss.sppRate?.billingType ?? 'FLAT_MONTHLY'
+        const masterRate = parseFloat(ss.sppRate?.amount?.toString() || '0')
+        // customSppAmount overrides master rate if set
+        const effectiveRate = ss.customSppAmount
+          ? parseFloat(ss.customSppAmount.toString())
+          : masterRate
+
+        let sppAmount: number
+        let sessionCount: number
+
+        if (billingType === 'PER_SESSION') {
+          // Count sessions where student was present in the billing month
+          const startDate = new Date(createDto.year!, createDto.month! - 1, 1)
+          const endDate = new Date(createDto.year!, createDto.month!, 1)
+          const attendedCount = await this.prisma.attendance.count({
+            where: {
+              studentId: student.id,
+              status: 'HADIR',
+              sessionLog: {
+                sessionDate: { gte: startDate, lt: endDate },
+                status: 'COMPLETED',
+                OR: [
+                  { isAdHoc: false, session: { subjectId: ss.subjectId } },
+                  { isAdHoc: true, adHocSubjectId: ss.subjectId },
+                ],
+              },
+            },
+          })
+          sessionCount = attendedCount
+          sppAmount = effectiveRate * attendedCount
+        } else {
+          // FLAT_MONTHLY — nominal tetap, session count hanya untuk display
+          sessionCount = ss.type === 'REGULAR' ? 12 : 8
+          sppAmount = effectiveRate
+        }
+
         const itemDiscount = parseFloat(ss.discountAmount?.toString() || '0')
         const itemAmount = Math.max(0, sppAmount - itemDiscount)
         subtotal += sppAmount
@@ -231,7 +265,7 @@ export class InvoicesService {
           discountAmount: itemDiscount,
           amount: itemAmount,
         }
-      })
+      }))
 
       const additionalDiscount = createDto.additionalDiscountAmount ?? 0
       const totalDiscount = enrollmentDiscount + additionalDiscount

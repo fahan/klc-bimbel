@@ -80,13 +80,14 @@ export class SppRatesService {
     }
   }
 
-  async findActiveRate(subjectId: string, type: string, date?: Date) {
+  async findActiveRate(subjectId: string, type: string, billingType?: string, date?: Date) {
     const checkDate = date || new Date()
 
     const sppRate = await this.prisma.sppRate.findFirst({
       where: {
         subjectId,
         type: type as any,
+        ...(billingType && { billingType: billingType as any }),
         effectiveFrom: { lte: checkDate },
         OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: checkDate } }],
       },
@@ -125,6 +126,7 @@ export class SppRatesService {
       data: {
         subjectId: createSppRateDto.subjectId,
         type: createSppRateDto.type,
+        billingType: createSppRateDto.billingType ?? 'FLAT_MONTHLY',
         amount: new Decimal(createSppRateDto.amount),
         effectiveFrom,
         effectiveUntil: createSppRateDto.effectiveUntil ? new Date(createSppRateDto.effectiveUntil) : null,
@@ -177,6 +179,7 @@ export class SppRatesService {
       data: {
         subjectId: updateSppRateDto.subjectId || sppRate.subjectId,
         type: updateSppRateDto.type || sppRate.type,
+        billingType: updateSppRateDto.billingType || sppRate.billingType,
         amount: updateSppRateDto.amount !== undefined ? new Decimal(updateSppRateDto.amount) : sppRate.amount,
         effectiveFrom: updateSppRateDto.effectiveFrom ? new Date(updateSppRateDto.effectiveFrom) : sppRate.effectiveFrom,
         effectiveUntil: updateSppRateDto.effectiveUntil ? new Date(updateSppRateDto.effectiveUntil) : sppRate.effectiveUntil,
@@ -218,6 +221,7 @@ export class SppRatesService {
       id: sppRate.id,
       subjectId: sppRate.subjectId,
       type: sppRate.type,
+      billingType: sppRate.billingType,
       amount: sppRate.amount.toString(),
       effectiveFrom: sppRate.effectiveFrom.toISOString(),
       effectiveUntil: sppRate.effectiveUntil ? sppRate.effectiveUntil.toISOString() : null,

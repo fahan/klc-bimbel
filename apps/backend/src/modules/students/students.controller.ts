@@ -240,7 +240,7 @@ export class StudentsController {
     @Param('id') studentId: string,
     @Body() addSubjectDto: AddSubjectDto,
   ): Promise<any> {
-    return this.studentsService.addSubjectEnrollment(studentId, addSubjectDto.subjectId, addSubjectDto.type as 'REGULAR' | 'PRIVATE', addSubjectDto.enrolledAt)
+    return this.studentsService.addSubjectEnrollment(studentId, addSubjectDto.subjectId, addSubjectDto.type as 'REGULAR' | 'PRIVATE', addSubjectDto.enrolledAt, addSubjectDto.billingType)
   }
 
   @Put(':id/subjects/:subjectId')
@@ -296,6 +296,9 @@ export class StudentsController {
       subjectId,
       dto.discountAmount !== undefined ? (dto.discountAmount ?? null) : null,
       dto.discountNote !== undefined ? (dto.discountNote ?? null) : null,
+      dto.customSppAmount !== undefined ? (dto.customSppAmount ?? null) : undefined,
+      dto.customSppNote !== undefined ? (dto.customSppNote ?? null) : undefined,
+      dto.discountAffectsCommission,
     )
   }
 

@@ -140,6 +140,11 @@ enum SppRateType {
   PRIVATE
 }
 
+enum BillingType {
+  FLAT_MONTHLY  // SPP flat per bulan (default)
+  PER_SESSION   // rate × jumlah sesi hadir siswa
+}
+
 enum TrialRegistrationStatus {
   NEW
   CONTACTED
@@ -293,16 +298,17 @@ model SubjectCommissionFormula {
 }
 
 model SppRate {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   subjectId       String
   type            SppRateType
-  amount          Decimal  @db.Decimal(12, 2)
+  billingType     BillingType @default(FLAT_MONTHLY)
+  amount          Decimal     @db.Decimal(12, 2)
   effectiveFrom   DateTime
   effectiveUntil  DateTime?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime    @default(now())
 
   // Relations
-  subject         Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   studentSubjects StudentSubject[]
 
   @@map("spp_rates")
@@ -360,17 +366,20 @@ model Student {
 }
 
 model StudentSubject {
-  id             String           @id @default(cuid())
-  studentId      String
-  subjectId      String
-  sppRateId      String
-  type           SessionType
-  enrolledAt     DateTime
-  endDate        DateTime?
-  status         EnrollmentStatus @default(ACTIVE)
-  isActive       Boolean          @default(true)
-  discountAmount Decimal?         @db.Decimal(12, 2)
-  discountNote   String?
+  id                        String           @id @default(cuid())
+  studentId                 String
+  subjectId                 String
+  sppRateId                 String
+  type                      SessionType
+  enrolledAt                DateTime
+  endDate                   DateTime?
+  status                    EnrollmentStatus @default(ACTIVE)
+  isActive                  Boolean          @default(true)
+  discountAmount            Decimal?         @db.Decimal(12, 2)
+  discountNote              String?
+  customSppAmount           Decimal?         @db.Decimal(12, 2)  // override rate per siswa (null = pakai sppRate.amount)
+  customSppNote             String?                               // alasan custom (keringanan, premium, dll)
+  discountAffectsCommission Boolean          @default(false)      // apakah customSppAmount juga jadi dasar komisi guru
 
   // Relations
   student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
