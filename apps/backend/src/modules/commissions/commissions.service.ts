@@ -100,8 +100,6 @@ export class CommissionsService {
     // ── Step 4: Caches for repeated-query results (same pair across many logs) ─
     // key: `${studentId}|${subjectId}` → total sessions in month
     const sessionCountCache = new Map<string, number>()
-    // key: `${studentId}|${teacherId}|${subjectId}` → sessions attended with this teacher
-    const attendanceCountCache = new Map<string, number>()
     // key: `${subjectId}|${sessionType}` → formula
     const formulaCache = new Map<string, any>()
 
@@ -147,32 +145,6 @@ export class CommissionsService {
       return sessionCountCache.get(key)!
     }
 
-    const getSessionsAttended = async (
-      studentId: string,
-      teacherId: string,
-      subjectId: string,
-    ) => {
-      const key = `${studentId}|${teacherId}|${subjectId}`
-      if (!attendanceCountCache.has(key)) {
-        const count = await this.prisma.attendance.count({
-          where: {
-            studentId,
-            status: 'HADIR',
-            sessionLog: {
-              sessionDate: { gte: startDate, lt: endDate },
-              actualTeacherId: teacherId,
-              OR: [
-                { isAdHoc: false, session: { subjectId } },
-                { isAdHoc: true, adHocSubjectId: subjectId },
-              ],
-            },
-          },
-        })
-        attendanceCountCache.set(key, count)
-      }
-      return attendanceCountCache.get(key)!
-    }
-
     // ── Step 5: Group logs by teacher & calculate commissions ─────────────────
     const teacherLogsMap = new Map<string, any[]>()
     for (const log of sessionLogs) {
@@ -208,11 +180,12 @@ export class CommissionsService {
           )
           if (!studentSubject || !studentSubject.sppRate) continue
 
-          // Cached counts — DB hit only on first occurrence per unique key
-          const [totalSessionsInMonth, sessionsAttended] = await Promise.all([
-            getTotalSessions(attendance.studentId, subjectId),
-            getSessionsAttended(attendance.studentId, teacherId, subjectId),
-          ])
+          // totalSessionsInMonth cached — needed only as denominator for PER_SESSION formula
+          // sessionsAttended is always 1 here: each attendance record = one session occurrence.
+          // The formula is applied per-session and aggregated across commission details,
+          // preventing double-counting when the same student appears in multiple session logs.
+          const totalSessionsInMonth = await getTotalSessions(attendance.studentId, subjectId)
+          const sessionsAttendedThisRecord = 1
 
           const masterRate = parseFloat(studentSubject.sppRate.amount.toString())
           const billingType: string =
@@ -221,13 +194,14 @@ export class CommissionsService {
           let commissionAmount: number
 
           if (billingType === 'PER_SESSION') {
+            // Billing per-sesi: komisi = rate × pct × 1 (per kehadiran)
             effectiveSppBase =
               studentSubject.customSppAmount && studentSubject.discountAffectsCommission
                 ? parseFloat(studentSubject.customSppAmount.toString())
                 : masterRate
-            commissionAmount =
-              effectiveSppBase * formula.commissionPercentage * sessionsAttended
+            commissionAmount = effectiveSppBase * formula.commissionPercentage * sessionsAttendedThisRecord
           } else {
+            // FLAT_MONTHLY: formula distribusi per-sesi, dijumlahkan lintas detail
             effectiveSppBase =
               studentSubject.customSppAmount && studentSubject.discountAffectsCommission
                 ? parseFloat(studentSubject.customSppAmount.toString())
@@ -239,7 +213,7 @@ export class CommissionsService {
             commissionAmount = this.applyFormula(
               effectiveSppBase,
               formula.commissionPercentage,
-              sessionsAttended,
+              sessionsAttendedThisRecord,   // 1 per session record
               totalSessionsInMonth,
               formula.formulaType,
             )
@@ -255,7 +229,7 @@ export class CommissionsService {
             subjectId,
             sppAmount: effectiveSppBase,
             totalSessionsInMonth,
-            sessionsAttended,
+            sessionsAttended: sessionsAttendedThisRecord,  // 1 per record; display aggregates
             commissionAmount,
             isReplacement: log.isReplacement,
             formulaType: formula.formulaType,
