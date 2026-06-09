@@ -39,6 +39,7 @@ export class CommissionsService {
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)
 
+    // ── Step 1: Load all completed session logs with attendances ──────────────
     const sessionLogs = await this.prisma.sessionLog.findMany({
       where: {
         sessionDate: { gte: startDate, lt: endDate },
@@ -59,17 +60,132 @@ export class CommissionsService {
       },
     })
 
-    const teacherMap = new Map<string, any[]>()
+    // ── Step 2: Collect all unique (studentId, subjectId) pairs & teacher IDs ─
+    const neededStudentIds = new Set<string>()
+    const neededSubjectIds = new Set<string>()
+    const neededTeacherIds = new Set<string>()
+
+    for (const log of sessionLogs) {
+      const subjectId = log.isAdHoc ? log.adHocSubjectId : log.session?.subjectId
+      if (!subjectId) continue
+      neededSubjectIds.add(subjectId)
+      if (log.actualTeacherId) neededTeacherIds.add(log.actualTeacherId)
+      for (const att of log.attendances) {
+        neededStudentIds.add(att.studentId)
+      }
+    }
+
+    // ── Step 3: Bulk pre-load — studentSubjects, teachers ────────────────────
+    const [allStudentSubjects, allTeachers] = await Promise.all([
+      this.prisma.studentSubject.findMany({
+        where: {
+          studentId: { in: Array.from(neededStudentIds) },
+          subjectId: { in: Array.from(neededSubjectIds) },
+          isActive: true,
+        },
+        include: { sppRate: true, subject: true },
+      }),
+      this.prisma.user.findMany({
+        where: { id: { in: Array.from(neededTeacherIds) } },
+      }),
+    ])
+
+    // Build O(1) lookup maps
+    const studentSubjectMap = new Map<string, any>()
+    for (const ss of allStudentSubjects) {
+      studentSubjectMap.set(`${ss.studentId}|${ss.subjectId}`, ss)
+    }
+    const teacherLookup = new Map(allTeachers.map(t => [t.id, t]))
+
+    // ── Step 4: Caches for repeated-query results (same pair across many logs) ─
+    // key: `${studentId}|${subjectId}` → total sessions in month
+    const sessionCountCache = new Map<string, number>()
+    // key: `${studentId}|${teacherId}|${subjectId}` → sessions attended with this teacher
+    const attendanceCountCache = new Map<string, number>()
+    // key: `${subjectId}|${sessionType}` → formula
+    const formulaCache = new Map<string, any>()
+
+    const getFormula = async (subjectId: string, sessionType: string) => {
+      const key = `${subjectId}|${sessionType}`
+      if (!formulaCache.has(key)) {
+        const f = await this.formulasService.getEffectiveFormula(
+          subjectId,
+          sessionType as 'REGULAR' | 'PRIVATE',
+        )
+        formulaCache.set(key, f)
+      }
+      return formulaCache.get(key)!
+    }
+
+    const getTotalSessions = async (studentId: string, subjectId: string) => {
+      const key = `${studentId}|${subjectId}`
+      if (!sessionCountCache.has(key)) {
+        const [regular, adHoc] = await Promise.all([
+          this.prisma.sessionLog.count({
+            where: {
+              sessionDate: { gte: startDate, lt: endDate },
+              status: 'COMPLETED',
+              isAdHoc: false,
+              session: {
+                subjectId,
+                studentSessions: { some: { studentId, isActive: true } },
+              },
+            },
+          }),
+          this.prisma.sessionLog.count({
+            where: {
+              sessionDate: { gte: startDate, lt: endDate },
+              status: 'COMPLETED',
+              isAdHoc: true,
+              adHocSubjectId: subjectId,
+              attendances: { some: { studentId } },
+            },
+          }),
+        ])
+        sessionCountCache.set(key, regular + adHoc)
+      }
+      return sessionCountCache.get(key)!
+    }
+
+    const getSessionsAttended = async (
+      studentId: string,
+      teacherId: string,
+      subjectId: string,
+    ) => {
+      const key = `${studentId}|${teacherId}|${subjectId}`
+      if (!attendanceCountCache.has(key)) {
+        const count = await this.prisma.attendance.count({
+          where: {
+            studentId,
+            status: 'HADIR',
+            sessionLog: {
+              sessionDate: { gte: startDate, lt: endDate },
+              actualTeacherId: teacherId,
+              OR: [
+                { isAdHoc: false, session: { subjectId } },
+                { isAdHoc: true, adHocSubjectId: subjectId },
+              ],
+            },
+          },
+        })
+        attendanceCountCache.set(key, count)
+      }
+      return attendanceCountCache.get(key)!
+    }
+
+    // ── Step 5: Group logs by teacher & calculate commissions ─────────────────
+    const teacherLogsMap = new Map<string, any[]>()
     for (const log of sessionLogs) {
       const tid = log.actualTeacherId
-      if (!teacherMap.has(tid)) teacherMap.set(tid, [])
-      teacherMap.get(tid)!.push(log)
+      if (!tid) continue
+      if (!teacherLogsMap.has(tid)) teacherLogsMap.set(tid, [])
+      teacherLogsMap.get(tid)!.push(log)
     }
 
     const results: any[] = []
 
-    for (const [teacherId, logs] of teacherMap.entries()) {
-      const teacher = await this.prisma.user.findUnique({ where: { id: teacherId } })
+    for (const [teacherId, logs] of teacherLogsMap.entries()) {
+      const teacher = teacherLookup.get(teacherId)
       if (!teacher) continue
 
       const commissionDetails: any[] = []
@@ -79,88 +195,46 @@ export class CommissionsService {
         const subjectId = log.isAdHoc ? log.adHocSubjectId : log.session?.subjectId
         if (!subjectId) continue
 
-        // Resolve session type for formula lookup
         const sessionType: 'REGULAR' | 'PRIVATE' =
           (log.session?.type as 'REGULAR' | 'PRIVATE') ?? 'REGULAR'
 
-        // Get effective formula for this subject + session type
-        const formula = await this.formulasService.getEffectiveFormula(subjectId, sessionType)
+        // Cached formula lookup (no DB hit for repeated subject+type combos)
+        const formula = await getFormula(subjectId, sessionType)
 
         for (const attendance of log.attendances) {
-          const studentSubject = await this.prisma.studentSubject.findFirst({
-            where: {
-              studentId: attendance.studentId,
-              subjectId,
-              isActive: true,
-            },
-            include: { sppRate: true, subject: true },
-          })
-
+          // O(1) map lookup — no DB query
+          const studentSubject = studentSubjectMap.get(
+            `${attendance.studentId}|${subjectId}`,
+          )
           if (!studentSubject || !studentSubject.sppRate) continue
 
-          const regularSessionCount = await this.prisma.sessionLog.count({
-            where: {
-              sessionDate: { gte: startDate, lt: endDate },
-              status: 'COMPLETED',
-              isAdHoc: false,
-              session: {
-                subjectId,
-                studentSessions: {
-                  some: { studentId: attendance.studentId, isActive: true },
-                },
-              },
-            },
-          })
-
-          const adHocSessionCount = await this.prisma.sessionLog.count({
-            where: {
-              sessionDate: { gte: startDate, lt: endDate },
-              status: 'COMPLETED',
-              isAdHoc: true,
-              adHocSubjectId: subjectId,
-              attendances: { some: { studentId: attendance.studentId } },
-            },
-          })
-
-          const totalSessionsInMonth = regularSessionCount + adHocSessionCount
-
-          const sessionsAttended = await this.prisma.attendance.count({
-            where: {
-              studentId: attendance.studentId,
-              status: 'HADIR',
-              sessionLog: {
-                sessionDate: { gte: startDate, lt: endDate },
-                actualTeacherId: teacherId,
-                OR: [
-                  { isAdHoc: false, session: { subjectId } },
-                  { isAdHoc: true, adHocSubjectId: subjectId },
-                ],
-              },
-            },
-          })
+          // Cached counts — DB hit only on first occurrence per unique key
+          const [totalSessionsInMonth, sessionsAttended] = await Promise.all([
+            getTotalSessions(attendance.studentId, subjectId),
+            getSessionsAttended(attendance.studentId, teacherId, subjectId),
+          ])
 
           const masterRate = parseFloat(studentSubject.sppRate.amount.toString())
-          const billingType: string = (studentSubject.sppRate as any).billingType ?? 'FLAT_MONTHLY'
-          // effectiveSppBase = nilai SPP yang dipakai sebagai basis kalkulasi komisi
+          const billingType: string =
+            (studentSubject.sppRate as any).billingType ?? 'FLAT_MONTHLY'
           let effectiveSppBase: number
           let commissionAmount: number
 
           if (billingType === 'PER_SESSION') {
-            // Per-sesi: komisi langsung dari rate × sesi hadir siswa bersama guru ini
-            // Tidak menggunakan applyFormula — formulaType tidak relevan untuk model ini
-            effectiveSppBase = studentSubject.customSppAmount && studentSubject.discountAffectsCommission
-              ? parseFloat(studentSubject.customSppAmount.toString())
-              : masterRate
-            commissionAmount = effectiveSppBase * formula.commissionPercentage * sessionsAttended
+            effectiveSppBase =
+              studentSubject.customSppAmount && studentSubject.discountAffectsCommission
+                ? parseFloat(studentSubject.customSppAmount.toString())
+                : masterRate
+            commissionAmount =
+              effectiveSppBase * formula.commissionPercentage * sessionsAttended
           } else {
-            // FLAT_MONTHLY — gunakan formula distribusi (MONTHLY_RATE / PER_SESSION)
-            // Tentukan basis SPP berdasarkan discountAffectsCommission
-            effectiveSppBase = studentSubject.customSppAmount && studentSubject.discountAffectsCommission
-              ? parseFloat(studentSubject.customSppAmount.toString())
-              : masterRate
+            effectiveSppBase =
+              studentSubject.customSppAmount && studentSubject.discountAffectsCommission
+                ? parseFloat(studentSubject.customSppAmount.toString())
+                : masterRate
 
-            // Guard: PER_SESSION formula needs at least 1 session
-            if (formula.formulaType === 'PER_SESSION' && totalSessionsInMonth === 0) continue
+            if (formula.formulaType === 'PER_SESSION' && totalSessionsInMonth === 0)
+              continue
 
             commissionAmount = this.applyFormula(
               effectiveSppBase,
