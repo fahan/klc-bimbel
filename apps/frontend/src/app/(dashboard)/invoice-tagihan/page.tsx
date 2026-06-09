@@ -730,16 +730,16 @@ Mohon segera dilunasi. Terima kasih 🙏`
                           <div className="text-right">
                             {it.isPersession ? (
                               <div>
-                                <p className="text-[10px] text-amber-600 font-medium">{formatRupiah(it.sppAmount)}/sesi</p>
+                                <p className="text-[10px] text-amber-600 font-medium">{formatRupiah(it.sppAmount ?? 0)}/sesi</p>
                                 <p className="text-[10px] text-gray-400">× sesi hadir</p>
                               </div>
                             ) : (
                               <div>
                                 {it.hasCustomSpp && it.masterRate !== it.sppAmount && (
-                                  <p className="text-[10px] text-gray-400 line-through">{formatRupiah(it.masterRate)}</p>
+                                  <p className="text-[10px] text-gray-400 line-through">{formatRupiah(it.masterRate ?? 0)}</p>
                                 )}
                                 <p className={`font-semibold ${it.hasCustomSpp ? 'text-purple-700' : 'text-gray-900'}`}>
-                                  {formatRupiah(it.sppAmount)}
+                                  {formatRupiah(it.sppAmount ?? it.amount ?? 0)}
                                 </p>
                               </div>
                             )}
