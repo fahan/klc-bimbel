@@ -218,6 +218,9 @@ export const invoiceApi = {
     month?: number
     year?: number
     studentId?: string
+    search?: string
+    page?: number
+    limit?: number
   }) => {
     const params = new URLSearchParams()
     if (filters?.branchId) params.append('branchId', filters.branchId)
@@ -226,6 +229,9 @@ export const invoiceApi = {
     if (filters?.month) params.append('month', String(filters.month))
     if (filters?.year) params.append('year', String(filters.year))
     if (filters?.studentId) params.append('studentId', filters.studentId)
+    if (filters?.search) params.append('search', filters.search)
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.limit) params.append('limit', String(filters.limit))
     const qs = params.toString()
     return apiClient.get(`/invoices${qs ? `?${qs}` : ''}`)
   },

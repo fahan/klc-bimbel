@@ -16,32 +16,58 @@ export class InvoicesService {
     month?: number
     year?: number
     studentId?: string
+    search?: string
+    page?: number
+    limit?: number
   }) {
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        ...(filters?.branchId && { branchId: filters.branchId }),
-        ...(filters?.status && { status: filters.status as any }),
-        ...(filters?.type && { type: filters.type as any }),
-        ...(filters?.month && { month: filters.month }),
-        ...(filters?.year && { year: filters.year }),
-        ...(filters?.studentId && { studentId: filters.studentId }),
-      },
-      include: {
-        branch: true,
-        student: true,
-        invoiceItems: true,
-        generatedBy: true,
-        payments: {
-          include: { recordedBy: true },
-          orderBy: { paidAt: 'desc' },
+    const page = filters?.page && filters.page > 0 ? filters.page : 1
+    const limit = filters?.limit && filters.limit > 0 ? Math.min(filters.limit, 100) : 20
+    const skip = (page - 1) * limit
+
+    const where: any = {
+      ...(filters?.branchId && { branchId: filters.branchId }),
+      ...(filters?.status && { status: filters.status as any }),
+      ...(filters?.type && { type: filters.type as any }),
+      ...(filters?.month && { month: filters.month }),
+      ...(filters?.year && { year: filters.year }),
+      ...(filters?.studentId && { studentId: filters.studentId }),
+      ...(filters?.search && {
+        OR: [
+          { invoiceNumber: { contains: filters.search, mode: 'insensitive' } },
+          { student: { name: { contains: filters.search, mode: 'insensitive' } } },
+        ],
+      }),
+    }
+
+    const [invoices, total] = await Promise.all([
+      this.prisma.invoice.findMany({
+        where,
+        include: {
+          branch: true,
+          student: true,
+          invoiceItems: true,
+          generatedBy: true,
+          payments: {
+            include: { recordedBy: true },
+            orderBy: { paidAt: 'desc' },
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.invoice.count({ where }),
+    ])
 
     return {
       success: true,
-      data: invoices.map(inv => this.formatInvoice(inv)),
+      data: {
+        data: invoices.map(inv => this.formatInvoice(inv)),
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+        limit,
+      },
     }
   }
 

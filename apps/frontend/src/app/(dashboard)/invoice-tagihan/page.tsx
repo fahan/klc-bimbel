@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { invoiceApi, paymentApi, branchApi, studentApi } from '@/lib/api/endpoints'
 import {
@@ -17,6 +17,8 @@ import {
   X,
   ChevronDown,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -44,7 +46,21 @@ export default function InvoiceTagihanPage() {
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterType, setFilterType] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [page, setPage] = useState(1)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value)
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(value)
+      setPage(1)
+    }, 350)
+  }, [])
+
+  const resetPage = useCallback(() => setPage(1), [])
 
   // Generate form state
   const today = new Date()
@@ -76,13 +92,18 @@ export default function InvoiceTagihanPage() {
   const [deleteInvoice, setDeleteInvoice] = useState<any>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const LIMIT = 20
+
   // Data queries
   const { data: invoicesData, isLoading, refetch } = useQuery({
-    queryKey: ['invoices', filterStatus, filterType],
+    queryKey: ['invoices', filterStatus, filterType, debouncedSearchTerm, page],
     queryFn: () =>
       invoiceApi.getAll({
         status: filterStatus || undefined,
         type: filterType || undefined,
+        search: debouncedSearchTerm || undefined,
+        page,
+        limit: LIMIT,
       }),
   })
 
@@ -105,7 +126,10 @@ export default function InvoiceTagihanPage() {
     queryFn: () => branchApi.getAll(),
   })
 
-  const invoices = invoicesData?.data?.data || []
+  const invoicePayload = invoicesData?.data?.data
+  const invoices: any[] = invoicePayload?.data || []
+  const totalInvoices: number = invoicePayload?.total || 0
+  const totalPages: number = invoicePayload?.totalPages || 1
   const metrics = metricsData?.data?.data
   const studentResults: any[] = studentsData?.data?.data || []
   const branches = branchesData?.data?.data || []
@@ -127,17 +151,6 @@ export default function InvoiceTagihanPage() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
-  const filteredInvoices = useMemo(
-    () =>
-      invoices.filter(
-        (inv: any) =>
-          !searchTerm ||
-          inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          inv.studentName.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [invoices, searchTerm],
-  )
 
   const selectedInvoice = invoices.find((inv: any) => inv.id === selectedInvoiceId)
 
@@ -328,7 +341,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
           ].map((s) => (
             <button
               key={s.v}
-              onClick={() => setFilterStatus(s.v)}
+              onClick={() => { setFilterStatus(s.v); resetPage() }}
               className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                 filterStatus === s.v ? s.c + ' ring-2 ring-offset-1 ring-gray-300' : s.c + ' opacity-70 hover:opacity-100'
               }`}
@@ -346,7 +359,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
           ].map((s) => (
             <button
               key={s.v}
-              onClick={() => setFilterType(s.v)}
+              onClick={() => { setFilterType(s.v); resetPage() }}
               className={`px-3 py-1 rounded-full text-xs font-medium transition ${
                 filterType === s.v ? s.c + ' ring-2 ring-offset-1 ring-gray-300' : s.c + ' opacity-70 hover:opacity-100'
               }`}
@@ -360,7 +373,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
               type="text"
               placeholder="Cari nama siswa / nomor invoice..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -421,14 +434,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredInvoices.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
-                          Tidak ada invoice yang sesuai dengan pencarian
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredInvoices.map((inv: any) => {
+                    {invoices.map((inv: any) => {
                         const isSelected = selectedInvoiceId === inv.id
                         return (
                           <tr
@@ -530,10 +536,57 @@ Mohon segera dilunasi. Terima kasih 🙏`
                             </td>
                           </tr>
                         )
-                      })
-                    )}
+                      })}
                   </tbody>
                 </table>
+              </div>
+              {/* Pagination footer */}
+              <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between bg-gray-50">
+                <p className="text-xs text-gray-500">
+                  {totalInvoices === 0
+                    ? 'Tidak ada invoice'
+                    : `${(page - 1) * LIMIT + 1}–${Math.min(page * LIMIT, totalInvoices)} dari ${totalInvoices} invoice`}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-gray-600" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                      acc.push(p)
+                      return acc
+                    }, [])
+                    .map((item, idx) =>
+                      item === 'ellipsis' ? (
+                        <span key={`e-${idx}`} className="px-1 text-xs text-gray-400">…</span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setPage(item as number)}
+                          className={`min-w-[28px] h-7 text-xs rounded transition ${
+                            page === item
+                              ? 'bg-blue-600 text-white font-semibold'
+                              : 'hover:bg-gray-200 text-gray-700'
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ),
+                    )}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                  </button>
+                </div>
               </div>
             </div>
           )}

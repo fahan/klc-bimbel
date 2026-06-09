@@ -29,13 +29,16 @@ export class InvoicesController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'List invoices' })
+  @ApiOperation({ summary: 'List invoices with server-side pagination' })
   @ApiQuery({ name: 'branchId', required: false })
   @ApiQuery({ name: 'status', required: false, enum: ['UNPAID', 'PARTIAL', 'PAID'] })
   @ApiQuery({ name: 'type', required: false, enum: ['SPP', 'REGISTRATION'] })
   @ApiQuery({ name: 'month', required: false })
   @ApiQuery({ name: 'year', required: false })
   @ApiQuery({ name: 'studentId', required: false })
+  @ApiQuery({ name: 'search', required: false, description: 'Search by invoice number or student name' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Items per page (default: 20, max: 100)' })
   @ApiResponse({ status: 200, description: 'Invoices retrieved', type: InvoiceResponseDto })
   async findAll(
     @Query('branchId') branchId?: string,
@@ -44,6 +47,9 @@ export class InvoicesController {
     @Query('month') month?: string,
     @Query('year') year?: string,
     @Query('studentId') studentId?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ): Promise<any> {
     return this.invoicesService.findAll({
       branchId,
@@ -52,6 +58,9 @@ export class InvoicesController {
       month: month ? parseInt(month, 10) : undefined,
       year: year ? parseInt(year, 10) : undefined,
       studentId,
+      search: search || undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
     })
   }
 
