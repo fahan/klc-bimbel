@@ -159,13 +159,17 @@ export default function InvoiceTagihanPage() {
     const items =
       selectedStudentObj.subjects?.map((s: any) => {
         const masterRate = parseFloat(s.sppAmount || '0')
-        // Use effectiveSppAmount (custom if set, master otherwise) — mirrors backend logic
+        // effectiveSppAmount = customSppAmount if set, else masterRate (mirrors backend)
         const effectiveRate = s.effectiveSppAmount
           ? parseFloat(s.effectiveSppAmount.toString())
           : masterRate
+        // Old discount model — still applied by backend on top of effectiveRate
+        const itemDiscount = parseFloat(s.discountAmount || '0')
         const billingType: string = s.billingType || 'FLAT_MONTHLY'
         const hasCustomSpp = s.customSppAmount != null
         const isPersession = billingType === 'PER_SESSION'
+        // Net amount after both custom rate and legacy discount (mirrors backend itemAmount)
+        const netAmount = isPersession ? 0 : Math.max(0, effectiveRate - itemDiscount)
 
         return {
           name: s.subjectName,
@@ -174,21 +178,24 @@ export default function InvoiceTagihanPage() {
           // PER_SESSION: session count unknown at preview (depends on actual attendance)
           sessionCount: isPersession ? null : (s.type === 'REGULAR' ? 12 : 8),
           masterRate,
-          sppAmount: effectiveRate,
+          sppAmount: effectiveRate,      // rate before legacy discount
+          discount: itemDiscount,         // legacy discountAmount (may be 0)
+          discountNote: s.discountNote || null,
           hasCustomSpp,
           customNote: s.customSppNote || null,
           isPersession,
-          // PER_SESSION amount = 0 in preview (backend will calc from attendance)
-          amount: isPersession ? 0 : effectiveRate,
+          amount: netAmount,
         }
       }) || []
 
     const hasPerSession = items.some((i: any) => i.isPersession)
-    // Subtotal only includes FLAT_MONTHLY items; PER_SESSION billed by backend from attendance
-    const subtotal = items.reduce((sum: number, i: any) => sum + i.amount, 0)
+    // sppAmount subtotal = sum of effective rates (before legacy discount)
+    const subtotal = items.reduce((sum: number, i: any) => sum + i.sppAmount, 0)
+    // enrollmentDiscount = sum of legacy discountAmount fields
+    const enrollmentDiscount = items.reduce((sum: number, i: any) => sum + i.discount, 0)
     const additionalDiscount = parseFloat(formAdditionalDiscount || '0') || 0
-    const total = Math.max(0, subtotal - additionalDiscount)
-    return { type: 'SPP', items, subtotal, enrollmentDiscount: 0, additionalDiscount, total, hasPerSession }
+    const total = Math.max(0, subtotal - enrollmentDiscount - additionalDiscount)
+    return { type: 'SPP', items, subtotal, enrollmentDiscount, additionalDiscount, total, hasPerSession }
   }, [selectedStudentObj, formType, formAdditionalDiscount, formRegistrationFee])
 
   const handleGenerate = async () => {
@@ -739,7 +746,13 @@ Mohon segera dilunasi. Terima kasih 🙏`
                           </div>
                         </div>
                         {it.hasCustomSpp && it.customNote && (
-                          <p className="text-[10px] text-purple-600 mt-0.5 ml-0">📝 {it.customNote}</p>
+                          <p className="text-[10px] text-purple-600 mt-0.5">📝 {it.customNote}</p>
+                        )}
+                        {!it.isPersession && it.discount > 0 && (
+                          <div className="flex justify-between text-[10px] text-green-700 mt-0.5">
+                            <span>Diskon{it.discountNote ? ` (${it.discountNote})` : ''}</span>
+                            <span>- {formatRupiah(it.discount)}</span>
+                          </div>
                         )}
                         {it.isPersession && (
                           <p className="text-[10px] text-amber-600 mt-0.5 italic">
@@ -754,12 +767,16 @@ Mohon segera dilunasi. Terima kasih 🙏`
                       ⚠ Mapel Per Sesi tidak termasuk dalam subtotal preview. Total final akan berbeda.
                     </div>
                   )}
-                  {(previewData.additionalDiscount > 0 || previewData.subtotal > 0) && (
+                  {(previewData.enrollmentDiscount > 0 || previewData.additionalDiscount > 0 || previewData.hasPerSession) && (
                     <div className="border-t border-gray-200 mt-2 pt-2 space-y-1">
-                      {previewData.hasPerSession && (
-                        <div className="flex justify-between text-xs text-gray-600">
-                          <span>Subtotal (Flat)</span>
-                          <span>{formatRupiah(previewData.subtotal)}</span>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Subtotal{previewData.hasPerSession ? ' (Flat)' : ''}</span>
+                        <span>{formatRupiah(previewData.subtotal)}</span>
+                      </div>
+                      {previewData.enrollmentDiscount > 0 && (
+                        <div className="flex justify-between text-xs text-green-700">
+                          <span>Diskon Enrollment</span>
+                          <span>- {formatRupiah(previewData.enrollmentDiscount)}</span>
                         </div>
                       )}
                       {previewData.additionalDiscount > 0 && (
