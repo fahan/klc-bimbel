@@ -114,7 +114,7 @@ export default function PembayaranSPPPage() {
   })
 
   const invoices: Invoice[] = useMemo(() => {
-    return invoicesData?.data?.data || []
+    return invoicesData?.data?.data?.data || []
   }, [invoicesData])
 
   const students = useMemo(() => {
@@ -126,7 +126,7 @@ export default function PembayaranSPPPage() {
   }, [paymentsData])
 
   const invoicePayments: Payment[] = useMemo(() => {
-    return selectedInvoicePayments?.data || []
+    return selectedInvoicePayments?.data?.data || []
   }, [selectedInvoicePayments])
 
   // Filter invoices by search term
