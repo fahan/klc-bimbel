@@ -415,15 +415,38 @@ export class CommissionsService {
 
     if (!commission) throw new NotFoundException('Commission not found')
 
+    // Bulk-load billingType for all (studentId, subjectId) pairs in this commission
+    // so we can display the correct formula (PER_SESSION billing vs FLAT_MONTHLY)
+    const uniqueStudentIds = [...new Set(commission.commissionDetails.map(d => d.studentId))]
+    const uniqueSubjectIds = [...new Set(commission.commissionDetails.map(d => d.subjectId))]
+    const studentSubjectsForBilling = await this.prisma.studentSubject.findMany({
+      where: {
+        studentId: { in: uniqueStudentIds },
+        subjectId: { in: uniqueSubjectIds },
+      },
+      include: { sppRate: true },
+    })
+    // key: `${studentId}|${subjectId}` → billingType
+    const billingTypeMap = new Map<string, string>()
+    for (const ss of studentSubjectsForBilling) {
+      billingTypeMap.set(
+        `${ss.studentId}|${ss.subjectId}`,
+        (ss.sppRate as any)?.billingType ?? 'FLAT_MONTHLY',
+      )
+    }
+
     const bySubject = new Map<string, any>()
     for (const d of commission.commissionDetails) {
       if (!bySubject.has(d.subjectId)) {
+        // Derive billingType from first student encountered for this subject
+        const bt = billingTypeMap.get(`${d.studentId}|${d.subjectId}`) ?? 'FLAT_MONTHLY'
         bySubject.set(d.subjectId, {
           subjectId: d.subjectId,
           subjectName: d.subject.name,
           subjectCode: d.subject.code,
           sessionType: d.sessionLog.session?.type ?? 'REGULAR',
           formulaType: d.formulaType,
+          billingType: bt,
           commissionPercentage: parseFloat(d.commissionPercentage.toString()),
           students: new Map<string, any>(),
           subtotal: 0,
@@ -433,9 +456,11 @@ export class CommissionsService {
       const subject = bySubject.get(d.subjectId)
       const studentKey = d.studentId
       if (!subject.students.has(studentKey)) {
+        const bt = billingTypeMap.get(`${d.studentId}|${d.subjectId}`) ?? 'FLAT_MONTHLY'
         subject.students.set(studentKey, {
           studentId: d.studentId,
           studentName: d.student.name,
+          billingType: bt,
           sppAmount: parseFloat(d.sppAmount.toString()),
           totalSessionsInMonth: d.totalSessionsInMonth,
           sessionsAttended: 0,
@@ -472,6 +497,7 @@ export class CommissionsService {
           subjectCode: s.subjectCode,
           sessionType: s.sessionType,
           formulaType: s.formulaType,
+          billingType: s.billingType,
           commissionPercentage: s.commissionPercentage,
           students: Array.from(s.students.values()).map((st: any) => ({
             ...st,

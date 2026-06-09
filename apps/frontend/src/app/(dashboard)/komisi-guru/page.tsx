@@ -490,23 +490,40 @@ export default function KomisiGuruPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900 text-sm">{subject.subjectName}</h3>
                     <p className="text-[10px] text-gray-500 mt-0.5">
-                      {subject.formulaType === 'MONTHLY_RATE'
-                        ? `SPP ÷ 12 × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`
-                        : `SPP ÷ total sesi × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`}
+                      {subject.billingType === 'PER_SESSION'
+                        ? `Tarif/sesi × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi hadir`
+                        : subject.formulaType === 'MONTHLY_RATE'
+                          ? `SPP ÷ 12 × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`
+                          : `SPP ÷ total sesi × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × sesi`}
                     </p>
                   </div>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                      subject.sessionType === 'REGULAR'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-purple-100 text-purple-700'
-                    }`}
-                  >
-                    {PREDIKAT_LABEL[subject.sessionType] || subject.sessionType}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {subject.billingType === 'PER_SESSION' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                        Per Sesi
+                      </span>
+                    )}
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        subject.sessionType === 'REGULAR'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-purple-100 text-purple-700'
+                      }`}
+                    >
+                      {PREDIKAT_LABEL[subject.sessionType] || subject.sessionType}
+                    </span>
+                  </div>
                 </div>
                 <div className="p-4 space-y-3">
-                  {subject.students.map((st: any) => (
+                  {subject.students.map((st: any) => {
+                    const pct = ((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)
+                    const billingType = st.billingType ?? subject.billingType ?? 'FLAT_MONTHLY'
+                    const formulaText = billingType === 'PER_SESSION'
+                      ? `${formatRupiah(st.sppAmount)}/sesi × ${pct}% × ${st.sessionsAttended} sesi`
+                      : subject.formulaType === 'MONTHLY_RATE'
+                        ? `${formatRupiah(st.sppAmount)} ÷ 12 × ${pct}% × ${st.sessionsAttended}`
+                        : `${formatRupiah(st.sppAmount)} ÷ ${st.totalSessionsInMonth} × ${pct}% × ${st.sessionsAttended}`
+                    return (
                     <div
                       key={st.studentId}
                       className={`p-2 rounded-lg ${
@@ -524,9 +541,7 @@ export default function KomisiGuruPage() {
                             )}
                           </p>
                           <p className="text-[11px] text-gray-500 mt-0.5 font-mono">
-                            {subject.formulaType === 'MONTHLY_RATE'
-                              ? `${formatRupiah(st.sppAmount)} ÷ 12 × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × ${st.sessionsAttended}`
-                              : `${formatRupiah(st.sppAmount)} ÷ ${st.totalSessionsInMonth} × ${((subject.commissionPercentage ?? 0.4) * 100).toFixed(0)}% × ${st.sessionsAttended}`}
+                            {formulaText}
                           </p>
                         </div>
                         <p className="text-sm font-semibold text-green-700 whitespace-nowrap">
@@ -534,7 +549,8 @@ export default function KomisiGuruPage() {
                         </p>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 flex items-center justify-between">
                   <p className="text-xs font-semibold text-gray-700">Subtotal</p>
