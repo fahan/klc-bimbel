@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { storeApi, studentApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
@@ -15,8 +15,12 @@ import {
   RefreshCw,
   ChevronDown,
   User,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
+
+const PAGE_SIZE = 10
 
 const CATEGORY_LABEL: Record<string, string> = {
   STATIONARY: 'Stationary',
@@ -48,6 +52,8 @@ export default function TokoStokPage() {
   const [filterCategory, setFilterCategory] = useState<string>('')
   const [filterLowStock, setFilterLowStock] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
   const { selectedBranchId, branches, canViewAllBranches, setSelectedBranchId } = useBranch()
   const branchId = selectedBranchId
 
@@ -81,15 +87,40 @@ export default function TokoStokPage() {
   const [restockQty, setRestockQty] = useState(1)
   const [restockNotes, setRestockNotes] = useState('')
 
+  // Debounce search → reset to page 1 on new search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setPage(1)
+    }, 350)
+    return () => clearTimeout(t)
+  }, [searchTerm])
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1) }, [filterCategory, filterLowStock, branchId])
+
   const { data: productsData, isLoading, refetch } = useQuery({
-    queryKey: ['store-products', branchId, filterCategory, filterLowStock],
+    queryKey: ['store-products', branchId, filterCategory, filterLowStock, debouncedSearch, page],
     queryFn: () =>
       storeApi.getProducts({
         branchId: branchId || undefined,
         category: filterCategory || undefined,
         lowStock: filterLowStock,
+        search: debouncedSearch || undefined,
+        page,
+        limit: PAGE_SIZE,
       }),
     enabled: !!branchId,
+    placeholderData: (prev) => prev,
+  })
+
+  // Separate query for sale form dropdown (all products, no pagination)
+  const { data: allProductsData } = useQuery({
+    queryKey: ['store-products-all', branchId],
+    queryFn: () =>
+      storeApi.getProducts({ branchId: branchId || undefined, limit: 1000, page: 1 }),
+    enabled: !!branchId,
+    staleTime: 60_000,
   })
 
   const { data: metricsData, refetch: refetchMetrics } = useQuery({
@@ -128,19 +159,15 @@ export default function TokoStokPage() {
     staleTime: 30_000,
   })
 
-  const products = productsData?.data?.data || []
+  const paginatedResult = productsData?.data?.data
+  const products: any[] = paginatedResult?.data || []
+  const totalProducts: number = paginatedResult?.total || 0
+  const totalPages: number = paginatedResult?.totalPages || 1
+
+  const allProductsForSale: any[] = allProductsData?.data?.data?.data || []
   const metrics = metricsData?.data?.data
   const lowStock = lowStockData?.data?.data || []
   const studentSearchResults: any[] = studentSearchData?.data?.data || []
-
-  const filteredProducts = useMemo(
-    () =>
-      products.filter(
-        (p: any) =>
-          !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [products, searchTerm],
-  )
 
   const cartTotal = cart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
 
@@ -153,7 +180,7 @@ export default function TokoStokPage() {
   // ============== CART HANDLERS ==============
   const addToCart = () => {
     if (!selectedProductId || selectedQty < 1) return
-    const product = products.find((p: any) => p.id === selectedProductId)
+    const product = allProductsForSale.find((p: any) => p.id === selectedProductId)
     if (!product) return
     if (product.stock < selectedQty) {
       alert(`Stok tidak cukup. Tersedia: ${product.stock}`)
@@ -452,7 +479,7 @@ export default function TokoStokPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredProducts.map((p: any) => {
+                    {products.map((p: any) => {
                       const lowOrOut = p.stockStatus === 'LOW' || p.stockStatus === 'OUT'
                       const stockPercent = p.minStock > 0 ? Math.min(100, (p.stock / (p.minStock * 2)) * 100) : 100
                       return (
@@ -539,6 +566,57 @@ export default function TokoStokPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                  <p className="text-xs text-gray-600">
+                    Menampilkan{' '}
+                    <span className="font-medium">{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalProducts)}</span>
+                    {' '}dari <span className="font-medium">{totalProducts}</span> produk
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="p-1.5 rounded-md hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-gray-700" />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                      .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                        acc.push(p)
+                        return acc
+                      }, [])
+                      .map((item, idx) =>
+                        item === 'ellipsis' ? (
+                          <span key={`e-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => setPage(item as number)}
+                            className={`min-w-[28px] h-7 px-1.5 rounded-md text-xs font-medium transition ${
+                              page === item
+                                ? 'bg-blue-600 text-white'
+                                : 'hover:bg-gray-200 text-gray-700'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        ),
+                      )}
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="p-1.5 rounded-md hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                    >
+                      <ChevronRight className="w-4 h-4 text-gray-700" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -690,7 +768,7 @@ export default function TokoStokPage() {
                 className="col-span-2 px-2 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">-- Pilih produk --</option>
-                {products
+                {allProductsForSale
                   .filter((p: any) => p.stock > 0)
                   .map((p: any) => (
                     <option key={p.id} value={p.id}>

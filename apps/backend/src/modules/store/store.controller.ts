@@ -18,19 +18,28 @@ export class StoreController {
   @Get('products')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'List products' })
+  @ApiOperation({ summary: 'List products with server-side pagination' })
   @ApiQuery({ name: 'branchId', required: false })
   @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'lowStock', required: false, type: Boolean })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   async findAllProducts(
     @Query('branchId') branchId?: string,
     @Query('category') category?: string,
     @Query('lowStock') lowStock?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ): Promise<any> {
     return this.storeService.findAllProducts({
       branchId,
       category,
       lowStock: lowStock === 'true',
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
     })
   }
 

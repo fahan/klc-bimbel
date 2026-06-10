@@ -9,26 +9,64 @@ export class StoreService {
   constructor(private prisma: PrismaService) {}
 
   // ============== PRODUCTS ==============
-  async findAllProducts(filters?: { branchId?: string; category?: string; lowStock?: boolean }) {
-    const products = await this.prisma.product.findMany({
-      where: {
-        isActive: true,
-        ...(filters?.branchId && { branchId: filters.branchId }),
-        ...(filters?.category && { category: filters.category as any }),
-      },
-      include: { branch: true },
-      orderBy: { name: 'asc' },
-    })
+  async findAllProducts(filters?: {
+    branchId?: string
+    category?: string
+    lowStock?: boolean
+    search?: string
+    page?: number
+    limit?: number
+  }) {
+    const page = Math.max(1, filters?.page || 1)
+    const limit = Math.min(100, Math.max(1, filters?.limit || 10))
+    const skip = (page - 1) * limit
 
-    let filtered = products.map(p => this.formatProduct(p))
-
-    if (filters?.lowStock) {
-      filtered = filtered.filter(p => p.stockStatus === 'LOW' || p.stockStatus === 'OUT')
+    const baseWhere: any = {
+      isActive: true,
+      ...(filters?.branchId && { branchId: filters.branchId }),
+      ...(filters?.category && { category: filters.category as any }),
+      ...(filters?.search && {
+        name: { contains: filters.search, mode: 'insensitive' },
+      }),
     }
+
+    // lowStock filter requires column comparison (stock <= minStock) which
+    // Prisma can't do in WHERE natively — fetch all and filter in memory
+    if (filters?.lowStock) {
+      const all = await this.prisma.product.findMany({
+        where: baseWhere,
+        include: { branch: true },
+        orderBy: { name: 'asc' },
+      })
+      const items = all
+        .map(p => this.formatProduct(p))
+        .filter(p => p.stockStatus === 'LOW' || p.stockStatus === 'OUT')
+      return {
+        success: true,
+        data: { data: items, total: items.length, page: 1, limit: items.length || 1, totalPages: 1 },
+      }
+    }
+
+    const [products, total] = await Promise.all([
+      this.prisma.product.findMany({
+        where: baseWhere,
+        include: { branch: true },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.product.count({ where: baseWhere }),
+    ])
 
     return {
       success: true,
-      data: filtered,
+      data: {
+        data: products.map(p => this.formatProduct(p)),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     }
   }
 

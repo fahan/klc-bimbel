@@ -363,11 +363,21 @@ export const financeApi = {
 // ===== STORE API =====
 export const storeApi = {
   // Products
-  getProducts: (filters?: { branchId?: string; category?: string; lowStock?: boolean }) => {
+  getProducts: (filters?: {
+    branchId?: string
+    category?: string
+    lowStock?: boolean
+    search?: string
+    page?: number
+    limit?: number
+  }) => {
     const params = new URLSearchParams()
     if (filters?.branchId) params.append('branchId', filters.branchId)
     if (filters?.category) params.append('category', filters.category)
     if (filters?.lowStock) params.append('lowStock', 'true')
+    if (filters?.search) params.append('search', filters.search)
+    if (filters?.page) params.append('page', String(filters.page))
+    if (filters?.limit) params.append('limit', String(filters.limit))
     const qs = params.toString()
     return apiClient.get(`/store/products${qs ? `?${qs}` : ''}`)
   },
