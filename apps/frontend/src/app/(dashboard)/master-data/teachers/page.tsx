@@ -84,19 +84,19 @@ export default function TeachersListPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Guru</h1>
-          <p className="text-gray-600 mt-1">Kelola daftar guru dan penugasan ke cabang</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Data Guru</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">Kelola daftar guru dan penugasan ke cabang</p>
         </div>
         <Link
           href="/master-data/teachers/create"
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm"
+          className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm text-sm"
         >
-          <Plus className="w-5 h-5" />
-          Tambah Guru Baru
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">Tambah </span>Guru Baru
         </Link>
       </div>
 
@@ -111,7 +111,7 @@ export default function TeachersListPage() {
       )}
 
       {/* Search and Filter */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
           <input
@@ -126,7 +126,7 @@ export default function TeachersListPage() {
           <select
             value={filterBranchId}
             onChange={(e) => setFilterBranchId(e.target.value)}
-            className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none bg-white text-gray-700 font-medium min-w-[200px]"
+            className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none bg-white text-gray-700 font-medium w-full sm:min-w-[200px]"
           >
             <option value="">Semua Cabang</option>
             {branches.map((branch: any) => (
@@ -141,7 +141,7 @@ export default function TeachersListPage() {
 
       {/* Stats Cards */}
       {!isLoading && teachers.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-blue-100 rounded-lg">

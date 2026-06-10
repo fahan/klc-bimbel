@@ -65,6 +65,7 @@ export default function BranchesPage() {
       {/* Branches Table */}
       {!isLoading && (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="overflow-x-auto">
           {branches.length === 0 ? (
             <div className="p-8 text-center text-gray-600">
               <p className="text-lg mb-2">No branches found</p>
@@ -137,6 +138,7 @@ export default function BranchesPage() {
               )}
             </>
           )}
+          </div>
         </div>
       )}
     </div>

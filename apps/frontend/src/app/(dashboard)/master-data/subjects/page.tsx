@@ -78,6 +78,7 @@ export default function SubjectsPage() {
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -131,6 +132,7 @@ export default function SubjectsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
               {subjects.length > 0 && pagination && (
                 <Pagination
                   currentPage={page}

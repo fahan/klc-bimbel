@@ -124,6 +124,7 @@ export default function SppRatesPage() {
             </div>
           ) : (
             <>
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -200,6 +201,7 @@ export default function SppRatesPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
               {rates.length > 0 && pagination && (
                 <Pagination
                   currentPage={page}

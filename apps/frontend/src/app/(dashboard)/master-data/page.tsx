@@ -71,17 +71,17 @@ export default function MasterDataPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h1 className="text-3xl font-bold text-primary mb-2">Master Data Management</h1>
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <h1 className="text-xl sm:text-3xl font-bold text-primary mb-2">Master Data Management</h1>
         <p className="text-gray-600">
           Manage branches, subjects, pricing rates, and curriculum structure for your tutoring system.
         </p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {cards.map((card) => (
           <Link key={card.href} href={card.href}>
             <div className={`bg-gradient-to-br ${card.color} rounded-lg shadow-md p-6 text-white hover:shadow-lg hover:scale-105 transition-all cursor-pointer`}>
@@ -97,9 +97,9 @@ export default function MasterDataPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-primary mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-bold text-primary mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <Link
             href="/master-data/branches/create"
             className="bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-lg p-4 transition-colors"
