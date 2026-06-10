@@ -316,22 +316,22 @@ Mohon segera dilunasi. Terima kasih 🙏`
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Invoice Tagihan</h1>
-          <p className="text-gray-600 mt-1">Generate, kirim, dan pantau status pembayaran</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Invoice Tagihan</h1>
+          <p className="text-gray-600 mt-1 text-sm">Generate, kirim, dan pantau status pembayaran</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
-          <Download className="w-5 h-5" />
+        <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-sm">
+          <Download className="w-4 h-4" />
           Export
         </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-700">Status:</span>
           {[
             { v: '', l: 'Semua', c: 'bg-gray-100 text-gray-700' },
@@ -350,7 +350,7 @@ Mohon segera dilunasi. Terima kasih 🙏`
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium text-gray-700">Tipe:</span>
           {[
             { v: '', l: 'Semua', c: 'bg-gray-100 text-gray-700' },
@@ -380,33 +380,33 @@ Mohon segera dilunasi. Terima kasih 🙏`
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Metrics */}
           {metrics && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-                <p className="text-xs text-gray-600 font-medium">Total Invoice Bulan Ini</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{metrics.totalInvoices}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatRupiah(metrics.totalAmount)}</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
+                <p className="text-xs text-gray-600 font-medium">Total Invoice</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{metrics.totalInvoices}</p>
+                <p className="text-xs text-gray-500 mt-1 truncate">{formatRupiah(metrics.totalAmount)}</p>
               </div>
-              <div className="bg-white rounded-lg border border-red-200 p-4 shadow-sm">
+              <div className="bg-white rounded-lg border border-red-200 p-3 sm:p-4 shadow-sm">
                 <p className="text-xs text-red-600 font-medium">Belum Lunas</p>
-                <p className="text-2xl font-bold text-red-700 mt-1">{metrics.unpaidCount}</p>
-                <p className="text-xs text-red-500 mt-1">{formatRupiah(metrics.unpaidAmount)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-700 mt-1">{metrics.unpaidCount}</p>
+                <p className="text-xs text-red-500 mt-1 truncate">{formatRupiah(metrics.unpaidAmount)}</p>
               </div>
-              <div className="bg-white rounded-lg border border-amber-200 p-4 shadow-sm">
+              <div className="bg-white rounded-lg border border-amber-200 p-3 sm:p-4 shadow-sm">
                 <p className="text-xs text-amber-600 font-medium">Sebagian</p>
-                <p className="text-2xl font-bold text-amber-700 mt-1">{metrics.partialCount}</p>
-                <p className="text-xs text-amber-500 mt-1">
+                <p className="text-xl sm:text-2xl font-bold text-amber-700 mt-1">{metrics.partialCount}</p>
+                <p className="text-xs text-amber-500 mt-1 truncate">
                   Sisa {formatRupiah(metrics.partialRemainingAmount)}
                 </p>
               </div>
-              <div className="bg-white rounded-lg border border-green-200 p-4 shadow-sm">
+              <div className="bg-white rounded-lg border border-green-200 p-3 sm:p-4 shadow-sm">
                 <p className="text-xs text-green-600 font-medium">Lunas</p>
-                <p className="text-2xl font-bold text-green-700 mt-1">{metrics.paidCount}</p>
-                <p className="text-xs text-green-500 mt-1">{formatRupiah(metrics.paidAmount)}</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-700 mt-1">{metrics.paidCount}</p>
+                <p className="text-xs text-green-500 mt-1 truncate">{formatRupiah(metrics.paidAmount)}</p>
               </div>
             </div>
           )}

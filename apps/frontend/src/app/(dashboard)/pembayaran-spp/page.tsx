@@ -238,15 +238,15 @@ export default function PembayaranSPPPage() {
   if (invoicesLoading) return <LoadingState />
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Pembayaran SPP</h1>
-        <p className="text-gray-600 mt-1">Kelola pembayaran dan konfirmasi penerimaan SPP siswa</p>
+      <div className="hidden sm:block">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Pembayaran SPP</h1>
+        <p className="text-gray-600 mt-1 text-sm">Kelola pembayaran dan konfirmasi penerimaan SPP siswa</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -304,7 +304,7 @@ export default function PembayaranSPPPage() {
           <h2 className="font-semibold text-gray-900">Filter</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
