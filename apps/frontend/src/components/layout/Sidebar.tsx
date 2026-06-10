@@ -123,12 +123,13 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     ? allMasterDataItems.filter(item => can(item.path))
     : allMasterDataItems
 
-  const menuSections = isLoaded && userRoles.length > 0
+  const menuSections = (isLoaded && userRoles.length > 0
     ? allMenuSections.map(section => ({
         ...section,
         items: section.items.filter(item => can(item.path))
       }))
     : allMenuSections
+  ).filter(section => section.items.length > 0)
 
   // Shared nav + user section (used in both desktop and mobile)
   const navContent = (

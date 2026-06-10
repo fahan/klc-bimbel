@@ -4,6 +4,8 @@ import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { dashboardApi } from '@/lib/api/endpoints'
 import { useApiBranchId, useBranch } from '@/lib/branch-context'
+import { usePermission } from '@/lib/use-permissions'
+import DashboardAdminCabang from './DashboardAdminCabang'
 import { Card, SectionCard } from '@/components/ui/Card'
 import { StatusBadge } from '@/components/ui/Badge'
 import { SkeletonCard } from '@/components/ui/States'
@@ -38,6 +40,18 @@ function formatRupiahFull(amount: number | string) {
 }
 
 export default function DashboardPage() {
+  const { hasRole, isLoaded } = usePermission()
+
+  if (!isLoaded) return <SkeletonCard count={4} />
+
+  if (hasRole('ADMIN_CABANG') && !hasRole('OWNER') && !hasRole('ADMIN_GLOBAL')) {
+    return <DashboardAdminCabang />
+  }
+
+  return <DashboardOwnerGlobal />
+}
+
+function DashboardOwnerGlobal() {
   const branchId = useApiBranchId()
   const { selectedBranch, canViewAllBranches } = useBranch()
   const today = new Date()

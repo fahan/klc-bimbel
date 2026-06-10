@@ -44,6 +44,7 @@ export const featurePermissions: PermissionConfig = {
   'laporan-presensi': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
   'laporan-keuangan': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
   'komisi-guru': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],
+  'formula-komisi': ['OWNER', 'ADMIN_GLOBAL'],
 
   // Guru pages (mobile layout)
   'guru': ['GURU'],
