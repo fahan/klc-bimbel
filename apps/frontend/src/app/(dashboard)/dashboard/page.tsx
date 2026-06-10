@@ -120,10 +120,10 @@ export default function DashboardPage() {
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header — hidden on mobile (topbar shows title) */}
+      <div className="hidden sm:block">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600 mt-2">
           {selectedBranch
             ? `${selectedBranch.name} · `
@@ -144,63 +144,63 @@ export default function DashboardPage() {
       {isLoading ? (
         <SkeletonCard count={4} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Total Siswa Aktif</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{metrics?.totalStudents ?? 0}</p>
+                <p className="text-gray-600 text-xs sm:text-sm font-medium">Total Siswa Aktif</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{metrics?.totalStudents ?? 0}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Users className="w-6 h-6 text-blue-600" />
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4">{metrics?.totalTeachers ?? 0} guru aktif</p>
+            <p className="text-xs text-gray-500 mt-2 sm:mt-4">{metrics?.totalTeachers ?? 0} guru aktif</p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Sesi Hari Ini</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{metrics?.totalSessionsToday ?? 0}</p>
+                <p className="text-gray-600 text-xs sm:text-sm font-medium">Sesi Hari Ini</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{metrics?.totalSessionsToday ?? 0}</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-green-600" />
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4">
+            <p className="text-xs text-gray-500 mt-2 sm:mt-4">
               {today.toLocaleDateString('id-ID', { weekday: 'long' })}
             </p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">SPP Terkumpul</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-gray-600 text-xs sm:text-sm font-medium">SPP Terkumpul</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-1 sm:mt-2">
                   {formatRupiah(metrics?.sppCollectedThisMonth ?? 0)}
                 </p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-purple-600" />
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4">Bulan ini</p>
+            <p className="text-xs text-gray-500 mt-2 sm:mt-4">Bulan ini</p>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-gray-600 text-sm font-medium">Total Komisi</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-gray-600 text-xs sm:text-sm font-medium">Total Komisi</p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900 mt-1 sm:mt-2">
                   {formatRupiah(metrics?.totalCommissionThisMonth ?? 0)}
                 </p>
               </div>
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-orange-600" />
+              <div className="p-2 sm:p-3 bg-orange-100 rounded-lg">
+                <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-4">Bulan ini (approved)</p>
+            <p className="text-xs text-gray-500 mt-2 sm:mt-4">Bulan ini (approved)</p>
           </div>
         </div>
       )}
@@ -214,30 +214,30 @@ export default function DashboardPage() {
       </div>
 
       {/* Master Data Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {masterDataCards.map(card => (
           <Link key={card.href} href={card.href}>
             <div
-              className={`bg-gradient-to-br ${card.color} rounded-lg shadow-md p-6 text-white hover:shadow-lg hover:scale-105 transition-all cursor-pointer`}
+              className={`bg-gradient-to-br ${card.color} rounded-lg shadow-md p-4 sm:p-6 text-white hover:shadow-lg hover:scale-105 transition-all cursor-pointer`}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{card.title}</h3>
-                <span className="text-3xl">{card.emoji}</span>
+              <div className="flex items-center justify-between mb-2 sm:mb-4">
+                <h3 className="text-sm sm:text-lg font-semibold leading-tight">{card.title}</h3>
+                <span className="text-2xl sm:text-3xl">{card.emoji}</span>
               </div>
-              <div className="text-3xl font-bold">{isLoading ? '…' : card.count}</div>
-              <p className="text-sm text-white/80 mt-2">Klik untuk kelola</p>
+              <div className="text-2xl sm:text-3xl font-bold">{isLoading ? '…' : card.count}</div>
+              <p className="text-xs sm:text-sm text-white/80 mt-1 sm:mt-2">Klik untuk kelola</p>
             </div>
           </Link>
         ))}
       </div>
 
       {/* Operational Section */}
-      <div className="border-t-2 border-gray-200 pt-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">📊 Ringkasan Operasional</h2>
+      <div className="border-t-2 border-gray-200 pt-4 sm:pt-6">
+        <h2 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">📊 Ringkasan Operasional</h2>
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Today's Sessions */}
