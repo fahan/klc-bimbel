@@ -176,16 +176,16 @@ export default function JadwalSesiPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Jadwal & Sesi</h1>
-          <p className="text-gray-600 mt-1">Kelola jadwal mingguan dan sesi per guru</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Jadwal & Sesi</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">Kelola jadwal mingguan dan sesi per guru</p>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Week Navigator (visual only) */}
-          <div className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white">
+        <div className="flex items-center gap-2">
+          {/* Week Navigator — desktop only */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white">
             <button className="p-1 hover:bg-gray-100 rounded">
               <ChevronLeft className="w-4 h-4 text-gray-600" />
             </button>
@@ -203,17 +203,18 @@ export default function JadwalSesiPage() {
           </div>
           <Link
             href="/jadwal-sesi/create"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm text-sm"
           >
-            <Plus className="w-5 h-5" />
-            Tambah Sesi
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="hidden sm:inline">Tambah Sesi</span>
+            <span className="sm:hidden">Tambah</span>
           </Link>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-        <div className="flex items-center gap-4 flex-wrap">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap overflow-x-auto pb-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-700">Filter guru:</span>
             <button

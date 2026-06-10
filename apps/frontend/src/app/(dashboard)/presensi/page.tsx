@@ -259,15 +259,13 @@ export default function AttendancePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Presensi</h1>
-          <p className="text-gray-600 mt-1">
-            Kelola presensi siswa untuk semua sesi
-          </p>
-        </div>
+      <div className="hidden sm:block">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Presensi</h1>
+        <p className="text-gray-600 mt-1 text-sm">
+          Kelola presensi siswa untuk semua sesi
+        </p>
       </div>
 
       {/* ===== AD-HOC PENDING APPROVALS ===== */}

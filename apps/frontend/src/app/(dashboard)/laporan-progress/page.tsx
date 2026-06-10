@@ -175,15 +175,15 @@ ${expiryText} Hubungi kami jika ada pertanyaan.`
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Laporan Progress Siswa</h1>
-        <p className="text-gray-600 mt-1">Generate & kirim link laporan ke orang tua</p>
+      <div className="hidden sm:block">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Laporan Progress Siswa</h1>
+        <p className="text-gray-600 mt-1 text-sm">Generate & kirim link laporan ke orang tua</p>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm flex items-center gap-3 flex-wrap">
+      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium text-gray-700">Filter:</span>
         {[
           { v: '', l: 'Semua', c: 'bg-gray-100 text-gray-700' },
@@ -216,12 +216,12 @@ ${expiryText} Hubungi kami jika ada pertanyaan.`
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Metrics */}
           {metrics && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                 <p className="text-xs text-gray-600 font-medium">Total Link Dibuat</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{metrics.total}</p>
