@@ -169,12 +169,12 @@ export default function LaporanPresensiPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Laporan Presensi</h1>
-          <p className="text-gray-600 mt-1">Analisis presensi sesi berdasarkan tanggal, cabang, dan guru</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Laporan Presensi</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">Analisis presensi sesi berdasarkan tanggal, cabang, dan guru</p>
         </div>
         <button
           onClick={handleExportCSV}
@@ -280,7 +280,7 @@ export default function LaporanPresensiPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
           <div className="flex items-start justify-between">
             <div>

@@ -145,12 +145,12 @@ export default function LaporanKeuanganPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Laporan Keuangan</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Laporan Keuangan</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">
             {selectedBranch
               ? `${selectedBranch.name} · `
               : canViewAllBranches
@@ -183,7 +183,7 @@ export default function LaporanKeuanganPage() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white rounded-lg border border-green-200 p-4 shadow-sm">
           <div className="flex items-start justify-between">
             <div>
