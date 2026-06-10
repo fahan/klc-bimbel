@@ -270,12 +270,12 @@ export default function TokoStokPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Toko & Stok</h1>
-          <p className="text-gray-600 mt-1">Penjualan stationary, modul, dan seragam</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Toko & Stok</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">Penjualan stationary, modul, dan seragam</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -377,12 +377,12 @@ export default function TokoStokPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left: Metrics + Products Table */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {/* Metrics */}
           {metrics && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <Package className="w-4 h-4 text-blue-600" />

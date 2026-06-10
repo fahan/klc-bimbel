@@ -113,11 +113,11 @@ export default function TransferStokPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Transfer Stok Antar Cabang</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Transfer Stok Antar Cabang</h1>
+        <p className="text-gray-600 mt-1 text-sm hidden sm:block">
           Pindahkan stok produk dari satu cabang ke cabang lain. Otomatis tercatat sebagai
           TRANSFER_OUT + TRANSFER_IN.
         </p>
@@ -131,9 +131,9 @@ export default function TransferStokPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Transfer Form */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <Truck className="w-5 h-5 text-blue-600" />
             Form Transfer Stok
