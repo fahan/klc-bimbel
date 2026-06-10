@@ -55,6 +55,21 @@ export default function LoginPage() {
           localStorage.removeItem('primaryBranchId')
         }
 
+        // Pre-set selectedBranchId for pure ADMIN_CABANG so BranchContext
+        // has it on first render after redirect (no async wait needed).
+        const loginRoles: string[] = user.roles || [user.role]
+        const isPureAdminCabang =
+          loginRoles.includes('ADMIN_CABANG') &&
+          !loginRoles.some((r: string) => r === 'OWNER' || r === 'ADMIN_GLOBAL')
+        if (isPureAdminCabang) {
+          const initialBranchId =
+            user.primaryBranchId ||
+            (Array.isArray(user.userBranchIds) && user.userBranchIds[0])
+          if (initialBranchId) {
+            localStorage.setItem('selectedBranchId', initialBranchId)
+          }
+        }
+
         console.log('✅ Token saved, redirecting...')
 
         // Redirect: go to admin if user has any admin role, otherwise guru view

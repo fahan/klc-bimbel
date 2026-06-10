@@ -88,10 +88,16 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     ? allBranches.filter(b => userBranchIds.includes(b.id))
     : allBranches
 
-  const isRestrictedToBranch = isPureAdminCabang && branches.length <= 1
+  // Use userBranchIds.length as fallback when branches API hasn't resolved yet.
+  // This unblocks the dropdown button immediately on first render after login.
+  const effectiveBranchCount = branches.length > 0
+    ? branches.length
+    : (isPureAdminCabang ? userBranchIds.length : allBranches.length)
+
+  const isRestrictedToBranch = isPureAdminCabang && effectiveBranchCount <= 1
 
   // ADMIN_CABANG can switch if assigned to more than one branch
-  const canSwitchBranch = canViewAllBranches || (isPureAdminCabang && branches.length > 1)
+  const canSwitchBranch = canViewAllBranches || (isPureAdminCabang && effectiveBranchCount > 1)
 
   // Auto-select correct branch on load for ADMIN_CABANG
   useEffect(() => {

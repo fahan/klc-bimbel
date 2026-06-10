@@ -15,7 +15,7 @@ interface TopbarProps {
 export default function Topbar({ onMenuToggle }: TopbarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { selectedBranchId, branches, canSwitchBranch, canViewAllBranches, isRestrictedToBranch, setSelectedBranchId } =
+  const { selectedBranchId, branches, canSwitchBranch, canViewAllBranches, isRestrictedToBranch, setSelectedBranchId, isLoading: branchesLoading } =
     useBranch()
   const branchId = useApiBranchId()
   const [showBranchDropdown, setShowBranchDropdown] = useState(false)
@@ -202,7 +202,9 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
                   )}
                   <div className="max-h-64 overflow-y-auto">
                     {branches.length === 0 ? (
-                      <p className="px-4 py-3 text-xs text-gray-500 italic">Belum ada cabang</p>
+                      <p className="px-4 py-3 text-xs text-gray-500 italic">
+                        {branchesLoading ? 'Memuat cabang...' : 'Belum ada cabang'}
+                      </p>
                     ) : (
                       branches.map(branch => (
                         <button
