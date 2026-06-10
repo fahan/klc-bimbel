@@ -10,6 +10,7 @@ import { LoadingState, EmptyState } from '@/components/ui/States'
 
 const DAYS_OF_WEEK = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU', 'MINGGU']
 const DAY_LABELS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+const DAY_FULL = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
 // Time slots from 07:00 to 21:00
 const TIME_SLOTS = [
@@ -51,6 +52,10 @@ export default function JadwalSesiPage() {
   const [filterBranchId, setFilterBranchId] = useState<string>('')
   const [columnSettings, setColumnSettings] = useState(DEFAULT_COLUMN_SETTINGS)
   const [showColumnModal, setShowColumnModal] = useState(false)
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
+    const d = new Date().getDay()
+    return d === 0 ? 6 : d - 1
+  })
 
   // Load column settings from localStorage on mount
   useEffect(() => {
@@ -166,6 +171,16 @@ export default function JadwalSesiPage() {
 
     return grid
   }, [filteredSessions])
+
+  // Sessions for the currently selected day on mobile (sorted by startTime)
+  const daySessions = useMemo(() => {
+    return filteredSessions
+      .filter((s: any) => s.dayOfWeek === DAYS_OF_WEEK[selectedDayIdx])
+      .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''))
+  }, [filteredSessions, selectedDayIdx])
+
+  const prevDay = () => setSelectedDayIdx(i => (i + 6) % 7)
+  const nextDay = () => setSelectedDayIdx(i => (i + 1) % 7)
 
   // Get current day for highlighting
   const today = new Date()
@@ -434,8 +449,132 @@ export default function JadwalSesiPage() {
         />
       ) : (
         <>
-          {/* Weekly Grid */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          {/* ── MOBILE: Single-day view ── */}
+          <div className="sm:hidden space-y-3">
+            {/* Day Selector */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3 flex items-center gap-2">
+              <button
+                onClick={prevDay}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition flex-shrink-0"
+              >
+                <ChevronLeft className="w-4 h-4 text-gray-600" />
+              </button>
+              <div className="flex flex-1 gap-1 overflow-x-auto scrollbar-hide">
+                {DAYS_OF_WEEK.map((_, idx) => {
+                  const isActive = selectedDayIdx === idx
+                  const isToday = idx === todayDayIdx
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedDayIdx(idx)}
+                      className={`flex-shrink-0 flex flex-col items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                        isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {DAY_LABELS[idx]}
+                      <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isToday ? (isActive ? 'bg-white' : 'bg-blue-500') : 'bg-transparent'}`} />
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={nextDay}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition flex-shrink-0"
+              >
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Day Header */}
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">{DAY_FULL[selectedDayIdx]}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {daySessions.length} sesi terjadwal
+                </p>
+              </div>
+              {selectedDayIdx === todayDayIdx && (
+                <span className="text-xs font-semibold px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full">
+                  Hari ini
+                </span>
+              )}
+            </div>
+
+            {/* Session Cards */}
+            {daySessions.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                <Calendar className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm font-medium text-gray-500">Tidak ada sesi</p>
+                <p className="text-xs text-gray-400 mt-0.5">Tidak ada sesi terjadwal hari {DAY_FULL[selectedDayIdx]}</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {daySessions.map((session: any) => {
+                  const teacher = teacherMap.get(session.teacherId)
+                  const color = teacher ? TEACHER_COLORS[teacher.colorIdx] : TEACHER_COLORS[0]
+                  const nicknames = session.students
+                    ?.map((s: any) => s.studentName?.split(' ')[0])
+                    .filter(Boolean) as string[] | undefined
+                  return (
+                    <button
+                      key={session.id}
+                      onClick={() => setSelectedSession(session)}
+                      className={`w-full text-left rounded-xl border-l-4 ${color.border} ${color.bg} shadow-sm p-3 hover:shadow-md transition`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        {/* Left: subject + teacher + students */}
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-bold text-sm ${color.text} leading-tight flex items-center gap-1.5`}>
+                            <span className="truncate">{session.subjectName}</span>
+                            {session.type === 'REGULAR' ? (
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-white/60 rounded text-gray-600">Reguler</span>
+                            ) : (
+                              <span className="flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 bg-white/60 rounded text-purple-700">Privat</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-700 mt-0.5 flex items-center gap-1">
+                            <Users className="w-3 h-3 flex-shrink-0 text-gray-500" />
+                            {session.teacherName}
+                          </div>
+                          {nicknames && nicknames.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {nicknames.map((nick, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-white/70 border border-white/80 rounded-full text-gray-700 leading-tight"
+                                >
+                                  {nick}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {/* Right: time + capacity */}
+                        <div className="flex-shrink-0 text-right">
+                          <div className={`text-sm font-bold ${color.text}`}>
+                            {session.startTime?.substring(0, 5)}
+                          </div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">
+                            {session.durationMinutes} menit
+                          </div>
+                          <div className={`text-[10px] font-medium mt-1 ${
+                            session.capacity?.isFull ? 'text-green-700' : 'text-gray-500'
+                          }`}>
+                            {session.capacity?.current}/{session.capacity?.max} siswa
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── DESKTOP: Weekly Grid ── */}
+          <div className="hidden sm:block bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -559,8 +698,8 @@ export default function JadwalSesiPage() {
             </div>
           </div>
 
-          {/* Legend */}
-          <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+          {/* Legend — desktop only */}
+          <div className="hidden sm:block bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
             <p className="text-xs font-semibold text-gray-700 mb-2">Legenda Warna Guru:</p>
             <div className="flex flex-wrap gap-2">
               {Array.from(teacherMap.values()).map(teacher => {
