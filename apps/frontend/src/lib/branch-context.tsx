@@ -70,12 +70,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   const isAdminCabang = userRole === 'ADMIN_CABANG'
   const canViewAllBranches = userRole === 'OWNER' || userRole === 'ADMIN_GLOBAL'
-  const isRestrictedToBranch = isAdminCabang && branches.length <= 1
 
   // ADMIN_CABANG only sees their assigned branches; others see all
   const branches = isAdminCabang && userBranchIds.length > 0
     ? allBranches.filter(b => userBranchIds.includes(b.id))
     : allBranches
+
+  const isRestrictedToBranch = isAdminCabang && branches.length <= 1
 
   // ADMIN_CABANG can switch only if assigned to more than one branch
   const canSwitchBranch = canViewAllBranches || (isAdminCabang && branches.length > 1)
