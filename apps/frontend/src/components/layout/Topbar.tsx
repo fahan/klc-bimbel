@@ -6,6 +6,7 @@ import { Bell, ChevronDown, LogOut, Globe, Lock, User, AlertTriangle, FileText, 
 import React, { useEffect, useState } from 'react'
 import { useBranch, useApiBranchId } from '@/lib/branch-context'
 import { useNotifications } from '@/lib/hooks/useNotifications'
+import { getEffectiveDisplayRole } from '@/lib/use-permissions'
 
 interface TopbarProps {
   onMenuToggle?: () => void
@@ -27,7 +28,9 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
   useEffect(() => {
     if (typeof window === 'undefined') return
     setUserName(localStorage.getItem('userName') || 'Admin')
-    setUserRole(localStorage.getItem('userRole') || 'ADMIN')
+    let roles: string[] = []
+    try { roles = JSON.parse(localStorage.getItem('userRoles') || '[]') } catch { /* */ }
+    setUserRole(getEffectiveDisplayRole(roles) || localStorage.getItem('userRole') || 'ADMIN')
   }, [])
 
   const handleLogout = () => {

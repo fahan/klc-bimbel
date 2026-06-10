@@ -9,7 +9,7 @@ import {
   GraduationCap, Receipt, Mail, ShoppingBag, Truck, Globe, Settings2,
   Wallet, X, Smartphone,
 } from 'lucide-react'
-import { usePermission } from '@/lib/use-permissions'
+import { usePermission, getEffectiveDisplayRole } from '@/lib/use-permissions'
 import { useAppSettings } from '@/lib/app-settings-context'
 
 interface SidebarProps {
@@ -43,7 +43,9 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   useEffect(() => {
     const name = localStorage.getItem('userName') || 'User'
-    const role = localStorage.getItem('userRole') || 'ADMIN'
+    let roles: string[] = []
+    try { roles = JSON.parse(localStorage.getItem('userRoles') || '[]') } catch { /* */ }
+    const role = getEffectiveDisplayRole(roles) || localStorage.getItem('userRole') || 'ADMIN'
     setUserName(name)
     setUserRole(role)
 

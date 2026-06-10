@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react'
 import { hasPermission } from './permissions'
 
+const ROLE_PRIORITY = ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG', 'GURU']
+
+/**
+ * Returns the most privileged role from the list for display purposes.
+ * In admin context, ADMIN_CABANG is preferred over GURU for dual-role users.
+ */
+export function getEffectiveDisplayRole(roles: string[]): string {
+  return ROLE_PRIORITY.find(r => roles.includes(r)) || roles[0] || ''
+}
+
 /**
  * Hook to check permissions for current user
  */
