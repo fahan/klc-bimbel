@@ -99,27 +99,29 @@ export default function StudentsListPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Data Siswa</h1>
-          <p className="text-gray-600 mt-1">Kelola daftar siswa terdaftar di semua cabang</p>
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Data Siswa</h1>
+          <p className="text-gray-600 mt-1 text-sm hidden sm:block">Kelola daftar siswa terdaftar di semua cabang</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-medium shadow-sm text-sm"
           >
-            <Upload className="w-5 h-5" />
-            Import CSV
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">Import CSV</span>
+            <span className="sm:hidden">Import</span>
           </button>
           <Link
             href="/master-data/students/create"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-sm text-sm"
           >
-            <Plus className="w-5 h-5" />
-            Daftarkan Siswa Baru
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Daftarkan Siswa Baru</span>
+            <span className="sm:hidden">Tambah</span>
           </Link>
         </div>
       </div>
@@ -231,7 +233,7 @@ export default function StudentsListPage() {
         </div>
       )}
 
-      {/* Table */}
+      {/* Student List */}
       {isLoading ? (
         <LoadingState />
       ) : studentsArray.length === 0 && !searchTerm && statusFilter === 'true' && !branchId ? (
@@ -245,7 +247,8 @@ export default function StudentsListPage() {
         />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          {/* Desktop: table */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -321,6 +324,49 @@ export default function StudentsListPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile: card list */}
+          <div className="sm:hidden divide-y divide-gray-100">
+            {studentsArray.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-500">
+                Tidak ada siswa yang sesuai dengan filter
+              </p>
+            ) : (
+              studentsArray.map((student: any) => (
+                <Link
+                  key={student.id}
+                  href={`/master-data/students/${student.id}`}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition"
+                >
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                    {student.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900 truncate">{student.name}</p>
+                      <StatusBadge status={student.isActive ? 'active' : 'inactive'} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-500 truncate">{getBranchName(student.branchId)}</span>
+                      <span className="text-gray-300">·</span>
+                      <span className="text-xs text-blue-600 font-medium flex-shrink-0">{student.subjects?.length || 0} mapel</span>
+                    </div>
+                    {student.parentPhone && (
+                      <p className="text-xs text-gray-400 mt-0.5">{student.parentPhone}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => { e.preventDefault(); handleDelete(student.id) }}
+                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition flex-shrink-0"
+                    title="Hapus"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </Link>
+              ))
+            )}
+          </div>
+
           {studentsArray.length > 0 && pagination && (
             <Pagination
               currentPage={page}
