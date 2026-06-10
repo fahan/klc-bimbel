@@ -37,6 +37,8 @@ export default function DashboardAdminCabang() {
     queryKey: ['dashboard-analytics', branchId, month, year],
     queryFn: () => dashboardApi.getAnalytics({ branchId, month, year }),
     staleTime: 1000 * 60 * 2,
+    // Don't fire until branchId is resolved — prevents unfiltered (all-branch) data flash
+    enabled: !!branchId,
   })
 
   const { data: unpaidData, isLoading: unpaidLoading } = useQuery({
