@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Clock, CheckSquare, CreditCard, TrendingUp,
   Gift, BookOpen, LogOut, ChevronDown, Building, DollarSign, FileText,
   GraduationCap, Receipt, Mail, ShoppingBag, Truck, Globe, Settings2,
-  Wallet, X,
+  Wallet, X, Smartphone,
 } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
 import { useAppSettings } from '@/lib/app-settings-context'
@@ -55,9 +55,14 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('userRole')
+    localStorage.removeItem('userRoles')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
     router.push('/login')
+  }
+
+  const handleSwitchToGuru = () => {
+    router.push('/guru/presensi')
   }
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
@@ -197,11 +202,21 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         </div>
       </nav>
 
-      <div className="border-t border-gray-200 p-4 space-y-3">
+      <div className="border-t border-gray-200 p-4 space-y-2">
         <div className="px-3 py-2 bg-gray-50 rounded-lg">
           <p className="text-sm font-medium text-gray-900">{userName}</p>
           <p className="text-xs text-gray-600 mt-0.5">{userRole}</p>
         </div>
+        {isLoaded && userRoles.includes('GURU') && (
+          <button
+            onClick={handleSwitchToGuru}
+            suppressHydrationWarning
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition font-medium"
+          >
+            <Smartphone className="w-4 h-4" />
+            Tampilan Guru
+          </button>
+        )}
         <button
           onClick={handleLogout}
           suppressHydrationWarning

@@ -40,19 +40,22 @@ export default function LoginPage() {
       if (response.data.success) {
         const { user, token } = response.data.data
 
-        // Store token & role in localStorage
+        // Store token & roles in localStorage
         localStorage.setItem('token', token)
         localStorage.setItem('userRole', user.role)
+        localStorage.setItem('userRoles', JSON.stringify(user.roles || [user.role]))
         localStorage.setItem('userId', user.id)
         localStorage.setItem('userName', user.name)
 
-        console.log('✅ Token saved, redirecting to dashboard...')
+        console.log('✅ Token saved, redirecting...')
 
-        // Redirect based on role
-        if (user.role === 'GURU') {
-          router.push('/guru/presensi')
-        } else {
+        // Redirect: go to admin if user has any admin role, otherwise guru view
+        const roles: string[] = user.roles || [user.role]
+        const hasAdminRole = roles.some((r) => r !== 'GURU')
+        if (hasAdminRole) {
           router.push('/dashboard')
+        } else {
+          router.push('/guru/presensi')
         }
       } else {
         throw new Error(response.data.message || 'Login failed')

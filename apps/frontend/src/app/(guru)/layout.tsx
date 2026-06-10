@@ -3,14 +3,14 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, TrendingUp, LogOut } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, TrendingUp, LogOut, Monitor } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
 
 export default function GuruLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [userName, setUserName] = useState('')
-  const { hasRole, isLoaded } = usePermission()
+  const { hasRole, hasAnyRole, isLoaded } = usePermission()
 
   useEffect(() => {
     const name = localStorage.getItem('userName') || 'Guru'
@@ -25,12 +25,19 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
     setUserName(name)
   }, [router, isLoaded, hasRole])
 
+  const hasAdminRole = isLoaded && hasAnyRole(['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'])
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('userRole')
+    localStorage.removeItem('userRoles')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
     router.push('/login')
+  }
+
+  const handleSwitchToAdmin = () => {
+    router.push('/dashboard')
   }
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
@@ -62,13 +69,24 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
               <p className="text-xs text-blue-100">Guru</p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-2 hover:bg-white/10 rounded-full transition"
-            title="Logout"
-          >
-            <LogOut className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {hasAdminRole && (
+              <button
+                onClick={handleSwitchToAdmin}
+                className="p-2 hover:bg-white/10 rounded-full transition"
+                title="Beralih ke Tampilan Admin"
+              >
+                <Monitor className="w-5 h-5" />
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              className="p-2 hover:bg-white/10 rounded-full transition"
+              title="Logout"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
