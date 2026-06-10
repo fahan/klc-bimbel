@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import apiClient from '@/lib/api/client'
+import { useAppSettings } from '@/lib/app-settings-context'
 
 const loginSchema = z.object({
   email: z.string().email('Email tidak valid'),
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const { settings } = useAppSettings()
 
   const {
     register,
@@ -90,8 +92,21 @@ export default function LoginPage() {
       <div className="bg-white rounded-lg shadow-lg p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary mb-2">🎓 BimbelApp</h1>
-          <p className="text-gray-600">Sistem Manajemen Bimbel Multi-Cabang</p>
+          {settings.logoUrl ? (
+            <img
+              src={settings.logoUrl}
+              alt="Logo"
+              className="w-16 h-16 rounded-xl object-cover mx-auto mb-3"
+            />
+          ) : (
+            <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <span className="text-2xl font-bold text-white">
+                {settings.appName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{settings.appName}</h1>
+          <p className="text-gray-500 text-sm">{settings.tagline}</p>
         </div>
 
         {/* Form */}
