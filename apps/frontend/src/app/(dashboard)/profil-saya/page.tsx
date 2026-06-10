@@ -137,10 +137,13 @@ export default function ProfilePage() {
     if (confirm('Yakin ingin keluar dari akun ini?')) {
       localStorage.removeItem('token')
       localStorage.removeItem('userRole')
+      localStorage.removeItem('userRoles')
       localStorage.removeItem('userId')
       localStorage.removeItem('userName')
       localStorage.removeItem('userEmail')
       localStorage.removeItem('selectedBranchId')
+      localStorage.removeItem('userBranchIds')
+      localStorage.removeItem('primaryBranchId')
       router.push('/login')
     }
   }

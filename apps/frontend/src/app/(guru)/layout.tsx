@@ -33,6 +33,8 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
     localStorage.removeItem('userRoles')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
+    localStorage.removeItem('userBranchIds')
+    localStorage.removeItem('primaryBranchId')
     router.push('/login')
   }
 

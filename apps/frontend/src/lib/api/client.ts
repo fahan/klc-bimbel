@@ -29,6 +29,9 @@ apiClient.interceptors.response.use(
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token')
         localStorage.removeItem('userRole')
+        localStorage.removeItem('userRoles')
+        localStorage.removeItem('userBranchIds')
+        localStorage.removeItem('primaryBranchId')
         window.location.href = '/login'
       }
     }

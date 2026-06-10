@@ -58,6 +58,8 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     localStorage.removeItem('userRoles')
     localStorage.removeItem('userId')
     localStorage.removeItem('userName')
+    localStorage.removeItem('userBranchIds')
+    localStorage.removeItem('primaryBranchId')
     router.push('/login')
   }
 

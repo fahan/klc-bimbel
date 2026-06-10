@@ -34,9 +34,12 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token')
       localStorage.removeItem('userRole')
+      localStorage.removeItem('userRoles')
       localStorage.removeItem('userId')
       localStorage.removeItem('userName')
       localStorage.removeItem('selectedBranchId')
+      localStorage.removeItem('userBranchIds')
+      localStorage.removeItem('primaryBranchId')
     }
     router.push('/login')
   }

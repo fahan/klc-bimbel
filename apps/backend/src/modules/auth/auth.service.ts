@@ -18,11 +18,12 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto
 
-    // Find user by email with roles
+    // Find user by email with roles and branches
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
         roles: true,
+        branches: { include: { branch: true } },
       },
     })
 
@@ -52,6 +53,11 @@ export class AuthService {
       roles, // New: array of all roles
     })
 
+    const primaryBranchId = (user as any).branches?.find((ub: any) => ub.isPrimary)?.branchId
+      || (user as any).branches?.[0]?.branchId
+      || null
+    const userBranchIds = (user as any).branches?.map((ub: any) => ub.branchId) || []
+
     return {
       success: true,
       data: {
@@ -61,7 +67,9 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           role: user.role,
-          roles, // Include all roles in response
+          roles,
+          primaryBranchId,
+          userBranchIds,
           isActive: user.isActive,
           createdAt: user.createdAt.toISOString(),
           updatedAt: user.updatedAt.toISOString(),
@@ -102,7 +110,6 @@ export class AuthService {
       include: {
         roles: true,
         branches: {
-          where: { isPrimary: true },
           include: { branch: true },
         },
       },
@@ -117,8 +124,9 @@ export class AuthService {
       ? user.roles.map((ur: any) => ur.role)
       : [user.role]
 
-    // Get primary branch if exists
-    const primaryBranch = user.branches?.[0]?.branch || null
+    // Get all assigned branches and primary
+    const primaryBranch = user.branches?.find((ub: any) => ub.isPrimary)?.branch || user.branches?.[0]?.branch || null
+    const userBranchIds = user.branches?.map((ub: any) => ub.branchId) || []
 
     return {
       success: true,
@@ -128,9 +136,10 @@ export class AuthService {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        roles, // Include all roles
+        roles,
         isActive: user.isActive,
         primaryBranchId: primaryBranch?.id || null,
+        userBranchIds,
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),
       },

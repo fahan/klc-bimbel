@@ -40,12 +40,18 @@ export default function LoginPage() {
       if (response.data.success) {
         const { user, token } = response.data.data
 
-        // Store token & roles in localStorage
+        // Store token, roles, and branch info in localStorage
         localStorage.setItem('token', token)
         localStorage.setItem('userRole', user.role)
         localStorage.setItem('userRoles', JSON.stringify(user.roles || [user.role]))
         localStorage.setItem('userId', user.id)
         localStorage.setItem('userName', user.name)
+        localStorage.setItem('userBranchIds', JSON.stringify(user.userBranchIds || []))
+        if (user.primaryBranchId) {
+          localStorage.setItem('primaryBranchId', user.primaryBranchId)
+        } else {
+          localStorage.removeItem('primaryBranchId')
+        }
 
         console.log('✅ Token saved, redirecting...')
 
