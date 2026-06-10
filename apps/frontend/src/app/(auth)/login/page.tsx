@@ -72,13 +72,12 @@ export default function LoginPage() {
 
         console.log('✅ Token saved, redirecting...')
 
-        // Redirect: go to admin if user has any admin role, otherwise guru view
+        // Redirect: GURU role takes priority (default view), admin-only goes to dashboard
         const roles: string[] = user.roles || [user.role]
-        const hasAdminRole = roles.some((r) => r !== 'GURU')
-        if (hasAdminRole) {
-          router.push('/dashboard')
-        } else {
+        if (roles.includes('GURU')) {
           router.push('/guru/presensi')
+        } else {
+          router.push('/dashboard')
         }
       } else {
         throw new Error(response.data.message || 'Login failed')
