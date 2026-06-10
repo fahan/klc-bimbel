@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
+import { useApiBranchId } from '@/lib/branch-context'
 
 const DURATION_PRESETS = [
   { value: 7, label: '7 hari' },
@@ -32,6 +33,7 @@ function formatDate(d?: string | null) {
 }
 
 export default function LaporanProgressPage() {
+  const branchId = useApiBranchId()
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
@@ -57,18 +59,18 @@ export default function LaporanProgressPage() {
   }, [formStudentSearch])
 
   const { data: linksData, isLoading, refetch } = useQuery({
-    queryKey: ['progress-report-links', filterStatus],
-    queryFn: () => progressReportApi.getAll({ status: filterStatus || undefined }),
+    queryKey: ['progress-report-links', branchId, filterStatus],
+    queryFn: () => progressReportApi.getAll({ branchId, status: filterStatus || undefined }),
   })
 
   const { data: metricsData } = useQuery({
-    queryKey: ['progress-report-metrics'],
-    queryFn: () => progressReportApi.getMetrics(),
+    queryKey: ['progress-report-metrics', branchId],
+    queryFn: () => progressReportApi.getMetrics(branchId),
   })
 
   const { data: studentsData, isFetching: studentsLoading } = useQuery({
-    queryKey: ['students-search', debouncedStudentSearch],
-    queryFn: () => studentApi.getAll(1, 20, undefined, debouncedStudentSearch || undefined),
+    queryKey: ['students-search', branchId, debouncedStudentSearch],
+    queryFn: () => studentApi.getAll(1, 20, branchId, debouncedStudentSearch || undefined),
     enabled: formStudentDropdownOpen,
   })
 
