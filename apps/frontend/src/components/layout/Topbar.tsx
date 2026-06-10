@@ -15,7 +15,7 @@ interface TopbarProps {
 export default function Topbar({ onMenuToggle }: TopbarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { selectedBranchId, branches, canSwitchBranch, canViewAllBranches, isRestrictedToBranch, setSelectedBranchId, isLoading: branchesLoading } =
+  const { selectedBranchId, branches, canSwitchBranch, canViewAllBranches, isRestrictedToBranch, setSelectedBranchId, isLoading: branchesLoading, hydrated: branchHydrated } =
     useBranch()
   const branchId = useApiBranchId()
   const [showBranchDropdown, setShowBranchDropdown] = useState(false)
@@ -147,7 +147,10 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
           </button>
 
           {/* Branch Selector */}
-          <div className="relative flex-shrink-0">
+          {!branchHydrated ? (
+            <div className="w-32 h-9 bg-gray-100 rounded-lg animate-pulse flex-shrink-0" />
+          ) : null}
+          <div className={`relative flex-shrink-0 ${!branchHydrated ? 'hidden' : ''}`}>
             <button
               onClick={() => canSwitchBranch && setShowBranchDropdown(!showBranchDropdown)}
               disabled={!canSwitchBranch}

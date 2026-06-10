@@ -27,6 +27,8 @@ interface BranchContextValue {
   setSelectedBranchId: (id: string) => void
   /** Loading state for branches list. */
   isLoading: boolean
+  /** True once localStorage has been read on the client. False during SSR/first render. */
+  hydrated: boolean
 }
 
 const BranchContext = createContext<BranchContextValue | null>(null)
@@ -141,6 +143,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         isRestrictedToBranch,
         setSelectedBranchId,
         isLoading,
+        hydrated,
       }}
     >
       {children}
