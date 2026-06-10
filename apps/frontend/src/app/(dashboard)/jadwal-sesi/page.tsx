@@ -227,9 +227,57 @@ export default function JadwalSesiPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 shadow-sm">
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap overflow-x-auto pb-1">
+      {/* Filter Bar — Mobile (dropdowns) */}
+      <div className="sm:hidden bg-white rounded-lg border border-gray-200 p-3 shadow-sm space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={selectedTeacherId}
+            onChange={(e) => setSelectedTeacherId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">Semua Guru</option>
+            {Array.from(teacherMap.values()).map(teacher => (
+              <option key={teacher.id} value={teacher.id}>{teacher.name}</option>
+            ))}
+          </select>
+          <select
+            value={selectedSubjectId}
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">Semua Mapel</option>
+            {subjectList.map(subject => (
+              <option key={subject.id} value={subject.id}>{subject.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Cari mapel atau guru..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <select
+            value={filterBranchId}
+            onChange={(e) => setFilterBranchId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Semua Cabang</option>
+            {branches.map((branch: any) => (
+              <option key={branch.id} value={branch.id}>{branch.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Filter Bar — Desktop (pills) */}
+      <div className="hidden sm:block bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+        <div className="flex items-center gap-4 flex-wrap overflow-x-auto pb-1">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-700">Filter guru:</span>
             <button
