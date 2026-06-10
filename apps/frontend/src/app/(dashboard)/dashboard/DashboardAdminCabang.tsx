@@ -53,7 +53,7 @@ export default function DashboardAdminCabang() {
   const invoiceMetrics = d?.invoiceMetrics
   const todaySessions: any[] = d?.todaySessions ?? []
   const topTeachers: any[] = d?.topTeachers ?? []
-  const unpaidInvoices: any[] = unpaidData?.data?.data ?? []
+  const unpaidInvoices: any[] = unpaidData?.data?.data?.data ?? []
 
   const paymentStatus = useMemo(() => {
     if (!invoiceMetrics) return []
