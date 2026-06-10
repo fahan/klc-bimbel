@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
+import { useApiBranchId, useBranch } from '@/lib/branch-context'
 
 const MONTHS = [
   'Januari',
@@ -43,6 +44,8 @@ function formatRupiah(amount: number | string) {
 }
 
 export default function InvoiceTagihanPage() {
+  const branchId = useApiBranchId()
+  const { canViewAllBranches } = useBranch()
   const [filterStatus, setFilterStatus] = useState<string>('')
   const [filterType, setFilterType] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -96,9 +99,10 @@ export default function InvoiceTagihanPage() {
 
   // Data queries
   const { data: invoicesData, isLoading, refetch } = useQuery({
-    queryKey: ['invoices', filterStatus, filterType, debouncedSearchTerm, page],
+    queryKey: ['invoices', branchId, filterStatus, filterType, debouncedSearchTerm, page],
     queryFn: () =>
       invoiceApi.getAll({
+        branchId,
         status: filterStatus || undefined,
         type: filterType || undefined,
         search: debouncedSearchTerm || undefined,
@@ -108,15 +112,16 @@ export default function InvoiceTagihanPage() {
   })
 
   const { data: metricsData } = useQuery({
-    queryKey: ['invoice-metrics', today.getMonth() + 1, today.getFullYear()],
+    queryKey: ['invoice-metrics', branchId, today.getMonth() + 1, today.getFullYear()],
     queryFn: () =>
-      invoiceApi.getMetrics({ month: today.getMonth() + 1, year: today.getFullYear() }),
+      invoiceApi.getMetrics({ branchId, month: today.getMonth() + 1, year: today.getFullYear() }),
   })
 
   // Server-side student search — only runs when dropdown is open
+  // For ADMIN_CABANG filter students by their branch
   const { data: studentsData, isFetching: studentsLoading } = useQuery({
-    queryKey: ['students-search', debouncedSearch],
-    queryFn: () => studentApi.getAll(1, 20, undefined, debouncedSearch || undefined),
+    queryKey: ['students-search', branchId, debouncedSearch],
+    queryFn: () => studentApi.getAll(1, 20, branchId, debouncedSearch || undefined),
     enabled: studentDropdownOpen,
     staleTime: 30_000,
   })
