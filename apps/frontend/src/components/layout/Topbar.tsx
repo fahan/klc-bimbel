@@ -60,6 +60,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
     if (pathname === '/presensi' || pathname.startsWith('/presensi/')) return 'Presensi'
     if (pathname === '/profil-saya') return 'Profil Saya'
     if (pathname === '/landing-content') return 'Konten Landing'
+    if (pathname === '/pengaturan') return 'Pengaturan Aplikasi'
     if (pathname.startsWith('/master-data/')) {
       const segments = pathname.split('/').filter(Boolean)
       const last = segments[segments.length - 1]

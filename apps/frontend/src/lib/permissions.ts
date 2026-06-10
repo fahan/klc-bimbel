@@ -38,6 +38,7 @@ export const featurePermissions: PermissionConfig = {
   // Administration
   'manajemen-user': ['OWNER', 'ADMIN_GLOBAL'],
   'landing-content': ['OWNER', 'ADMIN_GLOBAL'],
+  'pengaturan': ['OWNER', 'ADMIN_GLOBAL'],
 
   // Reports
   'laporan-presensi': ['OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG'],

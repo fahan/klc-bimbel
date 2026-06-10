@@ -10,6 +10,7 @@ import {
   Wallet, X,
 } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
+import { useAppSettings } from '@/lib/app-settings-context'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -23,6 +24,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [userRole, setUserRole] = useState('')
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['UTAMA']))
   const { userRoles, can, isLoaded } = usePermission()
+  const { settings: appSettings } = useAppSettings()
 
   // Close mobile drawer on navigation
   useEffect(() => {
@@ -94,6 +96,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       items: [
         { label: 'Manajemen Pengguna', path: '/manajemen-user', icon: Users },
         { label: 'Konten Landing Page', path: '/landing-content', icon: Globe },
+        { label: 'Pengaturan Aplikasi', path: '/pengaturan', icon: Settings2 },
       ]
     },
     {
@@ -217,12 +220,20 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              A
-            </div>
+            {appSettings.logoUrl ? (
+              <img
+                src={appSettings.logoUrl}
+                alt="Logo"
+                className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {appSettings.appName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
-              <h1 className="text-sm font-bold text-gray-900">BimbelApp</h1>
-              <p className="text-xs text-gray-500">Manajemen Bimbel</p>
+              <h1 className="text-sm font-bold text-gray-900">{appSettings.appName}</h1>
+              <p className="text-xs text-gray-500">{appSettings.tagline}</p>
             </div>
           </div>
         </div>
@@ -246,12 +257,20 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-              A
-            </div>
+            {appSettings.logoUrl ? (
+              <img
+                src={appSettings.logoUrl}
+                alt="Logo"
+                className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                {appSettings.appName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
-              <h1 className="text-sm font-bold text-gray-900">BimbelApp</h1>
-              <p className="text-xs text-gray-500">Manajemen Bimbel</p>
+              <h1 className="text-sm font-bold text-gray-900">{appSettings.appName}</h1>
+              <p className="text-xs text-gray-500">{appSettings.tagline}</p>
             </div>
           </div>
           <button

@@ -41,17 +41,38 @@ function formatDateTime(dateStr?: string | null) {
   )
 }
 
+interface AppSettings {
+  appName: string
+  tagline: string
+  logoUrl: string | null
+}
+
 export default function PublicInvoicePage() {
   const params = useParams()
   const token = params?.token as string
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    appName: 'BimbelApp',
+    tagline: 'Manajemen Bimbel',
+    logoUrl: null,
+  })
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    fetch(`${apiUrl}/app-settings/public`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.data) setAppSettings(json.data)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
         const res = await fetch(`${apiUrl}/invoices/public/${token}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -111,11 +132,15 @@ export default function PublicInvoicePage() {
         <div className="bg-[#185FA5] text-white px-6 py-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                <Building className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {appSettings.logoUrl ? (
+                  <img src={appSettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Building className="w-5 h-5" />
+                )}
               </div>
               <div>
-                <p className="font-bold text-base">KLC Bimbel</p>
+                <p className="font-bold text-base">{appSettings.appName}</p>
                 <p className="text-xs text-blue-100">Cabang {invoice.branchName}</p>
               </div>
             </div>
@@ -173,8 +198,8 @@ export default function PublicInvoicePage() {
                 {invoice.type === 'SPP'
                   ? `SPP ${MONTHS[(invoice.month || 1) - 1]}`
                   : 'pendaftaran'}{' '}
-                sebesar {formatRupiah(totalAmount)}. Hubungi admin KLC Bimbel untuk konfirmasi
-                pembayaran.
+                sebesar {formatRupiah(totalAmount)}. Hubungi admin {appSettings.appName} untuk
+                konfirmasi pembayaran.
               </p>
             </div>
           </div>
@@ -352,7 +377,7 @@ export default function PublicInvoicePage() {
                 <div className="text-center">
                   <p className="text-5xl font-black text-green-700">LUNAS</p>
                   <p className="text-xs font-bold text-green-700 mt-2 tracking-widest">
-                    KLC BIMBEL
+                    {appSettings.appName.toUpperCase()}
                   </p>
                 </div>
               </div>
@@ -367,7 +392,7 @@ export default function PublicInvoicePage() {
                 <p className="text-xs text-gray-500 mb-1">Dibayar pada</p>
                 <p className="font-bold text-green-700 text-sm">{formatDateTime(invoice.paidAt)}</p>
                 <p className="text-xs text-gray-500 mt-2">
-                  KLC Bimbel · {invoice.branchName}
+                  {appSettings.appName} · {invoice.branchName}
                 </p>
               </div>
             </div>
@@ -386,7 +411,7 @@ export default function PublicInvoicePage() {
             <Building className={`w-5 h-5 ${isPaid ? 'text-green-700' : 'text-gray-400'}`} />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">KLC Bimbel</p>
+            <p className="text-sm font-semibold text-gray-900">{appSettings.appName}</p>
             <p className="text-xs text-gray-600">Cabang {invoice.branchName}</p>
           </div>
           <p className="text-xs text-gray-500 italic">
@@ -401,7 +426,7 @@ export default function PublicInvoicePage() {
               ? 'Simpan halaman ini sebagai bukti pembayaran resmi Anda.'
               : 'Simpan halaman ini sebagai bukti tagihan Anda.'}
             <br />
-            Dokumen ini diterbitkan secara digital oleh KLC Bimbel.
+            Dokumen ini diterbitkan secara digital oleh {appSettings.appName}.
           </p>
         </div>
       </div>

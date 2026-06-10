@@ -58,17 +58,38 @@ function formatDateShort(d?: string | null) {
   })
 }
 
+interface AppSettings {
+  appName: string
+  tagline: string
+  logoUrl: string | null
+}
+
 export default function PublicProgressReportPage() {
   const params = useParams()
   const token = params?.token as string
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    appName: 'BimbelApp',
+    tagline: 'Manajemen Bimbel',
+    logoUrl: null,
+  })
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+    fetch(`${apiUrl}/app-settings/public`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.data) setAppSettings(json.data)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     const fetchReport = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
         const res = await fetch(`${apiUrl}/progress-reports/public/${token}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -137,11 +158,15 @@ export default function PublicProgressReportPage() {
         {/* Header (Blue) */}
         <div className="bg-[#185FA5] text-white px-6 py-6">
           <div className="flex items-start gap-3 mb-5">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Building className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {appSettings.logoUrl ? (
+                <img src={appSettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <Building className="w-5 h-5" />
+              )}
             </div>
             <div>
-              <p className="font-bold text-base">KLC Bimbel</p>
+              <p className="font-bold text-base">{appSettings.appName}</p>
               <p className="text-xs text-blue-100">Cabang {data.branchName}</p>
             </div>
           </div>
@@ -152,7 +177,7 @@ export default function PublicProgressReportPage() {
             </p>
             <h1 className="text-2xl font-bold mt-1">{data.studentName}</h1>
             <p className="text-xs text-blue-100 mt-1">
-              KLC Bimbel
+              {appSettings.appName}
               {data.studentClassLevel ? ` · ${data.studentClassLevel}` : ''}
             </p>
 
@@ -386,7 +411,7 @@ export default function PublicProgressReportPage() {
             <Building className="w-5 h-5 text-gray-400" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">KLC Bimbel</p>
+            <p className="text-sm font-semibold text-gray-900">{appSettings.appName}</p>
             <p className="text-xs text-gray-600">Cabang {data.branchName}</p>
           </div>
           <p className="text-xs text-gray-500 italic text-right">
@@ -399,8 +424,8 @@ export default function PublicProgressReportPage() {
         {/* Footer */}
         <div className="px-6 pb-6 text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            Laporan ini dibuat oleh KLC Bimbel dan hanya menampilkan data mata pelajaran yang dipilih
-            admin.
+            Laporan ini dibuat oleh {appSettings.appName} dan hanya menampilkan data mata pelajaran
+            yang dipilih admin.
             <br />
             {data.isPermanent
               ? 'Link ini berlaku permanen.'

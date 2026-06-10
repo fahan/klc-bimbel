@@ -23,6 +23,7 @@ import { MailModule } from './modules/mail/mail.module'
 import { LandingModule } from './modules/landing/landing.module'
 import { DashboardModule } from './modules/dashboard/dashboard.module'
 import { ExpensesModule } from './modules/expenses/expenses.module'
+import { AppSettingsModule } from './modules/app-settings/app-settings.module'
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ExpensesModule } from './modules/expenses/expenses.module'
     LandingModule,
     DashboardModule,
     ExpensesModule,
+    AppSettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

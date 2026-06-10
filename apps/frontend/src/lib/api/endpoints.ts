@@ -1,5 +1,16 @@
 import apiClient from './client'
 
+// ===== APP SETTINGS API =====
+export const appSettingsApi = {
+  getPublic: () =>
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/app-settings/public`).then(
+      (r) => r.json(),
+    ),
+  get: () => apiClient.get('/app-settings'),
+  update: (data: { appName?: string; tagline?: string; logoUrl?: string }) =>
+    apiClient.put('/app-settings', data),
+}
+
 // ===== DASHBOARD API =====
 export const dashboardApi = {
   getAnalytics: (filters?: { branchId?: string; month?: number; year?: number }) => {

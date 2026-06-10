@@ -828,7 +828,19 @@ model FreeTrialRegistration {
   @@map("free_trial_registrations")
 }
 
-// ===== 9. PENGELUARAN =====
+// ===== 9. APP SETTINGS =====
+
+model AppSettings {
+  id        Int      @id @default(1)
+  appName   String   @default("BimbelApp")
+  tagline   String   @default("Manajemen Bimbel")
+  logoUrl   String?
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// ===== 10. PENGELUARAN =====
 
 model Expense {
   id           String          @id @default(cuid())
