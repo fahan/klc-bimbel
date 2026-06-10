@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import './landing.css'
 import { landingApi } from '@/lib/api/endpoints'
+import { useAppSettings } from '@/lib/app-settings-context'
 
 /**
  * IMPORTANT: Landing Page Data Consistency
@@ -115,6 +116,7 @@ const DEFAULT_CONTENT = {
 }
 
 export default function LandingPage() {
+  const { settings: appSettings } = useAppSettings()
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -223,9 +225,19 @@ export default function LandingPage() {
       <nav className="klc-nav" ref={mobileMenuRef}>
         <div className="klc-container klc-nav-inner">
           <div className="klc-logo">
-            <div className="klc-logo-mark">K</div>
+            {appSettings.logoUrl ? (
+              <img
+                src={appSettings.logoUrl}
+                alt="Logo"
+                style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover' }}
+              />
+            ) : (
+              <div className="klc-logo-mark">
+                {appSettings.appName.charAt(0).toUpperCase()}
+              </div>
+            )}
             <div>
-              KLC Bimbel
+              {appSettings.appName}
               <small>Keluarga · Belajar · Tuntas</small>
             </div>
           </div>
@@ -602,7 +614,7 @@ export default function LandingPage() {
               <div className="klc-wa-head">
                 <div className="av">K</div>
                 <div>
-                  <div style={{ fontWeight: 600 }}>KLC Bimbel · Cabang Purwakarta</div>
+                  <div style={{ fontWeight: 600 }}>{appSettings.appName} · Cabang Purwakarta</div>
                   <div style={{ fontSize: '11px', opacity: 0.85 }}>online</div>
                 </div>
               </div>
@@ -931,7 +943,7 @@ export default function LandingPage() {
                 <div className="klc-form-success-icon">✓</div>
                 <h3>Pendaftaran Berhasil!</h3>
                 <p>
-                  Terima kasih! Tim KLC Bimbel akan menghubungi Anda via WhatsApp dalam <strong>24 jam</strong> untuk
+                  Terima kasih! Tim {appSettings.appName} akan menghubungi Anda via WhatsApp dalam <strong>24 jam</strong> untuk
                   mengatur jadwal sesi gratis pertama.
                 </p>
                 <p style={{ marginTop: '16px', fontSize: '14px', color: 'var(--klc-ink-3)' }}>
@@ -1091,9 +1103,19 @@ export default function LandingPage() {
           <div className="klc-footer-grid">
             <div>
               <div className="klc-logo">
-                <div className="klc-logo-mark">K</div>
+                {appSettings.logoUrl ? (
+                  <img
+                    src={appSettings.logoUrl}
+                    alt="Logo"
+                    style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div className="klc-logo-mark">
+                    {appSettings.appName.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
-                  KLC Bimbel
+                  {appSettings.appName}
                   <small>Keluarga · Belajar · Tuntas</small>
                 </div>
               </div>
@@ -1162,7 +1184,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="klc-footer-bottom">
-            <span>© 2026 KLC Bimbel. Semua hak dilindungi.</span>
+            <span>© 2026 {appSettings.appName}. Semua hak dilindungi.</span>
             <span className="right">
               <a href="#mapel" style={{ marginRight: '18px' }}>
                 Kebijakan Privasi
