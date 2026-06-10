@@ -96,10 +96,13 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
     ? branches.length
     : (isPureAdminCabang ? userBranchIds.length : allBranches.length)
 
-  const isRestrictedToBranch = isPureAdminCabang && effectiveBranchCount <= 1
+  // While branches are loading we don't know the count yet — don't lock the button.
+  const isRestrictedToBranch = isPureAdminCabang && !isLoading && effectiveBranchCount <= 1
 
-  // ADMIN_CABANG can switch if assigned to more than one branch
-  const canSwitchBranch = canViewAllBranches || (isPureAdminCabang && effectiveBranchCount > 1)
+  // Enable switching for ADMIN_CABANG while branches are loading (count unknown).
+  // Once loaded, only disable when count is proven ≤ 1.
+  const canSwitchBranch = canViewAllBranches ||
+    (isPureAdminCabang && (effectiveBranchCount > 1 || isLoading))
 
   // Auto-select correct branch on load for ADMIN_CABANG
   useEffect(() => {
