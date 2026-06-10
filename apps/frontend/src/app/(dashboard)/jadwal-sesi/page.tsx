@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { sessionApi, branchApi } from '@/lib/api/endpoints'
+import { useApiBranchId, useBranch } from '@/lib/branch-context'
 import { Plus, ChevronLeft, ChevronRight, Search, Calendar, Clock, MapPin, Users, X, Settings, Layers } from 'lucide-react'
 import { LoadingState, EmptyState } from '@/components/ui/States'
 
@@ -45,11 +46,22 @@ export default function JadwalSesiPage() {
   const searchParams = useSearchParams()
   const successParam = searchParams.get('success')
   const updatedParam = searchParams.get('updated')
+  const contextBranchId = useApiBranchId()
+  const { canViewAllBranches } = useBranch()
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all')
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSession, setSelectedSession] = useState<any>(null)
   const [filterBranchId, setFilterBranchId] = useState<string>('')
+
+  // Sync page-level branch filter with global BranchContext.
+  // ADMIN_CABANG: always locked to their branch from context.
+  // OWNER/ADMIN_GLOBAL: use their own in-page filter.
+  useEffect(() => {
+    if (!canViewAllBranches) {
+      setFilterBranchId(contextBranchId || '')
+    }
+  }, [contextBranchId, canViewAllBranches])
   const [columnSettings, setColumnSettings] = useState(DEFAULT_COLUMN_SETTINGS)
   const [showColumnModal, setShowColumnModal] = useState(false)
   const [selectedDayIdx, setSelectedDayIdx] = useState<number>(() => {
@@ -262,16 +274,18 @@ export default function JadwalSesiPage() {
               className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={filterBranchId}
-            onChange={(e) => setFilterBranchId(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Semua Cabang</option>
-            {branches.map((branch: any) => (
-              <option key={branch.id} value={branch.id}>{branch.name}</option>
-            ))}
-          </select>
+          {canViewAllBranches && (
+            <select
+              value={filterBranchId}
+              onChange={(e) => setFilterBranchId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Semua Cabang</option>
+              {branches.map((branch: any) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -353,18 +367,20 @@ export default function JadwalSesiPage() {
                 className="w-full pl-9 pr-4 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
-            <select
-              value={filterBranchId}
-              onChange={(e) => setFilterBranchId(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium text-gray-700 bg-white"
-            >
-              <option value="">Semua Cabang</option>
-              {branches.map((branch: any) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            {canViewAllBranches && (
+              <select
+                value={filterBranchId}
+                onChange={(e) => setFilterBranchId(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium text-gray-700 bg-white"
+              >
+                <option value="">Semua Cabang</option>
+                {branches.map((branch: any) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={() => setShowColumnModal(!showColumnModal)}
               className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
