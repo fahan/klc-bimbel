@@ -7,12 +7,11 @@ export class AppSettingsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getSettings() {
-    let settings = await this.prisma.appSettings.findUnique({ where: { id: 1 } })
-    if (!settings) {
-      settings = await this.prisma.appSettings.create({
-        data: { id: 1, appName: 'BimbelApp', tagline: 'Manajemen Bimbel' },
-      })
-    }
+    const settings = await this.prisma.appSettings.upsert({
+      where: { id: 1 },
+      create: { id: 1, appName: 'BimbelApp', tagline: 'Manajemen Bimbel' },
+      update: {},
+    })
     return { success: true, data: settings }
   }
 

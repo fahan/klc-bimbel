@@ -11,6 +11,7 @@ import {
   StickyNote,
   Award,
 } from 'lucide-react'
+import type { AppSettings } from '@/lib/app-settings-context'
 
 const PREDICATE_LABEL: Record<string, string> = {
   PERLU_BIMBINGAN: 'Perlu Bimbingan',
@@ -56,12 +57,6 @@ function formatDateShort(d?: string | null) {
     month: 'short',
     year: 'numeric',
   })
-}
-
-interface AppSettings {
-  appName: string
-  tagline: string
-  logoUrl: string | null
 }
 
 export default function PublicProgressReportPage() {

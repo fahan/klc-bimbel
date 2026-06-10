@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
 export interface AppSettings {
   appName: string
@@ -22,7 +22,7 @@ const AppSettingsContext = createContext<{
 export function AppSettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaults)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const res = await fetch(`${apiUrl}/app-settings/public`)
@@ -38,11 +38,11 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     } catch {
       // silently keep defaults
     }
-  }
+  }, [])
 
   useEffect(() => {
     load()
-  }, [])
+  }, [load])
 
   return (
     <AppSettingsContext.Provider value={{ settings, reload: load }}>

@@ -17,5 +17,6 @@ export class UpdateAppSettingsDto {
   @ApiPropertyOptional({ description: 'URL or base64 data URL of the logo' })
   @IsOptional()
   @IsString()
+  @MaxLength(3_000_000, { message: 'Logo terlalu besar (maksimal 2MB)' })
   logoUrl?: string
 }

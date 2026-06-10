@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { CheckCircle, AlertCircle, Building, Calendar, User, FileText } from 'lucide-react'
+import type { AppSettings } from '@/lib/app-settings-context'
 
 const MONTHS = [
   'Januari',
@@ -39,12 +40,6 @@ function formatDateTime(dateStr?: string | null) {
     d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) +
     ' WIB'
   )
-}
-
-interface AppSettings {
-  appName: string
-  tagline: string
-  logoUrl: string | null
 }
 
 export default function PublicInvoicePage() {
