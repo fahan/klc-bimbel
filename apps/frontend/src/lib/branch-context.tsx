@@ -70,7 +70,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
   const isAdminCabang = userRole === 'ADMIN_CABANG'
   const canViewAllBranches = userRole === 'OWNER' || userRole === 'ADMIN_GLOBAL'
-  const isRestrictedToBranch = isAdminCabang
+  const isRestrictedToBranch = isAdminCabang && branches.length <= 1
 
   // ADMIN_CABANG only sees their assigned branches; others see all
   const branches = isAdminCabang && userBranchIds.length > 0
