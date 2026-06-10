@@ -226,7 +226,7 @@ export default function UsersManagementPage() {
 
   // ── render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="min-h-screen">
       <div className="max-w-7xl mx-auto">
 
         {/* Toast */}
@@ -241,13 +241,13 @@ export default function UsersManagementPage() {
         )}
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Manajemen Pengguna</h1>
-          <p className="text-gray-600">Kelola pengguna, peran, dan akses cabang</p>
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">Manajemen Pengguna</h1>
+          <p className="text-gray-600 text-sm hidden sm:block">Kelola pengguna, peran, dan akses cabang</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-8">
           {[
             { label: 'Total Pengguna', value: pagination.total || 0, color: 'blue' },
             { label: 'Admin Global', value: usersData?.data?.filter((u: any) => u.role === 'ADMIN_GLOBAL').length || 0, color: 'purple' },

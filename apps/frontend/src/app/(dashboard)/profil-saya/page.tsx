@@ -162,9 +162,9 @@ export default function ProfilePage() {
   if (isLoading) return <LoadingState />
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Profil Saya</h1>
+        <h1 className="text-xl sm:text-3xl font-bold text-gray-900">Profil Saya</h1>
         <p className="text-gray-600 mt-1">Kelola informasi akun dan pengaturan keamanan Anda</p>
       </div>
 
@@ -182,7 +182,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Avatar & summary */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">

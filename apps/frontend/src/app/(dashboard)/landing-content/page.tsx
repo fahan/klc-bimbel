@@ -626,9 +626,9 @@ export default function LandingContentPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-4 sm:mb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Globe className="w-5 h-5 text-blue-600" />
@@ -673,7 +673,7 @@ export default function LandingContentPage() {
           <span className="ml-2 text-gray-500">Memuat konten...</span>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
           {activeTab === 'hero' && <HeroTab initial={content.hero ?? defaultHero} />}
           {activeTab === 'teachers' && <TeachersTab initial={content.teachers ?? []} />}
           {activeTab === 'testimonials' && <TestimonialsTab initial={content.testimonials ?? []} />}
