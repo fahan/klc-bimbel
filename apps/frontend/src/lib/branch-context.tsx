@@ -35,16 +35,25 @@ const STORAGE_KEY = 'selectedBranchId'
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const [selectedBranchId, setSelectedBranchIdState] = useState<string>('')
-  const [userRole, setUserRole] = useState<string>('')
+  const [userRoles, setUserRoles] = useState<string[]>([])
   const [userBranchIds, setUserBranchIds] = useState<string[]>([])
   const [primaryBranchId, setPrimaryBranchId] = useState<string>('')
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const role = localStorage.getItem('userRole') || ''
+    const primaryRole = localStorage.getItem('userRole') || ''
     const persisted = localStorage.getItem(STORAGE_KEY) || ''
     const primary = localStorage.getItem('primaryBranchId') || ''
+
+    // Read all roles — fall back to primary role if userRoles not stored
+    let roles: string[] = []
+    try {
+      const parsed = JSON.parse(localStorage.getItem('userRoles') || '[]')
+      roles = Array.isArray(parsed) && parsed.length > 0 ? parsed : (primaryRole ? [primaryRole] : [])
+    } catch {
+      roles = primaryRole ? [primaryRole] : []
+    }
 
     let branchIds: string[] = []
     try {
@@ -53,61 +62,64 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       branchIds = []
     }
 
-    setUserRole(role)
+    setUserRoles(roles)
     setUserBranchIds(branchIds)
     setPrimaryBranchId(primary)
     setSelectedBranchIdState(persisted)
     setHydrated(true)
   }, [])
 
+  // Derive flags from all roles (handles dual-role users correctly)
+  const isAdminCabang = userRoles.includes('ADMIN_CABANG')
+  const canViewAllBranches = userRoles.some(r => r === 'OWNER' || r === 'ADMIN_GLOBAL')
+  // Pure ADMIN_CABANG = has ADMIN_CABANG but NOT OWNER/ADMIN_GLOBAL
+  const isPureAdminCabang = isAdminCabang && !canViewAllBranches
+
   const { data: branchesData, isLoading } = useQuery({
     queryKey: ['branches'],
     queryFn: () => branchApi.getAll(),
-    enabled: hydrated && !!userRole && userRole !== 'GURU',
+    enabled: hydrated && userRoles.length > 0 && !userRoles.every(r => r === 'GURU'),
   })
 
   const allBranches: Branch[] = branchesData?.data?.data || []
 
-  const isAdminCabang = userRole === 'ADMIN_CABANG'
-  const canViewAllBranches = userRole === 'OWNER' || userRole === 'ADMIN_GLOBAL'
-
-  // ADMIN_CABANG only sees their assigned branches; others see all
-  const branches = isAdminCabang && userBranchIds.length > 0
+  // ADMIN_CABANG (pure) only sees their assigned branches; others see all
+  const branches = isPureAdminCabang && userBranchIds.length > 0
     ? allBranches.filter(b => userBranchIds.includes(b.id))
     : allBranches
 
-  const isRestrictedToBranch = isAdminCabang && branches.length <= 1
+  const isRestrictedToBranch = isPureAdminCabang && branches.length <= 1
 
-  // ADMIN_CABANG can switch only if assigned to more than one branch
-  const canSwitchBranch = canViewAllBranches || (isAdminCabang && branches.length > 1)
+  // ADMIN_CABANG can switch if assigned to more than one branch
+  const canSwitchBranch = canViewAllBranches || (isPureAdminCabang && branches.length > 1)
 
-  // Auto-select correct branch on load
+  // Auto-select correct branch on load for ADMIN_CABANG
   useEffect(() => {
     if (!hydrated || branches.length === 0) return
 
-    if (isAdminCabang) {
-      // Use primaryBranchId if valid, else first assigned branch
+    if (isPureAdminCabang) {
+      // Use primaryBranchId if valid in their branches, else first assigned branch
       const target = branches.find(b => b.id === primaryBranchId) || branches[0]
       if (selectedBranchId !== target.id) {
         setSelectedBranchIdState(target.id)
         localStorage.setItem(STORAGE_KEY, target.id)
       }
     }
-  }, [hydrated, branches.length, isAdminCabang, primaryBranchId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated, branches.length, isPureAdminCabang, primaryBranchId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setSelectedBranchId = useCallback(
     (id: string) => {
-      // ADMIN_CABANG can only select their own branches
-      if (isAdminCabang && id && !userBranchIds.includes(id)) return
+      // Pure ADMIN_CABANG can only select their assigned branches (when userBranchIds is populated)
+      if (isPureAdminCabang && userBranchIds.length > 0 && id && !userBranchIds.includes(id)) return
       // Single-branch ADMIN_CABANG cannot switch
-      if (isAdminCabang && branches.length <= 1) return
+      if (isPureAdminCabang && branches.length <= 1) return
 
       setSelectedBranchIdState(id)
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEY, id)
       }
     },
-    [isAdminCabang, userBranchIds, branches.length],
+    [isPureAdminCabang, userBranchIds, branches.length],
   )
 
   const selectedBranch = branches.find(b => b.id === selectedBranchId) || null
