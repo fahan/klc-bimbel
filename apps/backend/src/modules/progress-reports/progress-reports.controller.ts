@@ -52,6 +52,26 @@ export class ProgressReportsController {
     return this.service.getMetrics(branchId)
   }
 
+  @Get('student/:studentId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'View student progress in-app (admin)',
+    description:
+      'Returns the same per-subject progress payload as the public report, but authenticated and without generating a share link. Defaults to all active enrollments.',
+  })
+  @ApiQuery({ name: 'subjectIds', required: false, description: 'Comma-separated subject ids' })
+  @ApiResponse({ status: 200, description: 'Progress retrieved' })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  async getStudentReport(
+    @Param('studentId') studentId: string,
+    @CurrentUser() user: any,
+    @Query('subjectIds') subjectIds?: string,
+  ): Promise<any> {
+    return this.service.getStudentReportForAdmin(studentId, subjectIds, user)
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')

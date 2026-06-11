@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common'
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
 import { CreateReportLinkDto } from './dto/create-report-link.dto'
 import { randomBytes } from 'crypto'
@@ -106,9 +111,36 @@ export class ProgressReportsService {
       data: { viewCount: link.viewCount + 1 },
     })
 
-    // Get progress data per subject
+    // Get progress data per subject (shared with admin in-app view)
+    const subjectReports = await this.buildSubjectReports(link.studentId, link.subjectIds)
+
+    return {
+      success: true,
+      data: {
+        isExpired: false,
+        token: link.token,
+        studentId: link.studentId,
+        studentName: link.student.name,
+        studentClassLevel: link.student.classLevel,
+        branchId: link.branchId,
+        branchName: link.branch.name,
+        createdAt: link.createdAt.toISOString(),
+        expiresAt: link.expiresAt?.toISOString() || null,
+        isPermanent: !link.expiresAt,
+        subjectReports,
+      },
+    }
+  }
+
+  /**
+   * Builds the per-subject progress report payload (modules / free-material +
+   * recent sessions). Shared by the public token view (findByToken) and the
+   * authenticated admin in-app view (getStudentReportForAdmin) so both render
+   * identical data.
+   */
+  private async buildSubjectReports(studentId: string, subjectIds: string[]) {
     const subjects = await this.prisma.subject.findMany({
-      where: { id: { in: link.subjectIds } },
+      where: { id: { in: subjectIds } },
       include: {
         curriculumModules: {
           orderBy: { orderNumber: 'asc' },
@@ -117,13 +149,13 @@ export class ProgressReportsService {
     })
 
     // For each subject, get progress data
-    const subjectReports = await Promise.all(
+    return Promise.all(
       subjects.map(async subject => {
         if (subject.trackingType === 'MODULE_BASED') {
           // Module-based: get module progress
           const moduleProgress = await this.prisma.studentModuleProgress.findMany({
             where: {
-              studentId: link.studentId,
+              studentId,
               module: { subjectId: subject.id },
             },
             include: { module: true },
@@ -132,7 +164,7 @@ export class ProgressReportsService {
           // Get recent session logs with progress
           const recentLogs = await this.prisma.progressLog.findMany({
             where: {
-              studentId: link.studentId,
+              studentId,
               subjectId: subject.id,
             },
             include: {
@@ -186,7 +218,7 @@ export class ProgressReportsService {
           // Free-material: get progress logs
           const recentLogs = await this.prisma.progressLog.findMany({
             where: {
-              studentId: link.studentId,
+              studentId,
               subjectId: subject.id,
             },
             include: { sessionLog: true },
@@ -237,20 +269,61 @@ export class ProgressReportsService {
         }
       }),
     )
+  }
+
+  /**
+   * Admin in-app view: returns the same per-subject progress payload as the
+   * public token view, but authenticated and without creating a share link.
+   * Defaults to all of the student's active subject enrollments.
+   */
+  async getStudentReportForAdmin(
+    studentId: string,
+    subjectIdsCsv: string | undefined,
+    user: { id: string; role: string },
+  ) {
+    const student = await this.prisma.student.findUnique({
+      where: { id: studentId },
+      include: {
+        branch: true,
+        studentSubjects: {
+          where: { isActive: true },
+          select: { subjectId: true },
+        },
+      },
+    })
+
+    if (!student) throw new NotFoundException('Siswa tidak ditemukan')
+
+    // Server-side branch isolation for ADMIN_CABANG
+    if (user.role === 'ADMIN_CABANG') {
+      const allowed = await this.prisma.userBranch.findFirst({
+        where: { userId: user.id, branchId: student.branchId },
+      })
+      if (!allowed) {
+        throw new ForbiddenException('Siswa berada di luar cabang Anda')
+      }
+    }
+
+    const enrolledIds = student.studentSubjects.map(ss => ss.subjectId)
+
+    // Default to all active enrollments; otherwise intersect requested ids with
+    // enrollments so callers can't probe arbitrary subjects.
+    let subjectIds = enrolledIds
+    if (subjectIdsCsv) {
+      const requested = subjectIdsCsv.split(',').map(s => s.trim()).filter(Boolean)
+      subjectIds = requested.filter(id => enrolledIds.includes(id))
+    }
+
+    const subjectReports = await this.buildSubjectReports(studentId, subjectIds)
 
     return {
       success: true,
       data: {
-        isExpired: false,
-        token: link.token,
-        studentId: link.studentId,
-        studentName: link.student.name,
-        studentClassLevel: link.student.classLevel,
-        branchId: link.branchId,
-        branchName: link.branch.name,
-        createdAt: link.createdAt.toISOString(),
-        expiresAt: link.expiresAt?.toISOString() || null,
-        isPermanent: !link.expiresAt,
+        studentId: student.id,
+        studentName: student.name,
+        studentClassLevel: student.classLevel,
+        branchId: student.branchId,
+        branchName: student.branch.name,
         subjectReports,
       },
     }
