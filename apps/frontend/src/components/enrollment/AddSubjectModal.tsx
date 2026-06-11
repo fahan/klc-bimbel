@@ -39,8 +39,6 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
   const filteredSubjects = availableSubjects.filter((s: any) => !enrolledSubjectIds.includes(s.id))
   const currentSubject = availableSubjects.find((s: any) => s.id === selectedSubject)
   const sppAmount = sppRateData?.data?.data?.amount ? parseFloat(sppRateData.data.data.amount) : 0
-  const registrationFee = 200000
-  const totalFirstBill = registrationFee + sppAmount
 
   const handleSubmit = async () => {
     if (!selectedSubject) {
@@ -203,24 +201,6 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
             </div>
           )}
 
-          {/* Cost Summary */}
-          {selectedSubject && sppAmount > 0 && (
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Biaya pendaftaran</span>
-                <span className="font-medium text-gray-900">Rp {registrationFee.toLocaleString('id-ID')}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">SPP bulan pertama</span>
-                <span className="font-medium text-gray-900">Rp {sppAmount.toLocaleString('id-ID')}</span>
-              </div>
-              <div className="border-t border-gray-200 pt-2 flex justify-between">
-                <span className="font-medium text-gray-900">Total tagihan pertama</span>
-                <span className="font-semibold text-lg text-blue-700">Rp {totalFirstBill.toLocaleString('id-ID')}</span>
-              </div>
-            </div>
-          )}
-
           {/* Buttons */}
           <div className="flex gap-3">
             <button
@@ -252,8 +232,9 @@ export default function AddSubjectModal({ studentId, enrolledSubjectIds, onClose
             </div>
             <h4 className="text-lg font-semibold text-gray-900 text-center mb-2">Konfirmasi Penambahan</h4>
             <p className="text-sm text-gray-600 text-center mb-4">
-              Tambahkan <strong>{currentSubject?.name}</strong> ({selectedType === 'REGULAR' ? 'Reguler' : 'Private'}) ke siswa ini? Total tagihan pertama adalah{' '}
-              <strong>Rp {totalFirstBill.toLocaleString('id-ID')}</strong> (biaya pendaftaran + SPP bulan pertama).
+              Tambahkan <strong>{currentSubject?.name}</strong> ({selectedType === 'REGULAR' ? 'Reguler' : 'Private'}) ke siswa ini? Tarif SPP{' '}
+              <strong>Rp {sppAmount.toLocaleString('id-ID')}</strong>
+              {selectedBillingType === 'PER_SESSION' ? '/sesi' : '/bulan'} akan dikunci untuk siswa ini.
             </p>
             <div className="flex gap-3">
               <button
