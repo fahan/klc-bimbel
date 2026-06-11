@@ -11,9 +11,10 @@ type AttendanceStatus = 'HADIR' | 'ABSEN' | 'IZIN' | 'SAKIT'
 
 interface StudentEntry {
   studentId: string
-  studentName: string
+  studentName: string   // nama panggilan (sureName) jika ada
+  fullName?: string     // nama lengkap
   classLevel?: string
-  isManual?: boolean // tambahan manual (bukan dari enrollment)
+  isManual?: boolean
 }
 
 export default function SesDaruratPage() {
@@ -109,7 +110,8 @@ export default function SesDaruratPage() {
   // Enrolled students from API
   const enrolledStudents: StudentEntry[] = (studentsData?.data?.data || []).map((s: any) => ({
     studentId: s.studentId,
-    studentName: s.studentName,
+    studentName: s.studentName, // sureName jika ada, fallback ke name
+    fullName: s.fullName,
     classLevel: s.classLevel,
     isManual: false,
   }))
@@ -140,7 +142,8 @@ export default function SesDaruratPage() {
   const addManualStudent = (s: any) => {
     setManualStudents(prev => [...prev, {
       studentId: s.id,
-      studentName: s.name,
+      studentName: s.sureName?.trim() || s.name,
+      fullName: s.name,
       classLevel: s.classLevel,
       isManual: true,
     }])
@@ -430,13 +433,16 @@ export default function SesDaruratPage() {
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-xs bg-gradient-to-br ${student.isManual ? 'from-blue-400 to-blue-600' : 'from-orange-400 to-orange-600'}`}>
                         {student.studentName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="font-medium text-gray-900 text-sm">{student.studentName}</p>
                           {student.isManual && (
                             <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Manual</span>
                           )}
                         </div>
+                        {student.fullName && student.fullName !== student.studentName && (
+                          <p className="text-xs text-gray-500 truncate">{student.fullName}</p>
+                        )}
                         {student.classLevel && <p className="text-xs text-gray-400">{student.classLevel}</p>}
                       </div>
                       {student.isManual && (
@@ -490,18 +496,23 @@ export default function SesDaruratPage() {
                         {searchQuery.length < 2 ? 'Ketik minimal 2 karakter' : 'Tidak ada siswa ditemukan'}
                       </p>
                     ) : (
-                      searchResults.map((s: any) => (
-                        <button key={s.id} onClick={() => addManualStudent(s)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50 transition text-left">
-                          <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-semibold text-xs flex-shrink-0">
-                            {s.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{s.name}</p>
-                            {s.classLevel && <p className="text-xs text-gray-400">{s.classLevel}</p>}
-                          </div>
-                        </button>
-                      ))
+                      searchResults.map((s: any) => {
+                        const nickname = s.sureName?.trim() || null
+                        const displayName = nickname || s.name
+                        return (
+                          <button key={s.id} onClick={() => addManualStudent(s)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50 transition text-left">
+                            <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-semibold text-xs flex-shrink-0">
+                              {displayName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800">{displayName}</p>
+                              {nickname && <p className="text-xs text-gray-500 truncate">{s.name}</p>}
+                              {s.classLevel && <p className="text-xs text-gray-400">{s.classLevel}</p>}
+                            </div>
+                          </button>
+                        )
+                      })
                     )}
                   </div>
                 )}
