@@ -347,6 +347,11 @@ export const progressReportApi = {
     const qs = branchId ? `?branchId=${branchId}` : ''
     return apiClient.get(`/progress-reports/metrics${qs}`)
   },
+  // Admin in-app view — authenticated, no link generated
+  getStudentReport: (studentId: string, subjectIds?: string[]) => {
+    const qs = subjectIds?.length ? `?subjectIds=${subjectIds.join(',')}` : ''
+    return apiClient.get(`/progress-reports/student/${studentId}${qs}`)
+  },
   create: (data: any) => apiClient.post('/progress-reports', data),
   revoke: (id: string) => apiClient.post(`/progress-reports/${id}/revoke`, {}),
   renew: (id: string, durationDays: number) =>

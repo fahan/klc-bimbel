@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["-F", "apps-frontend", "exec", "next", "dev", "-p", "3002"],
       "port": 3002
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:backend"],
+      "port": 3000
     }
   ]
 }
