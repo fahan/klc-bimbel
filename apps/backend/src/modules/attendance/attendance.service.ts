@@ -216,39 +216,52 @@ export class AttendanceService {
       where.actualTeacherId = filters.teacherId
     }
 
-    // Fetch session logs with related data
-    const sessionLogs = await this.prisma.sessionLog.findMany({
-      where,
-      include: {
-        session: {
-          include: {
-            teacher: true,
-            branch: true,
-            subject: true,
-            studentSessions: {
-              where: { isActive: true },
+    // Fetch the paginated page, total count, and summary aggregates in a single
+    // parallel wave. Only the fields used below are selected (the previous
+    // version eagerly loaded full relations — including unused student rows).
+    const [sessionLogs, total, statusGroups, attendanceGroups] = await Promise.all([
+      this.prisma.sessionLog.findMany({
+        where,
+        select: {
+          id: true,
+          sessionId: true,
+          isAdHoc: true,
+          sessionDate: true,
+          status: true,
+          adHocStartTime: true,
+          adHocDuration: true,
+          actualTeacher: { select: { name: true } },
+          adHocBranch: { select: { name: true } },
+          adHocSubject: { select: { name: true } },
+          session: {
+            select: {
+              startTime: true,
+              durationMinutes: true,
+              teacher: { select: { name: true } },
+              branch: { select: { name: true } },
+              subject: { select: { name: true } },
+              _count: { select: { studentSessions: { where: { isActive: true } } } },
             },
           },
+          attendances: { select: { status: true } },
         },
-        adHocBranch: true,
-        adHocSubject: true,
-        actualTeacher: true,
-        attendances: {
-          include: { student: true },
-        },
-      },
-      orderBy: { sessionDate: 'desc' },
-      skip,
-      take: limit,
-    })
-
-    // Count total for pagination
-    const total = await this.prisma.sessionLog.count({ where })
+        orderBy: { sessionDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.sessionLog.count({ where }),
+      this.prisma.sessionLog.groupBy({ by: ['status'], where, _count: { id: true } }),
+      this.prisma.attendance.groupBy({
+        by: ['sessionLogId', 'status'],
+        where: { sessionLog: { is: where } },
+        _count: { id: true },
+      }),
+    ])
 
     // Format data
     const data = sessionLogs.map(log => {
       // session is nullable (null for ad-hoc logs)
-      const studentCount = log.session?.studentSessions?.length ?? log.attendances.length
+      const studentCount = log.session?._count?.studentSessions ?? log.attendances.length
 
       // Count attendances
       const attendanceCounts = {
@@ -286,30 +299,30 @@ export class AttendanceService {
       }
     })
 
-    // Calculate summary
-    const allLogs = await this.prisma.sessionLog.findMany({
-      where,
-      include: {
-        attendances: true,
-      },
-    })
+    // Summary from aggregates — replicates the previous per-log (HADIR / total
+    // attendances) rate averaged over every matching log, but without fetching
+    // all logs and their attendance rows.
+    const statusCount = (status: string) =>
+      statusGroups.find(g => g.status === status)?._count.id ?? 0
+
+    const perLog = new Map<string, { hadir: number; total: number }>()
+    for (const g of attendanceGroups) {
+      const entry = perLog.get(g.sessionLogId) ?? { hadir: 0, total: 0 }
+      entry.total += g._count.id
+      if (g.status === 'HADIR') entry.hadir += g._count.id
+      perLog.set(g.sessionLogId, entry)
+    }
+    let ratioSum = 0
+    for (const entry of perLog.values()) {
+      ratioSum += entry.total > 0 ? entry.hadir / entry.total : 0
+    }
 
     const summary = {
       totalSessions: total,
-      completedSessions: allLogs.filter(l => l.status === 'COMPLETED').length,
-      pendingSessions: allLogs.filter(l => l.status === 'SCHEDULED').length,
-      cancelledSessions: allLogs.filter(l => l.status === 'CANCELLED').length,
-      averageAttendanceRate: 0 as number,
-    }
-
-    // Calculate average attendance rate
-    if (allLogs.length > 0) {
-      const totalAttendance = allLogs.reduce((sum, log) => {
-        const attendanceCount = log.attendances.filter(a => a.status === 'HADIR').length
-        const studentCount = log.attendances.length
-        return sum + (studentCount > 0 ? attendanceCount / studentCount : 0)
-      }, 0)
-      summary.averageAttendanceRate = parseFloat((totalAttendance / allLogs.length * 100).toFixed(1))
+      completedSessions: statusCount('COMPLETED'),
+      pendingSessions: statusCount('SCHEDULED'),
+      cancelledSessions: statusCount('CANCELLED'),
+      averageAttendanceRate: total > 0 ? parseFloat((ratioSum / total * 100).toFixed(1)) : 0,
     }
 
     return {
