@@ -254,6 +254,8 @@ export class StoreService {
 
   async findAllSales(filters?: { branchId?: string; limit?: number }) {
     const sales = await this.prisma.sale.findMany({
+      // Single JOIN for relations instead of one query per relation.
+      relationLoadStrategy: 'join',
       where: filters?.branchId ? { branchId: filters.branchId } : undefined,
       include: {
         saleItems: { include: { product: true } },

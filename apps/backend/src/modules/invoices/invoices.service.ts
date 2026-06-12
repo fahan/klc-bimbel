@@ -41,6 +41,9 @@ export class InvoicesService {
 
     const [invoices, total] = await Promise.all([
       this.prisma.invoice.findMany({
+        // Resolve relations with a single SQL JOIN instead of one query per
+        // relation — avoids ~6 extra round-trips per request.
+        relationLoadStrategy: 'join',
         where,
         include: {
           branch: true,

@@ -19,6 +19,8 @@ export class SessionsService {
 
     const [sessions, total] = await Promise.all([
       this.prisma.session.findMany({
+        // Single JOIN for relations instead of one query per relation.
+        relationLoadStrategy: 'join',
         where: {
           isActive: true,
           ...(filters?.branchId && { branchId: filters.branchId }),

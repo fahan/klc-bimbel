@@ -154,8 +154,11 @@ export class FinanceService {
   async getRecentTransactions(branchId: string | undefined, limit: number = 20) {
     const branchFilter = branchId ? { branchId } : {}
 
+    // relationLoadStrategy: 'join' resolves each query's relations in a single
+    // SQL JOIN instead of one extra round-trip per relation.
     const [payments, sales, commissions, bonuses, expenses] = await Promise.all([
       this.prisma.payment.findMany({
+        relationLoadStrategy: 'join',
         where: branchFilter,
         include: {
           invoice: { include: { student: true } },
@@ -165,6 +168,7 @@ export class FinanceService {
         take: limit,
       }),
       this.prisma.sale.findMany({
+        relationLoadStrategy: 'join',
         where: branchFilter,
         include: {
           student: true,
@@ -175,18 +179,21 @@ export class FinanceService {
         take: limit,
       }),
       this.prisma.commission.findMany({
+        relationLoadStrategy: 'join',
         where: { ...branchFilter, status: 'APPROVED' },
         include: { teacher: true, approvedBy: true },
         orderBy: { approvedAt: 'desc' },
         take: limit,
       }),
       this.prisma.teacherBonus.findMany({
+        relationLoadStrategy: 'join',
         where: { ...branchFilter, status: 'APPROVED' },
         include: { teacher: true, approvedBy: true },
         orderBy: { approvedAt: 'desc' },
         take: limit,
       }),
       this.prisma.expense.findMany({
+        relationLoadStrategy: 'join',
         where: branchFilter,
         include: { branch: true, recordedBy: true },
         orderBy: { date: 'desc' },

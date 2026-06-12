@@ -436,6 +436,8 @@ export class AttendanceService {
     if (branchId) where.adHocBranchId = branchId
 
     const logs = await this.prisma.sessionLog.findMany({
+      // Single JOIN for relations instead of one query per relation.
+      relationLoadStrategy: 'join',
       where,
       include: {
         actualTeacher: true,
