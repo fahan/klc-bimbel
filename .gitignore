@@ -57,3 +57,9 @@ memory/
 # PWA build output
 apps/frontend/public/sw.js
 apps/frontend/public/workbox-*.js
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Local backups
+backups/
