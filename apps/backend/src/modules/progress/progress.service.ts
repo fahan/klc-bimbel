@@ -9,6 +9,7 @@ export class ProgressService {
   async submitProgress(submitDto: SubmitProgressDto, currentUserId: string) {
     // Verify session log exists
     const sessionLog = await this.prisma.sessionLog.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: submitDto.sessionLogId },
       include: {
         session: {
@@ -159,6 +160,7 @@ export class ProgressService {
 
     // Get the result
     const progressLogs = await this.prisma.progressLog.findMany({
+      relationLoadStrategy: 'join',
       where: { sessionLogId: submitDto.sessionLogId },
       include: {
         student: true,
@@ -207,6 +209,7 @@ export class ProgressService {
     }
 
     const progressLogs = await this.prisma.progressLog.findMany({
+      relationLoadStrategy: 'join',
       where: { sessionLogId: submitDto.sessionLogId },
       include: {
         student: true,
@@ -225,34 +228,38 @@ export class ProgressService {
     const where: any = { studentId }
     if (subjectId) where.subjectId = subjectId
 
-    const progressLogs = await this.prisma.progressLog.findMany({
-      where,
-      include: {
-        sessionLog: {
-          include: {
-            session: {
-              include: {
-                teacher: true,
-                branch: true,
+    // Both reads are independent — run them in parallel, each resolving its
+    // relations with a single JOIN.
+    const [progressLogs, moduleProgress] = await Promise.all([
+      this.prisma.progressLog.findMany({
+        relationLoadStrategy: 'join',
+        where,
+        include: {
+          sessionLog: {
+            include: {
+              session: {
+                include: {
+                  teacher: true,
+                  branch: true,
+                },
               },
             },
           },
+          module: true,
+          subject: true,
         },
-        module: true,
-        subject: true,
-      },
-      orderBy: { recordedAt: 'desc' },
-    })
-
-    // Also get module progress summary
-    const moduleProgress = await this.prisma.studentModuleProgress.findMany({
-      where: { studentId },
-      include: {
-        module: {
-          include: { subject: true },
+        orderBy: { recordedAt: 'desc' },
+      }),
+      this.prisma.studentModuleProgress.findMany({
+        relationLoadStrategy: 'join',
+        where: { studentId },
+        include: {
+          module: {
+            include: { subject: true },
+          },
         },
-      },
-    })
+      }),
+    ])
 
     return {
       success: true,
@@ -279,6 +286,7 @@ export class ProgressService {
   async getStudentLastModule(studentId: string, subjectId: string) {
     // Find current module being worked on
     const inProgress = await this.prisma.studentModuleProgress.findFirst({
+      relationLoadStrategy: 'join',
       where: {
         studentId,
         status: 'IN_PROGRESS',
@@ -304,6 +312,7 @@ export class ProgressService {
 
     // No in-progress, get next module to start
     const completedModules = await this.prisma.studentModuleProgress.findMany({
+      relationLoadStrategy: 'join',
       where: {
         studentId,
         status: 'COMPLETED',

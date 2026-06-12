@@ -41,6 +41,9 @@ export class InvoicesService {
 
     const [invoices, total] = await Promise.all([
       this.prisma.invoice.findMany({
+        // Resolve relations with a single SQL JOIN instead of one query per
+        // relation — avoids ~6 extra round-trips per request.
+        relationLoadStrategy: 'join',
         where,
         include: {
           branch: true,
@@ -73,6 +76,7 @@ export class InvoicesService {
 
   async findOne(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branch: true,
@@ -107,6 +111,7 @@ export class InvoicesService {
 
   async findByToken(token: string) {
     const invoice = await this.prisma.invoice.findUnique({
+      relationLoadStrategy: 'join',
       where: { publicToken: token },
       include: {
         branch: true,
@@ -194,6 +199,7 @@ export class InvoicesService {
   async create(createDto: CreateInvoiceDto, currentUserId: string) {
     // Verify student exists
     const student = await this.prisma.student.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: createDto.studentId },
       include: {
         branch: true,
@@ -298,6 +304,7 @@ export class InvoicesService {
       const totalAmount = Math.max(0, subtotal - totalDiscount)
 
       const invoice = await this.prisma.invoice.create({
+        relationLoadStrategy: 'join',
         data: {
           branchId: student.branchId,
           studentId: student.id,
@@ -338,6 +345,7 @@ export class InvoicesService {
       const publicToken = this.generatePublicToken()
 
       const invoice = await this.prisma.invoice.create({
+        relationLoadStrategy: 'join',
         data: {
           branchId: student.branchId,
           studentId: student.id,
@@ -378,6 +386,7 @@ export class InvoicesService {
 
   async remove(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: { payments: true },
     })

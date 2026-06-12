@@ -24,18 +24,24 @@ export class DashboardService {
       ? { branches: { some: { branchId } } }
       : {}
 
-    // Build 6-month trend ranges
+    // Build 6-month trend ranges (oldest → newest; last range is current month)
     const trendRanges = Array.from({ length: 6 }, (_, i) => {
       const tDate = new Date(year, month - 1 - (5 - i), 1)
       const tYear = tDate.getFullYear()
       const tMonth = tDate.getMonth() + 1
       return { year: tYear, month: tMonth, start: tDate, end: new Date(tYear, tMonth, 1) }
     })
+    const trendStart = trendRanges[0].start // earliest month boundary
+    const trendEnd = endDate // current month boundary (== trendRanges[5].end)
 
     // =========================================================
-    // PHASE 1 — counts & aggregates (no heavy JOINs, ~14 queries)
+    // SINGLE QUERY WAVE — all queries are independent, so fire them
+    // together (no phase barriers) to keep the connection pool saturated.
+    // The 6-month trend is computed from 3 windowed queries + JS bucketing
+    // instead of 24 per-month aggregates (4 metrics × 6 months).
     // =========================================================
     const [
+      // counts & current-month aggregates
       totalStudents,
       totalTeachers,
       branches,
@@ -49,6 +55,16 @@ export class DashboardService {
       commissionAgg,
       stockIn,
       unpaidInvoices,
+      // row data with JOINs (small limits)
+      todaySessions,
+      recentStudents,
+      topTeachers,
+      recentPayments,
+      recentSales,
+      // 6-month trend source rows (bucketed in JS below)
+      trendPayments,
+      trendSales,
+      trendCommissions,
     ] = await Promise.all([
       // Counts
       this.prisma.student.count({ where: { isActive: true, ...branchFilter } }),
@@ -99,106 +115,128 @@ export class DashboardService {
         where: { ...branchFilter, status: { in: ['UNPAID', 'PARTIAL'] }, type: 'SPP' },
         select: { studentId: true, totalAmount: true, paidAmount: true },
       }),
+
+      // Today's sessions (up to 10)
+      this.prisma.session.findMany({
+        relationLoadStrategy: 'join',
+        where: { isActive: true, dayOfWeek: todayDow, ...branchFilter },
+        include: {
+          branch: { select: { name: true } },
+          subject: { select: { name: true } },
+          teacher: { select: { name: true } },
+          studentSessions: { where: { isActive: true }, select: { id: true } },
+        },
+        orderBy: { startTime: 'asc' },
+        take: 10,
+      }),
+
+      // 4 most recent students
+      this.prisma.student.findMany({
+        where: { isActive: true, ...branchFilter },
+        select: {
+          id: true,
+          name: true,
+          classLevel: true,
+          isActive: true,
+          createdAt: true,
+          studentSubjects: { where: { isActive: true }, select: { id: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 4,
+      }),
+
+      // Top 4 teachers by session count
+      this.prisma.user.findMany({
+        where: { role: 'GURU', isActive: true, ...teacherBranchCond },
+        select: {
+          id: true,
+          name: true,
+          branches: { select: { branch: { select: { name: true, code: true } } } },
+          _count: { select: { sessionsAsTeacher: { where: { isActive: true } } } },
+        },
+        orderBy: { sessionsAsTeacher: { _count: 'desc' } },
+        take: 4,
+      }),
+
+      // Recent 4 payments
+      this.prisma.payment.findMany({
+        relationLoadStrategy: 'join',
+        where: branchFilter,
+        include: {
+          invoice: { select: { type: true, invoiceNumber: true, student: { select: { name: true } } } },
+          recordedBy: { select: { name: true } },
+        },
+        orderBy: { paidAt: 'desc' },
+        take: 4,
+      }),
+
+      // Recent 4 sales
+      this.prisma.sale.findMany({
+        relationLoadStrategy: 'join',
+        where: branchFilter,
+        include: {
+          student: { select: { name: true } },
+          saleItems: { include: { product: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 4,
+      }),
+
+      // 6-month trend — payments in window, bucketed by month + invoice type in JS
+      this.prisma.payment.findMany({
+        where: { ...branchFilter, paidAt: { gte: trendStart, lt: trendEnd } },
+        select: { amount: true, paidAt: true, invoice: { select: { type: true } } },
+      }),
+      // 6-month trend — sales in window, bucketed by month in JS
+      this.prisma.sale.findMany({
+        where: { ...branchFilter, createdAt: { gte: trendStart, lt: trendEnd } },
+        select: { totalAmount: true, createdAt: true },
+      }),
+      // 6-month trend — approved commissions grouped by (month, year) natively
+      this.prisma.commission.groupBy({
+        by: ['month', 'year'],
+        where: {
+          ...branchFilter,
+          status: 'APPROVED',
+          OR: trendRanges.map(r => ({ month: r.month, year: r.year })),
+        },
+        _sum: { totalAmount: true },
+      }),
     ])
 
     // =========================================================
-    // PHASE 2 — row data with JOINs, small limits (~5 queries)
+    // Build 6-month finance trend from windowed rows (JS bucketing)
     // =========================================================
-    const [todaySessions, recentStudents, topTeachers, recentPayments, recentSales] =
-      await Promise.all([
-        // Today's sessions (up to 10)
-        this.prisma.session.findMany({
-          where: { isActive: true, dayOfWeek: todayDow, ...branchFilter },
-          include: {
-            branch: { select: { name: true } },
-            subject: { select: { name: true } },
-            teacher: { select: { name: true } },
-            studentSessions: { where: { isActive: true }, select: { id: true } },
-          },
-          orderBy: { startTime: 'asc' },
-          take: 10,
-        }),
-
-        // 4 most recent students
-        this.prisma.student.findMany({
-          where: { isActive: true, ...branchFilter },
-          select: {
-            id: true,
-            name: true,
-            classLevel: true,
-            isActive: true,
-            createdAt: true,
-            studentSubjects: { where: { isActive: true }, select: { id: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 4,
-        }),
-
-        // Top 4 teachers by session count
-        this.prisma.user.findMany({
-          where: { role: 'GURU', isActive: true, ...teacherBranchCond },
-          select: {
-            id: true,
-            name: true,
-            branches: { select: { branch: { select: { name: true, code: true } } } },
-            _count: { select: { sessionsAsTeacher: { where: { isActive: true } } } },
-          },
-          orderBy: { sessionsAsTeacher: { _count: 'desc' } },
-          take: 4,
-        }),
-
-        // Recent 4 payments
-        this.prisma.payment.findMany({
-          where: branchFilter,
-          include: {
-            invoice: { select: { type: true, invoiceNumber: true, student: { select: { name: true } } } },
-            recordedBy: { select: { name: true } },
-          },
-          orderBy: { paidAt: 'desc' },
-          take: 4,
-        }),
-
-        // Recent 4 sales
-        this.prisma.sale.findMany({
-          where: branchFilter,
-          include: {
-            student: { select: { name: true } },
-            saleItems: { include: { product: { select: { name: true } } } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 4,
-        }),
-      ])
-
-    // =========================================================
-    // PHASE 3 — 6-month trend (each month: 4 aggregates parallel)
-    // =========================================================
-    const financeTrend = await Promise.all(
-      trendRanges.map(async r => {
-        const [tSpp, tReg, tSales, tComm] = await Promise.all([
-          this.prisma.payment.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
-          }),
-          this.prisma.payment.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'REGISTRATION' } },
-          }),
-          this.prisma.sale.aggregate({
-            _sum: { totalAmount: true },
-            where: { ...branchFilter, createdAt: { gte: r.start, lt: r.end } },
-          }),
-          this.prisma.commission.aggregate({
-            _sum: { totalAmount: true },
-            where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
-          }),
-        ])
-        const income =
-          toNum(tSpp._sum.amount) + toNum(tReg._sum.amount) + toNum(tSales._sum.totalAmount)
-        const expense = toNum(tComm._sum.totalAmount)
-        return { month: r.month, year: r.year, income, expense, net: income - expense }
-      }),
+    const trendKey = (y: number, m: number) => `${y}-${m}`
+    const trendBuckets = new Map(
+      trendRanges.map(r => [trendKey(r.year, r.month), { spp: 0, reg: 0, sales: 0, comm: 0 }]),
     )
+    const findBucket = (date: Date) => {
+      for (const r of trendRanges) {
+        if (date >= r.start && date < r.end) return trendBuckets.get(trendKey(r.year, r.month))
+      }
+      return undefined
+    }
+    for (const p of trendPayments) {
+      const b = findBucket(p.paidAt)
+      if (!b) continue
+      if (p.invoice.type === 'SPP') b.spp += toNum(p.amount)
+      else if (p.invoice.type === 'REGISTRATION') b.reg += toNum(p.amount)
+    }
+    for (const s of trendSales) {
+      const b = findBucket(s.createdAt)
+      if (b) b.sales += toNum(s.totalAmount)
+    }
+    for (const c of trendCommissions) {
+      const b = trendBuckets.get(trendKey(c.year, c.month))
+      if (b) b.comm += toNum(c._sum.totalAmount)
+    }
+    const financeTrend = trendRanges.map(r => {
+      const b = trendBuckets.get(trendKey(r.year, r.month))!
+      const income = b.spp + b.reg + b.sales
+      const expense = b.comm
+      return { month: r.month, year: r.year, income, expense, net: income - expense }
+    })
 
     // =========================================================
     // COMPOSE RESPONSE

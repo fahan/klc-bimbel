@@ -35,6 +35,7 @@ export class TeacherBonusesService {
     if (!teacher) throw new NotFoundException('Guru tidak ditemukan')
 
     const bonus = await this.prisma.teacherBonus.create({
+      relationLoadStrategy: 'join',
       data: {
         branchId: dto.branchId,
         teacherId: dto.teacherId,
@@ -56,6 +57,7 @@ export class TeacherBonusesService {
 
   async findAll(branchId: string, month: number, year: number) {
     const bonuses = await this.prisma.teacherBonus.findMany({
+      relationLoadStrategy: 'join',
       where: { branchId, month, year },
       include: { branch: true, teacher: true, createdBy: true, approvedBy: true },
       orderBy: [{ teacher: { name: 'asc' } }, { createdAt: 'asc' }],
@@ -84,6 +86,7 @@ export class TeacherBonusesService {
 
   async findByTeacher(teacherId: string, year?: number) {
     const bonuses = await this.prisma.teacherBonus.findMany({
+      relationLoadStrategy: 'join',
       where: { teacherId, ...(year && { year }) },
       include: { branch: true, approvedBy: true },
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
@@ -103,6 +106,7 @@ export class TeacherBonusesService {
     }
 
     const updated = await this.prisma.teacherBonus.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         ...(dto.amount !== undefined && { amount: dto.amount }),
@@ -137,6 +141,7 @@ export class TeacherBonusesService {
     }
 
     const updated = await this.prisma.teacherBonus.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         status: 'APPROVED',

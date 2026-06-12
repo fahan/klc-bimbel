@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode, BadRequestException } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger'
 import { CommissionsService } from './commissions.service'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
@@ -55,13 +55,15 @@ export class CommissionsController {
     @Query('month') month: string,
     @Query('year') year: string,
   ): Promise<any> {
-    if (!branchId || !month || !year) {
-      throw new Error('branchId, month, and year are required')
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    if (!branchId || Number.isNaN(monthNum) || Number.isNaN(yearNum)) {
+      throw new BadRequestException('branchId, month, and year are required')
     }
     return this.commissionsService.getCommissionsByMonth(
       branchId,
-      parseInt(month, 10),
-      parseInt(year, 10),
+      monthNum,
+      yearNum,
     )
   }
 

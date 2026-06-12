@@ -13,6 +13,7 @@ export class SubjectsService {
 
     const [subjects, total] = await Promise.all([
       this.prisma.subject.findMany({
+        relationLoadStrategy: 'join',
         where: {
           isActive: true,
           ...(filters?.trackingType && { trackingType: filters.trackingType as any }),
@@ -52,6 +53,7 @@ export class SubjectsService {
 
   async findOne(id: string) {
     const subject = await this.prisma.subject.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         sppRates: true,
@@ -118,6 +120,7 @@ export class SubjectsService {
     }
 
     const updated = await this.prisma.subject.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         name: updateSubjectDto.name || subject.name,

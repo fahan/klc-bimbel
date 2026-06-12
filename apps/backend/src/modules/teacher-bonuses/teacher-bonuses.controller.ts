@@ -1,6 +1,6 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, UseGuards,
+  Body, Param, Query, UseGuards, BadRequestException,
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
 import { TeacherBonusesService } from './teacher-bonuses.service'
@@ -35,10 +35,12 @@ export class TeacherBonusesController {
     @Query('month') month: string,
     @Query('year') year: string,
   ) {
-    if (!branchId || !month || !year) {
-      throw new Error('branchId, month, and year are required')
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    if (!branchId || Number.isNaN(monthNum) || Number.isNaN(yearNum)) {
+      throw new BadRequestException('branchId, month, and year are required')
     }
-    return this.service.findAll(branchId, parseInt(month), parseInt(year))
+    return this.service.findAll(branchId, monthNum, yearNum)
   }
 
   @Get('my')

@@ -14,6 +14,7 @@ export class TeachersService {
 
     const [teachers, total] = await Promise.all([
       this.prisma.user.findMany({
+        relationLoadStrategy: 'join',
         where: {
           role: 'GURU',
           isActive: true,
@@ -70,6 +71,7 @@ export class TeachersService {
 
   async findOne(id: string) {
     const teacher = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branches: {
@@ -122,6 +124,7 @@ export class TeachersService {
 
     // Create teacher with branch assignments in transaction
     const teacher = await this.prisma.user.create({
+      relationLoadStrategy: 'join',
       data: {
         name: createTeacherDto.name,
         email: createTeacherDto.email,
@@ -211,6 +214,7 @@ export class TeachersService {
     }
 
     const updated = await this.prisma.user.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: updateData,
       include: {
@@ -235,6 +239,7 @@ export class TeachersService {
 
   async remove(id: string) {
     const teacher = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         sessionsAsTeacher: {

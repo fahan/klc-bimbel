@@ -9,6 +9,7 @@ export class ExpensesService {
 
   async create(dto: CreateExpenseDto, userId: string) {
     const expense = await this.prisma.expense.create({
+      relationLoadStrategy: 'join',
       data: {
         branchId: dto.branchId,
         category: dto.category,
@@ -44,6 +45,7 @@ export class ExpensesService {
     if (filters.category) where.category = filters.category
 
     const expenses = await this.prisma.expense.findMany({
+      relationLoadStrategy: 'join',
       where,
       include: {
         branch: { select: { id: true, name: true, code: true } },
@@ -63,6 +65,7 @@ export class ExpensesService {
 
   async findOne(id: string) {
     const expense = await this.prisma.expense.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branch: { select: { id: true, name: true, code: true } },
@@ -76,6 +79,7 @@ export class ExpensesService {
   async update(id: string, dto: UpdateExpenseDto) {
     await this.findOne(id)
     const updated = await this.prisma.expense.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         ...(dto.category && { category: dto.category }),

@@ -19,6 +19,8 @@ export class SessionsService {
 
     const [sessions, total] = await Promise.all([
       this.prisma.session.findMany({
+        // Single JOIN for relations instead of one query per relation.
+        relationLoadStrategy: 'join',
         where: {
           isActive: true,
           ...(filters?.branchId && { branchId: filters.branchId }),
@@ -71,6 +73,7 @@ export class SessionsService {
 
   async findOne(id: string) {
     const session = await this.prisma.session.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branch: true,
@@ -102,6 +105,7 @@ export class SessionsService {
     const todayDow = days[today.getDay()]
 
     const sessions = await this.prisma.session.findMany({
+      relationLoadStrategy: 'join',
       where: {
         teacherId,
         dayOfWeek: todayDow as any,
@@ -191,6 +195,7 @@ export class SessionsService {
     }
 
     const sessions = await this.prisma.session.findMany({
+      relationLoadStrategy: 'join',
       where: whereClause,
       include: {
         branch: true,
@@ -327,6 +332,7 @@ export class SessionsService {
     try {
       session = await this.prisma.$transaction(async (tx) => {
         const newSession = await tx.session.create({
+          relationLoadStrategy: 'join',
           data: {
             branchId: createSessionDto.branchId,
             subjectId: createSessionDto.subjectId,
@@ -519,6 +525,7 @@ export class SessionsService {
 
         for (const sessionItem of createBulkDto.sessions) {
           const newSession = await tx.session.create({
+            relationLoadStrategy: 'join',
             data: {
               branchId: createBulkDto.branchId,
               subjectId: createBulkDto.subjectId,
@@ -734,6 +741,7 @@ export class SessionsService {
             const subjectRecord = subjects.find(s => s.id === subject.subjectId)
 
             const newSession = await tx.session.create({
+              relationLoadStrategy: 'join',
               data: {
                 branchId: createCombinedDto.branchId,
                 subjectId: subject.subjectId,
@@ -1046,6 +1054,7 @@ export class SessionsService {
     }
 
     const updated = await this.prisma.session.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         branchId: updateSessionDto.branchId ?? session.branchId,
@@ -1077,6 +1086,7 @@ export class SessionsService {
 
   async remove(id: string) {
     const session = await this.prisma.session.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         studentSessions: { where: { isActive: true } },
@@ -1106,6 +1116,7 @@ export class SessionsService {
 
   async hardDelete(id: string) {
     const session = await this.prisma.session.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         studentSessions: { where: { isActive: true } },
@@ -1143,6 +1154,7 @@ export class SessionsService {
   async updateSessionWithStudents(id: string, updateDto: UpdateSessionWithStudentsDto) {
     // Verify session exists
     const session = await this.prisma.session.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branch: true,
@@ -1235,6 +1247,7 @@ export class SessionsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       // Update session details
       const updatedSession = await tx.session.update({
+        relationLoadStrategy: 'join',
         where: { id },
         data: {
           branchId: updateDto.branchId ?? session.branchId,

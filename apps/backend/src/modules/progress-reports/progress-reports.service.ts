@@ -14,6 +14,7 @@ export class ProgressReportsService {
 
   async findAll(filters?: { branchId?: string; status?: string; studentId?: string }) {
     const links = await this.prisma.progressReportLink.findMany({
+      relationLoadStrategy: 'join',
       where: {
         ...(filters?.branchId && { branchId: filters.branchId }),
         ...(filters?.studentId && { studentId: filters.studentId }),
@@ -80,6 +81,7 @@ export class ProgressReportsService {
 
   async findByToken(token: string) {
     const link = await this.prisma.progressReportLink.findUnique({
+      relationLoadStrategy: 'join',
       where: { token },
       include: {
         branch: true,
@@ -140,6 +142,7 @@ export class ProgressReportsService {
    */
   private async buildSubjectReports(studentId: string, subjectIds: string[]) {
     const subjects = await this.prisma.subject.findMany({
+      relationLoadStrategy: 'join',
       where: { id: { in: subjectIds } },
       include: {
         curriculumModules: {
@@ -154,6 +157,7 @@ export class ProgressReportsService {
         if (subject.trackingType === 'MODULE_BASED') {
           // Module-based: get module progress
           const moduleProgress = await this.prisma.studentModuleProgress.findMany({
+            relationLoadStrategy: 'join',
             where: {
               studentId,
               module: { subjectId: subject.id },
@@ -163,6 +167,7 @@ export class ProgressReportsService {
 
           // Get recent session logs with progress
           const recentLogs = await this.prisma.progressLog.findMany({
+            relationLoadStrategy: 'join',
             where: {
               studentId,
               subjectId: subject.id,
@@ -217,6 +222,7 @@ export class ProgressReportsService {
         } else {
           // Free-material: get progress logs
           const recentLogs = await this.prisma.progressLog.findMany({
+            relationLoadStrategy: 'join',
             where: {
               studentId,
               subjectId: subject.id,
@@ -282,6 +288,7 @@ export class ProgressReportsService {
     user: { id: string; role: string },
   ) {
     const student = await this.prisma.student.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: studentId },
       include: {
         branch: true,
@@ -332,6 +339,7 @@ export class ProgressReportsService {
   async create(dto: CreateReportLinkDto, currentUserId: string) {
     // Verify student exists
     const student = await this.prisma.student.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: dto.studentId },
       include: {
         studentSubjects: {
@@ -363,6 +371,7 @@ export class ProgressReportsService {
     }
 
     const link = await this.prisma.progressReportLink.create({
+      relationLoadStrategy: 'join',
       data: {
         studentId: dto.studentId,
         branchId: student.branchId,
@@ -391,6 +400,7 @@ export class ProgressReportsService {
 
     // Set expiresAt to past to revoke
     const updated = await this.prisma.progressReportLink.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: { expiresAt: new Date(Date.now() - 1000) },
       include: {
@@ -415,6 +425,7 @@ export class ProgressReportsService {
       durationDays > 0 ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000) : null
 
     const updated = await this.prisma.progressReportLink.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: { expiresAt },
       include: {

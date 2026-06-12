@@ -14,6 +14,7 @@ export class SppRatesService {
 
     const [sppRates, total] = await Promise.all([
       this.prisma.sppRate.findMany({
+        relationLoadStrategy: 'join',
         where: {
           ...(filters?.subjectId && { subjectId: filters.subjectId }),
         },
@@ -50,6 +51,7 @@ export class SppRatesService {
 
   async findOne(id: string) {
     const sppRate = await this.prisma.sppRate.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         subject: true,
@@ -123,6 +125,7 @@ export class SppRatesService {
     }
 
     const sppRate = await this.prisma.sppRate.create({
+      relationLoadStrategy: 'join',
       data: {
         subjectId: createSppRateDto.subjectId,
         type: createSppRateDto.type,
@@ -175,6 +178,7 @@ export class SppRatesService {
     }
 
     const updated = await this.prisma.sppRate.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         subjectId: updateSppRateDto.subjectId || sppRate.subjectId,

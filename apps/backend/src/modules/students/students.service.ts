@@ -29,6 +29,7 @@ export class StudentsService {
 
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
+        relationLoadStrategy: 'join',
         where,
         include: {
           studentSubjects: {
@@ -65,6 +66,7 @@ export class StudentsService {
 
   async findOne(id: string) {
     const student = await this.prisma.student.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         studentSubjects: {
@@ -98,6 +100,7 @@ export class StudentsService {
     }
 
     const student = await this.prisma.student.create({
+      relationLoadStrategy: 'join',
       data: {
         name: createStudentDto.name,
         sureName: createStudentDto.sureName || null,
@@ -138,6 +141,7 @@ export class StudentsService {
     }
 
     const updated = await this.prisma.student.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         ...(updateStudentDto.name && { name: updateStudentDto.name }),
@@ -216,6 +220,7 @@ export class StudentsService {
 
       // Get session
       const session = await this.prisma.session.findUnique({
+        relationLoadStrategy: 'join',
         where: { id: subjectEnroll.sessionId },
         include: { teacher: true },
       })
@@ -334,6 +339,7 @@ export class StudentsService {
     }
 
     const sessions = await this.prisma.session.findMany({
+      relationLoadStrategy: 'join',
       where: {
         subjectId,
         branchId,
@@ -532,6 +538,7 @@ export class StudentsService {
 
     // Create enrollment
     const studentSubject = await this.prisma.studentSubject.create({
+      relationLoadStrategy: 'join',
       data: {
         studentId,
         subjectId,
@@ -578,6 +585,7 @@ export class StudentsService {
     }
 
     const studentSubject = await this.prisma.studentSubject.findFirst({
+      relationLoadStrategy: 'join',
       where: {
         studentId,
         subjectId,
@@ -620,6 +628,7 @@ export class StudentsService {
 
     // Update student subject
     const updated = await this.prisma.studentSubject.update({
+      relationLoadStrategy: 'join',
       where: { id: studentSubject.id },
       data: {
         type: newType as any,
@@ -635,6 +644,7 @@ export class StudentsService {
     let sessionInfo: any = {}
     if (updateData.sessionId) {
       const session = await this.prisma.session.findUnique({
+        relationLoadStrategy: 'join',
         where: { id: updateData.sessionId },
         include: { teacher: true },
       })
@@ -695,6 +705,7 @@ export class StudentsService {
     discountAffectsCommission?: boolean,
   ) {
     const studentSubject = await this.prisma.studentSubject.findFirst({
+      relationLoadStrategy: 'join',
       where: { studentId, subjectId, isActive: true },
       include: { subject: true },
     })
@@ -703,6 +714,7 @@ export class StudentsService {
     }
 
     const updated = await this.prisma.studentSubject.update({
+      relationLoadStrategy: 'join',
       where: { id: studentSubject.id },
       data: {
         discountAmount: discountAmount !== null ? discountAmount : null,
@@ -781,6 +793,7 @@ export class StudentsService {
     }
 
     const studentSubject = await this.prisma.studentSubject.findFirst({
+      relationLoadStrategy: 'join',
       where: { studentId, subjectId, isActive: true },
       include: { subject: true },
     })
@@ -823,6 +836,7 @@ export class StudentsService {
   // Helper: format student for response
   async updateSubjectSppRate(studentId: string, subjectId: string, sppRateId: string) {
     const studentSubject = await this.prisma.studentSubject.findFirst({
+      relationLoadStrategy: 'join',
       where: { studentId, subjectId, isActive: true },
       include: { subject: true },
     })
