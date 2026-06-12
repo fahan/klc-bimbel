@@ -122,6 +122,7 @@ export class PaymentsService {
 
   async getRecentPayments(branchId?: string, limit: number = 20) {
     const payments = await this.prisma.payment.findMany({
+      relationLoadStrategy: 'join',
       where: branchId ? { branchId } : undefined,
       include: {
         recordedBy: true,

@@ -44,6 +44,7 @@ export class ExpensesService {
     if (filters.category) where.category = filters.category
 
     const expenses = await this.prisma.expense.findMany({
+      relationLoadStrategy: 'join',
       where,
       include: {
         branch: { select: { id: true, name: true, code: true } },

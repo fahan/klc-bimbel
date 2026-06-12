@@ -353,6 +353,7 @@ export class CommissionsService {
 
   async getCommissionsByMonth(branchId: string, month: number, year: number) {
     const commissions = await this.prisma.commission.findMany({
+      relationLoadStrategy: 'join',
       where: { branchId, month, year },
       include: {
         teacher: true,
@@ -597,6 +598,7 @@ export class CommissionsService {
 
   async getMyCommissions(teacherId: string, year?: number) {
     const commissions = await this.prisma.commission.findMany({
+      relationLoadStrategy: 'join',
       where: {
         teacherId,
         ...(year && { year }),

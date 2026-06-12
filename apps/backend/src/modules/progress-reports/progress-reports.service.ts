@@ -14,6 +14,7 @@ export class ProgressReportsService {
 
   async findAll(filters?: { branchId?: string; status?: string; studentId?: string }) {
     const links = await this.prisma.progressReportLink.findMany({
+      relationLoadStrategy: 'join',
       where: {
         ...(filters?.branchId && { branchId: filters.branchId }),
         ...(filters?.studentId && { studentId: filters.studentId }),

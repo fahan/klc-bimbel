@@ -118,6 +118,7 @@ export class DashboardService {
 
       // Today's sessions (up to 10)
       this.prisma.session.findMany({
+        relationLoadStrategy: 'join',
         where: { isActive: true, dayOfWeek: todayDow, ...branchFilter },
         include: {
           branch: { select: { name: true } },
@@ -159,6 +160,7 @@ export class DashboardService {
 
       // Recent 4 payments
       this.prisma.payment.findMany({
+        relationLoadStrategy: 'join',
         where: branchFilter,
         include: {
           invoice: { select: { type: true, invoiceNumber: true, student: { select: { name: true } } } },
@@ -170,6 +172,7 @@ export class DashboardService {
 
       // Recent 4 sales
       this.prisma.sale.findMany({
+        relationLoadStrategy: 'join',
         where: branchFilter,
         include: {
           student: { select: { name: true } },

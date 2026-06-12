@@ -14,6 +14,7 @@ export class TeachersService {
 
     const [teachers, total] = await Promise.all([
       this.prisma.user.findMany({
+        relationLoadStrategy: 'join',
         where: {
           role: 'GURU',
           isActive: true,

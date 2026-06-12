@@ -38,6 +38,7 @@ export class UsersService {
 
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
+        relationLoadStrategy: "join",
         where,
         include: {
           branches: {

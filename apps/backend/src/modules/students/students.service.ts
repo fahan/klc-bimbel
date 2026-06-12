@@ -29,6 +29,7 @@ export class StudentsService {
 
     const [students, total] = await Promise.all([
       this.prisma.student.findMany({
+        relationLoadStrategy: 'join',
         where,
         include: {
           studentSubjects: {
