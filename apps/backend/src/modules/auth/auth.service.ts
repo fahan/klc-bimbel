@@ -20,6 +20,7 @@ export class AuthService {
 
     // Find user by email with roles and branches
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { email },
       include: {
         roles: true,
@@ -81,6 +82,7 @@ export class AuthService {
 
   async validateUser(payload: any) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: payload.id },
       include: {
         roles: true,
@@ -106,6 +108,7 @@ export class AuthService {
 
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         roles: true,

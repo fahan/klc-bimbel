@@ -34,6 +34,7 @@ export class StoreService {
     // Prisma can't do in WHERE natively — fetch all and filter in memory
     if (filters?.lowStock) {
       const all = await this.prisma.product.findMany({
+        relationLoadStrategy: 'join',
         where: baseWhere,
         include: { branch: true },
         orderBy: { name: 'asc' },
@@ -49,6 +50,7 @@ export class StoreService {
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
+        relationLoadStrategy: 'join',
         where: baseWhere,
         include: { branch: true },
         orderBy: { name: 'asc' },
@@ -72,6 +74,7 @@ export class StoreService {
 
   async findOneProduct(id: string) {
     const product = await this.prisma.product.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: { branch: true },
     })
@@ -88,6 +91,7 @@ export class StoreService {
     if (!branch) throw new BadRequestException('Branch not found')
 
     const product = await this.prisma.product.create({
+      relationLoadStrategy: 'join',
       data: {
         branchId: dto.branchId,
         name: dto.name,
@@ -112,6 +116,7 @@ export class StoreService {
     if (!existing) throw new NotFoundException('Product not found')
 
     const updated = await this.prisma.product.update({
+      relationLoadStrategy: 'join',
       where: { id },
       data: {
         name: dto.name ?? existing.name,
@@ -201,6 +206,7 @@ export class StoreService {
     // Create sale + decrement stock + record mutations in transaction
     const sale = await this.prisma.$transaction(async tx => {
       const newSale = await tx.sale.create({
+        relationLoadStrategy: 'join',
         data: {
           branchId: dto.branchId,
           studentId: dto.studentId || null,
@@ -296,6 +302,7 @@ export class StoreService {
     })
 
     const updated = await this.prisma.product.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: dto.productId },
       include: { branch: true },
     })
@@ -309,6 +316,7 @@ export class StoreService {
 
   async getLowStockProducts(branchId?: string) {
     const products = await this.prisma.product.findMany({
+      relationLoadStrategy: 'join',
       where: {
         isActive: true,
         ...(branchId && { branchId }),
@@ -332,6 +340,7 @@ export class StoreService {
    */
   async transferStock(dto: TransferStockDto, currentUserId: string) {
     const sourceProduct = await this.prisma.product.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: dto.productId },
       include: { branch: true },
     })
@@ -435,6 +444,7 @@ export class StoreService {
 
   async getTransferHistory(branchId?: string) {
     const mutations = await this.prisma.stockMutation.findMany({
+      relationLoadStrategy: 'join',
       where: {
         type: { in: ['TRANSFER_IN', 'TRANSFER_OUT'] },
         ...(branchId && { branchId }),
@@ -467,6 +477,7 @@ export class StoreService {
 
   async getStockMutations(productId: string) {
     const mutations = await this.prisma.stockMutation.findMany({
+      relationLoadStrategy: 'join',
       where: { productId },
       include: { createdBy: true, product: true },
       orderBy: { createdAt: 'desc' },

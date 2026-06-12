@@ -41,6 +41,7 @@ export class CommissionsService {
 
     // ── Step 1: Load all completed session logs with attendances ──────────────
     const sessionLogs = await this.prisma.sessionLog.findMany({
+      relationLoadStrategy: 'join',
       where: {
         sessionDate: { gte: startDate, lt: endDate },
         status: 'COMPLETED',
@@ -78,6 +79,7 @@ export class CommissionsService {
     // ── Step 3: Bulk pre-load — studentSubjects, teachers ────────────────────
     const [allStudentSubjects, allTeachers] = await Promise.all([
       this.prisma.studentSubject.findMany({
+        relationLoadStrategy: 'join',
         where: {
           studentId: { in: Array.from(neededStudentIds) },
           subjectId: { in: Array.from(neededSubjectIds) },
@@ -426,6 +428,7 @@ export class CommissionsService {
 
   async getCommissionDetail(commissionId: string) {
     const commission = await this.prisma.commission.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: commissionId },
       include: {
         teacher: true,
@@ -452,6 +455,7 @@ export class CommissionsService {
     const uniqueStudentIds = [...new Set(commission.commissionDetails.map(d => d.studentId))]
     const uniqueSubjectIds = [...new Set(commission.commissionDetails.map(d => d.subjectId))]
     const studentSubjectsForBilling = await this.prisma.studentSubject.findMany({
+      relationLoadStrategy: 'join',
       where: {
         studentId: { in: uniqueStudentIds },
         subjectId: { in: uniqueSubjectIds },
@@ -551,6 +555,7 @@ export class CommissionsService {
     }
 
     const updated = await this.prisma.commission.update({
+      relationLoadStrategy: 'join',
       where: { id: commissionId },
       data: {
         status: 'APPROVED',

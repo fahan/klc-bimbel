@@ -74,6 +74,7 @@ export class UsersService {
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id },
       include: {
         branches: {
@@ -97,6 +98,7 @@ export class UsersService {
 
   async updateRole(userId: string, updateRoleDto: UpdateRoleDto) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -125,6 +127,7 @@ export class UsersService {
     }
 
     const updated = await this.prisma.user.update({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       data: { role: updateRoleDto.role as any },
       include: {
@@ -145,6 +148,7 @@ export class UsersService {
 
   async assignBranch(userId: string, assignBranchDto: AssignBranchDto) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: true,
@@ -192,6 +196,7 @@ export class UsersService {
     })
 
     const updated = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -211,6 +216,7 @@ export class UsersService {
 
   async removeBranch(userId: string, branchId: string) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: true,
@@ -248,6 +254,7 @@ export class UsersService {
     })
 
     const updated = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -283,6 +290,7 @@ export class UsersService {
     }
 
     const updated = await this.prisma.user.update({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       data: { isActive: false },
       include: {
@@ -315,6 +323,7 @@ export class UsersService {
     }
 
     const updated = await this.prisma.user.update({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       data: { isActive: true },
       include: {
@@ -335,6 +344,7 @@ export class UsersService {
 
   async addRole(userId: string, role: string) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -375,6 +385,7 @@ export class UsersService {
     })
 
     const updated = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -395,6 +406,7 @@ export class UsersService {
 
   async removeRole(userId: string, role: string) {
     const user = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -437,6 +449,7 @@ export class UsersService {
     })
 
     const updated = await this.prisma.user.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       include: {
         branches: {
@@ -466,6 +479,7 @@ export class UsersService {
     if (emailTaken) throw new ConflictException("Email sudah digunakan oleh akun lain")
 
     const updated = await this.prisma.user.update({
+      relationLoadStrategy: 'join',
       where: { id: userId },
       data: { name: dto.name, email: dto.email, phone: dto.phone ?? null },
       include: {

@@ -9,6 +9,7 @@ export class ProgressService {
   async submitProgress(submitDto: SubmitProgressDto, currentUserId: string) {
     // Verify session log exists
     const sessionLog = await this.prisma.sessionLog.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: submitDto.sessionLogId },
       include: {
         session: {
@@ -159,6 +160,7 @@ export class ProgressService {
 
     // Get the result
     const progressLogs = await this.prisma.progressLog.findMany({
+      relationLoadStrategy: 'join',
       where: { sessionLogId: submitDto.sessionLogId },
       include: {
         student: true,
@@ -207,6 +209,7 @@ export class ProgressService {
     }
 
     const progressLogs = await this.prisma.progressLog.findMany({
+      relationLoadStrategy: 'join',
       where: { sessionLogId: submitDto.sessionLogId },
       include: {
         student: true,
@@ -283,6 +286,7 @@ export class ProgressService {
   async getStudentLastModule(studentId: string, subjectId: string) {
     // Find current module being worked on
     const inProgress = await this.prisma.studentModuleProgress.findFirst({
+      relationLoadStrategy: 'join',
       where: {
         studentId,
         status: 'IN_PROGRESS',
@@ -308,6 +312,7 @@ export class ProgressService {
 
     // No in-progress, get next module to start
     const completedModules = await this.prisma.studentModuleProgress.findMany({
+      relationLoadStrategy: 'join',
       where: {
         studentId,
         status: 'COMPLETED',

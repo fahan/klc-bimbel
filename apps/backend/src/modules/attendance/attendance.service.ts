@@ -10,6 +10,7 @@ export class AttendanceService {
   async submitAttendance(submitDto: SubmitAttendanceDto, currentUserId: string, substitutionReason?: string) {
     // Verify session exists
     const session = await this.prisma.session.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: submitDto.sessionId },
       include: {
         teacher: true,
@@ -109,6 +110,7 @@ export class AttendanceService {
 
     // Get the complete session log with attendances
     const result = await this.prisma.sessionLog.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: sessionLog.id },
       include: {
         actualTeacher: true,
@@ -132,6 +134,7 @@ export class AttendanceService {
     date.setHours(0, 0, 0, 0)
 
     const sessionLog = await this.prisma.sessionLog.findFirst({
+      relationLoadStrategy: 'join',
       where: {
         sessionId,
         sessionDate: date,
@@ -161,6 +164,7 @@ export class AttendanceService {
 
   async getAttendanceHistory(sessionId: string) {
     const sessionLogs = await this.prisma.sessionLog.findMany({
+      relationLoadStrategy: 'join',
       where: { sessionId },
       include: {
         actualTeacher: true,
@@ -412,6 +416,7 @@ export class AttendanceService {
     })
 
     const result = await this.prisma.sessionLog.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: sessionLog.id },
       include: {
         actualTeacher: true,
@@ -468,6 +473,7 @@ export class AttendanceService {
 
     // 1. Approve the session log
     const updated = await this.prisma.sessionLog.update({
+      relationLoadStrategy: 'join',
       where: { id: sessionLogId },
       data: {
         status: 'COMPLETED',
@@ -674,6 +680,7 @@ export class AttendanceService {
     }
 
     const updated = await this.prisma.sessionLog.update({
+      relationLoadStrategy: 'join',
       where: { id: sessionLogId },
       data: {
         status: 'REJECTED',
@@ -699,6 +706,7 @@ export class AttendanceService {
   async getEligibleStudents(branchId: string, subjectId: string) {
     // Students at branch who are enrolled in the given subject
     const studentSubjects = await this.prisma.studentSubject.findMany({
+      relationLoadStrategy: 'join',
       where: {
         subjectId,
         isActive: true,
@@ -722,6 +730,7 @@ export class AttendanceService {
 
   async getSessionLogById(sessionLogId: string) {
     const log = await this.prisma.sessionLog.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: sessionLogId },
       include: {
         session: { include: { subject: true, teacher: true } },
@@ -763,6 +772,7 @@ export class AttendanceService {
 
   async getMyAdHocHistory(teacherId: string) {
     const logs = await this.prisma.sessionLog.findMany({
+      relationLoadStrategy: 'join',
       where: { isAdHoc: true, actualTeacherId: teacherId },
       include: {
         adHocBranch: true,

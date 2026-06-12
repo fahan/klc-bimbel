@@ -8,6 +8,7 @@ export class CommissionFormulasService {
 
   async findAll(subjectId?: string) {
     const subjects = await this.prisma.subject.findMany({
+      relationLoadStrategy: 'join',
       where: {
         isActive: true,
         ...(subjectId && { id: subjectId }),

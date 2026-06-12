@@ -9,6 +9,7 @@ export class PaymentsService {
   async recordPayment(dto: RecordPaymentDto, currentUserId: string) {
     // Get invoice
     const invoice = await this.prisma.invoice.findUnique({
+      relationLoadStrategy: 'join',
       where: { id: dto.invoiceId },
       include: { payments: true },
     })
@@ -34,6 +35,7 @@ export class PaymentsService {
     const result = await this.prisma.$transaction(async tx => {
       // Create payment
       const payment = await tx.payment.create({
+        relationLoadStrategy: 'join',
         data: {
           invoiceId: dto.invoiceId,
           branchId: invoice.branchId,
@@ -51,6 +53,7 @@ export class PaymentsService {
       const newPaidAmount = currentPaid + dto.amount
       const newStatus = newPaidAmount >= total ? 'PAID' : 'PARTIAL'
       const updatedInvoice = await tx.invoice.update({
+        relationLoadStrategy: 'join',
         where: { id: dto.invoiceId },
         data: {
           paidAmount: newPaidAmount,
@@ -101,6 +104,7 @@ export class PaymentsService {
 
   async getInvoicePayments(invoiceId: string) {
     const payments = await this.prisma.payment.findMany({
+      relationLoadStrategy: 'join',
       where: { invoiceId },
       include: { recordedBy: true },
       orderBy: { paidAt: 'desc' },
