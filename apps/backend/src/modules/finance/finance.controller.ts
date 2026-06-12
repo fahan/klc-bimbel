@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Query, UseGuards, BadRequestException } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { FinanceService } from './finance.service'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
@@ -26,11 +26,12 @@ export class FinanceController {
     @Query('month') month: string,
     @Query('year') year: string,
   ): Promise<any> {
-    return this.financeService.getOverview(
-      branchId,
-      parseInt(month, 10),
-      parseInt(year, 10),
-    )
+    const monthNum = parseInt(month, 10)
+    const yearNum = parseInt(year, 10)
+    if (Number.isNaN(monthNum) || Number.isNaN(yearNum)) {
+      throw new BadRequestException('month and year are required')
+    }
+    return this.financeService.getOverview(branchId, monthNum, yearNum)
   }
 
   @Get('transactions')
