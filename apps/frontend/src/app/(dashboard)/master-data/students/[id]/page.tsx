@@ -22,6 +22,7 @@ import {
   Tag,
   X,
   DollarSign,
+  CheckCircle,
 } from 'lucide-react'
 import { LoadingState } from '@/components/ui/States'
 import { StatusBadge } from '@/components/ui/Badge'
@@ -69,6 +70,11 @@ export default function StudentDetailPage() {
   const [customSppNote, setCustomSppNote] = useState('')
   const [discountAffectsCommission, setDiscountAffectsCommission] = useState(false)
   const [savingCustomSpp, setSavingCustomSpp] = useState(false)
+  // End-enrollment editor state
+  const [endingSubjectId, setEndingSubjectId] = useState<string | null>(null)
+  const [endStatus, setEndStatus] = useState<'COMPLETED' | 'DROPPED_OUT'>('COMPLETED')
+  const [endDate, setEndDate] = useState('')
+  const [savingEnd, setSavingEnd] = useState(false)
 
   const { data: studentData, isLoading: loadingStudent, refetch } = useQuery({
     queryKey: ['student', studentId],
@@ -241,6 +247,34 @@ export default function StudentDetailPage() {
     }
   }
 
+  const openEndEditor = (subject: any) => {
+    setEndingSubjectId(subject.subjectId)
+    setEndStatus('COMPLETED')
+    setEndDate(new Date().toISOString().split('T')[0])
+    setDiscountSubjectId(null)
+    setSppRateSubjectId(null)
+    setCustomSppSubjectId(null)
+  }
+
+  const handleEndEnrollment = async (subjectName: string) => {
+    if (!endingSubjectId) return
+    const label = endStatus === 'COMPLETED' ? 'menandai selesai' : 'menandai keluar dari'
+    if (!confirm(`Yakin ingin ${label} ${subjectName}? Data presensi & history tetap tersimpan.`)) return
+    try {
+      setSavingEnd(true)
+      await studentApi.endSubjectEnrollment(studentId, endingSubjectId, {
+        status: endStatus,
+        endDate: endDate || undefined,
+      })
+      setEndingSubjectId(null)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal mengakhiri enrollment')
+    } finally {
+      setSavingEnd(false)
+    }
+  }
+
   const handleCancelEdit = () => {
     if (student) {
       reset({
@@ -277,11 +311,12 @@ export default function StudentDetailPage() {
   const allSppRates: any[] = sppRatesData?.data?.data || []
   // Tampilkan semua rate dengan tipe sesi yang sama, dikelompokkan per billingType
   const filteredSppRates = allSppRates.filter((r: any) => r.type === sppRateSubjectType)
-  const totalSubjects = student.subjects?.length || 0
-  const totalSPP = student.subjects?.reduce(
+  const activeSubjects = student.subjects?.filter((s: any) => s.isActive) || []
+  const totalSubjects = activeSubjects.length
+  const totalSPP = activeSubjects.reduce(
     (sum: number, s: any) => sum + parseFloat(s.sppAmount || '0'),
     0,
-  ) || 0
+  )
 
   const inputClass = (hasError?: boolean) =>
     `w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
@@ -606,7 +641,7 @@ export default function StudentDetailPage() {
           </button>
         </div>
 
-        {totalSubjects === 0 ? (
+        {(student.subjects?.length || 0) === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <BookOpen className="w-12 h-12 text-gray-300" />
             <p className="text-sm text-gray-500">Belum terdaftar untuk mata pelajaran apapun</p>
@@ -628,11 +663,17 @@ export default function StudentDetailPage() {
               const isEditingDiscount = discountSubjectId === subject.subjectId
               const isEditingSppRate = sppRateSubjectId === subject.subjectId
               const isEditingCustomSpp = customSppSubjectId === subject.subjectId
+              const isEditingEnd = endingSubjectId === subject.subjectId
+              const isEnded = subject.isActive === false
 
               return (
                 <div
                   key={subject.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition"
+                  className={`border rounded-lg p-4 transition ${
+                    isEnded
+                      ? 'border-gray-200 bg-gray-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -650,6 +691,16 @@ export default function StudentDetailPage() {
                         <p className="text-xs text-gray-500">
                           Terdaftar: {new Date(subject.enrolledAt).toLocaleDateString('id-ID')}
                         </p>
+                        {subject.status === 'COMPLETED' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-700">
+                            Selesai{subject.endDate ? ` · ${new Date(subject.endDate).toLocaleDateString('id-ID')}` : ''}
+                          </span>
+                        )}
+                        {subject.status === 'DROPPED_OUT' && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-700">
+                            Keluar{subject.endDate ? ` · ${new Date(subject.endDate).toLocaleDateString('id-ID')}` : ''}
+                          </span>
+                        )}
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                             isPerSession
@@ -700,6 +751,7 @@ export default function StudentDetailPage() {
                         )}
                         <p className="text-xs text-gray-500">{isPerSession ? 'per sesi' : 'per bulan'}</p>
                       </div>
+                      {!isEnded && (
                       <div className="flex gap-1 justify-end flex-wrap">
                         <button
                           onClick={() => openDiscountEditor(subject)}
@@ -745,6 +797,20 @@ export default function StudentDetailPage() {
                         </button>
                         <button
                           onClick={() => {
+                            if (isEditingEnd) setEndingSubjectId(null)
+                            else openEndEditor(subject)
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium transition ${
+                            isEditingEnd
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          <CheckCircle className="w-3 h-3 inline mr-1" />
+                          Selesaikan
+                        </button>
+                        <button
+                          onClick={() => {
                             if (confirm(`Yakin ingin menghapus ${subject.subjectName}?`)) {
                               studentApi.removeSubject(studentId, subject.subjectId).then(() => refetch())
                             }
@@ -755,8 +821,59 @@ export default function StudentDetailPage() {
                           Hapus
                         </button>
                       </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Inline end-enrollment editor */}
+                  {isEditingEnd && (
+                    <div className="mt-3 pt-3 border-t border-gray-200 bg-emerald-50 rounded-lg p-3 space-y-2">
+                      <p className="text-xs font-semibold text-emerald-800 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Akhiri Enrollment
+                      </p>
+                      <p className="text-[10px] text-emerald-700">
+                        Data presensi & history tetap tersimpan. Enrollment tidak lagi ditagih SPP setelah tanggal berakhir.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Status</label>
+                          <select
+                            value={endStatus}
+                            onChange={(e) => setEndStatus(e.target.value as 'COMPLETED' | 'DROPPED_OUT')}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          >
+                            <option value="COMPLETED">Selesai (lulus)</option>
+                            <option value="DROPPED_OUT">Keluar (berhenti)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-medium text-gray-600 mb-1">Tanggal Berakhir</label>
+                          <input
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleEndEnrollment(subject.subjectName)}
+                          disabled={savingEnd}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded transition disabled:opacity-50"
+                        >
+                          {savingEnd ? 'Menyimpan...' : 'Akhiri Enrollment'}
+                        </button>
+                        <button
+                          onClick={() => setEndingSubjectId(null)}
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded transition"
+                        >
+                          <X className="w-3 h-3 inline" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Inline SPP rate editor */}
                   {isEditingSppRate && (

@@ -622,15 +622,14 @@ All 6 phases are complete. See git log + commit history for detailed timeline.
 
 ## 12. Test Credentials
 
-(Configured in DB seed — verify still valid)
+> **Updated:** The old seed accounts (`owner@bimbel.com`, `admin@bimbel.com`, `guru@bimbel.com`)
+> are **NOT present** in the active KLC database. The real accounts use live emails — Owner is
+> `hanstracker@gmail.com`. Ask the owner for the actual password; it is no longer `password`.
 
-| Role         | Email              | Password   |
-| ------------ | ------------------ | ---------- |
-| Owner        | `owner@bimbel.com` | `password` |
-| Admin Global | `admin@bimbel.com` | `password` |
-| Guru         | `guru@bimbel.com`  | `password` |
-
-(Auth service in current state accepts ANY non-empty password — passwords aren't bcrypt-hashed yet. **Implement bcrypt before production.**)
+**Auth now uses bcrypt** — `auth.service.ts` hashes passwords (`bcrypt.compare` on login,
+`bcrypt.hash` on change-password). The old note "accepts ANY non-empty password" is obsolete.
+For local UI verification without a known password, mint a dev JWT with the backend's
+`JWT_SECRET` (payload `{ id, email, role, roles }`) rather than logging in.
 
 ---
 
@@ -638,7 +637,7 @@ All 6 phases are complete. See git log + commit history for detailed timeline.
 
 When approaching production, address:
 
-1. **Hash passwords** — current auth accepts any non-empty string
+1. ~~**Hash passwords**~~ — ✅ done (bcrypt in `auth.service.ts`)
 2. **Strong JWT_SECRET** — generate cryptographically random
 3. **Use service role key**, not publishable key, for `SUPABASE_SERVICE_ROLE_KEY`
 4. **Enable RLS** on all Supabase tables + write policies

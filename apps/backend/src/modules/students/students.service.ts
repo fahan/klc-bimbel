@@ -70,11 +70,13 @@ export class StudentsService {
       where: { id },
       include: {
         studentSubjects: {
-          where: { isActive: true },
+          // Tampilkan semua enrollment termasuk yang sudah selesai/keluar,
+          // agar tanggal & status berakhir tetap terlihat di halaman detail.
           include: {
             subject: true,
             sppRate: true,
           },
+          orderBy: [{ isActive: 'desc' }, { enrolledAt: 'desc' }],
         },
         branch: true,
       },
