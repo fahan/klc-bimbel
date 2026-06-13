@@ -428,12 +428,24 @@ datasource db {
 
 ### Supabase project info (current)
 
-- **Project ref:** `dntpsrsvvyqjjwvyhdhf`
-- **Region:** `ap-northeast-2` (Seoul)
-- **Pooler host:** `aws-1-ap-northeast-2.pooler.supabase.com`
-- **Database host (direct, IPv6):** `db.dntpsrsvvyqjjwvyhdhf.supabase.co`
-- **API URL:** `https://dntpsrsvvyqjjwvyhdhf.supabase.co`
+> **Migrated Seoul → Singapore on 2026-06-13** for lower latency from Indonesia.
+> The database (`DATABASE_URL`/`DIRECT_URL`) now points to the **KLC** project below.
+> The old Seoul project (`learning-center`, ref `dntpsrsvvyqjjwvyhdhf`) is kept as a
+> backup and STILL hosts landing-page image **Storage** (bucket `landing-images`) —
+> see the storage note. Single-query latency floor dropped ~480ms → ~164ms.
+
+**Active DB project — `KLC`:**
+
+- **Project ref:** `wqcgdmhldsniomnuaipi`
+- **Region:** `ap-southeast-1` (Singapore)
+- **Pooler host:** `aws-1-ap-southeast-1.pooler.supabase.com`
+- **Database host (direct, IPv6):** `db.wqcgdmhldsniomnuaipi.supabase.co`
+- **API URL:** `https://wqcgdmhldsniomnuaipi.supabase.co`
 - **RLS:** Disabled on all tables (auth handled at app layer via JWT) — re-enable for production
+
+**Old backup project — `learning-center` (Seoul):** ref `dntpsrsvvyqjjwvyhdhf`, region `ap-northeast-2`, pooler `aws-1-ap-northeast-2.pooler.supabase.com`. Do not delete until Storage is fully migrated and KLC is verified stable.
+
+> **Migration note:** schema was created on KLC from `prisma migrate diff` (offline DDL); data was copied server-side via `dblink` + `json_populate_record` (Seoul → KLC). `_prisma_migrations` was NOT copied — before running `prisma migrate deploy` against KLC, run `prisma migrate resolve --applied <name>` for each existing migration. Performance levers in [perf memory]: `relationLoadStrategy: 'join'` (preview `relationJoins`, enabled) and pooler `connection_limit=10`.
 
 ### Prisma operations
 
