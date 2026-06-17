@@ -1,5 +1,5 @@
-import { buildCandidateSlots, buildRecommendation } from './recommendation.engine'
-import { DemandItem, TeacherInfo } from './recommendation.types'
+import { buildCandidateSlots, buildRecommendation, planApply } from './recommendation.engine'
+import { ApplyProposal, DemandItem, TeacherInfo } from './recommendation.types'
 
 describe('buildCandidateSlots', () => {
   it('builds 30-minute grid slots that fit before window end', () => {
@@ -161,5 +161,95 @@ describe('buildRecommendation', () => {
     })
     expect(out.proposals).toHaveLength(0)
     expect(out.unassigned).toHaveLength(1)
+  })
+})
+
+function proposal(over: Partial<ApplyProposal> = {}): ApplyProposal {
+  return {
+    tempId: 'p1',
+    subjectId: 'subjA',
+    type: 'REGULAR',
+    teacherId: 't1',
+    dayOfWeek: 'SENIN',
+    startTime: '14:00',
+    durationMinutes: 60,
+    studentIds: ['s1', 's2'],
+    ...over,
+  }
+}
+
+const capacity = { subjA: { maxCapacityRegular: 3, maxCapacityPrivate: 1 } }
+
+describe('planApply', () => {
+  it('accepts a valid proposal', () => {
+    const plan = planApply({
+      proposals: [proposal()],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1', 's2'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan.toCreate).toHaveLength(1)
+    expect(plan.skipped).toHaveLength(0)
+  })
+
+  it('skips a proposal whose teacher is no longer active', () => {
+    const plan = planApply({
+      proposals: [proposal()],
+      activeTeacherIds: [],
+      activeStudentIds: ['s1', 's2'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan.toCreate).toHaveLength(0)
+    expect(plan.skipped[0].reason).toMatch(/guru/i)
+  })
+
+  it('skips a proposal with an inactive student', () => {
+    const plan = planApply({
+      proposals: [proposal({ studentIds: ['s1', 'sX'] })],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan.skipped[0].reason).toMatch(/siswa/i)
+  })
+
+  it('skips a proposal that exceeds subject capacity', () => {
+    const plan = planApply({
+      proposals: [proposal({ studentIds: ['s1', 's2', 's3', 's4'] })],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1', 's2', 's3', 's4'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan.skipped[0].reason).toMatch(/kapasitas/i)
+  })
+
+  it('skips a proposal that overlaps an existing busy slot', () => {
+    const plan = planApply({
+      proposals: [proposal()],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1', 's2'],
+      subjectCapacity: capacity,
+      busySlots: [{ teacherId: 't1', dayOfWeek: 'SENIN', startMinutes: 840, endMinutes: 900 }],
+    })
+    expect(plan.skipped[0].reason).toMatch(/bentrok/i)
+  })
+
+  it('skips the second of two proposals that conflict with each other', () => {
+    const plan = planApply({
+      proposals: [
+        proposal({ tempId: 'p1' }),
+        proposal({ tempId: 'p2', studentIds: ['s3'] }),
+      ],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1', 's2', 's3'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan.toCreate.map((p) => p.tempId)).toEqual(['p1'])
+    expect(plan.skipped.map((p) => p.tempId)).toEqual(['p2'])
   })
 })

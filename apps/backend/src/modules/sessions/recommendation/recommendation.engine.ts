@@ -1,4 +1,7 @@
 import {
+  ApplyPlan,
+  ApplyPlanInput,
+  ApplyProposal,
   BusySlot,
   CandidateSlot,
   DemandItem,
@@ -209,4 +212,54 @@ export function buildRecommendation(input: EngineInput): EngineOutput {
   }))
 
   return { proposals, unassigned, teacherLoad }
+}
+
+export function planApply(input: ApplyPlanInput): ApplyPlan {
+  const { proposals, activeTeacherIds, activeStudentIds, subjectCapacity, busySlots } = input
+  const teacherSet = new Set(activeTeacherIds)
+  const studentSet = new Set(activeStudentIds)
+
+  const running: BusySlot[] = busySlots.map((b) => ({ ...b }))
+
+  const toCreate: ApplyProposal[] = []
+  const skipped: { tempId: string; reason: string }[] = []
+
+  for (const p of proposals) {
+    if (!teacherSet.has(p.teacherId)) {
+      skipped.push({ tempId: p.tempId, reason: 'Guru sudah tidak aktif' })
+      continue
+    }
+    const missingStudent = p.studentIds.some((id) => !studentSet.has(id))
+    if (missingStudent || p.studentIds.length === 0) {
+      skipped.push({ tempId: p.tempId, reason: 'Ada siswa yang sudah tidak aktif' })
+      continue
+    }
+    const caps = subjectCapacity[p.subjectId]
+    const max = caps ? (p.type === 'REGULAR' ? caps.maxCapacityRegular : caps.maxCapacityPrivate) : 0
+    if (max <= 0 || p.studentIds.length > max) {
+      skipped.push({ tempId: p.tempId, reason: `Melebihi kapasitas mata pelajaran (${max})` })
+      continue
+    }
+    const start = timeToMinutes(p.startTime)
+    const end = start + p.durationMinutes
+    const conflict = running.some(
+      (b) =>
+        b.teacherId === p.teacherId &&
+        b.dayOfWeek === p.dayOfWeek &&
+        overlaps(start, end, b.startMinutes, b.endMinutes),
+    )
+    if (conflict) {
+      skipped.push({ tempId: p.tempId, reason: 'Guru bentrok dengan sesi lain' })
+      continue
+    }
+    running.push({
+      teacherId: p.teacherId,
+      dayOfWeek: p.dayOfWeek,
+      startMinutes: start,
+      endMinutes: end,
+    })
+    toCreate.push(p)
+  }
+
+  return { toCreate, skipped }
 }
