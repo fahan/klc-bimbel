@@ -5,6 +5,19 @@ import { CreateBulkSessionsDto } from './dto/create-bulk-sessions.dto'
 import { UpdateSessionDto } from './dto/update-session.dto'
 import { UpdateSessionWithStudentsDto } from './dto/update-session-with-students.dto'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
+import { GenerateRecommendationDto } from './dto/generate-recommendation.dto'
+import { ApplyRecommendationDto } from './dto/apply-recommendation.dto'
+import {
+  buildRecommendation,
+  planApply,
+  timeToMinutes as engineTimeToMinutes,
+} from './recommendation/recommendation.engine'
+import {
+  BusySlot,
+  DemandItem,
+  EngineDayOfWeek,
+  EngineSessionType,
+} from './recommendation/recommendation.types'
 
 @Injectable()
 export class SessionsService {
@@ -1366,6 +1379,116 @@ export class SessionsService {
       success: true,
       data: this.formatSession(updated),
       message: 'Session updated with students successfully',
+    }
+  }
+
+  async generateRecommendation(dto: GenerateRecommendationDto) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: dto.branchId, isActive: true },
+    })
+    if (!branch) {
+      throw new NotFoundException('Cabang tidak ditemukan')
+    }
+
+    // Teachers: all active GURU assigned to this branch
+    const teacherUsers = await this.prisma.user.findMany({
+      where: {
+        role: 'GURU',
+        isActive: true,
+        branches: { some: { branchId: dto.branchId } },
+      },
+      select: { id: true, name: true },
+    })
+    const teachers = teacherUsers.map((t) => ({ teacherId: t.id, name: t.name }))
+
+    // Active enrollments for active students in this branch
+    const enrollments = await this.prisma.studentSubject.findMany({
+      where: {
+        status: 'ACTIVE',
+        isActive: true,
+        student: { branchId: dto.branchId, isActive: true },
+      },
+      include: {
+        student: { select: { id: true, name: true, classLevel: true } },
+        subject: {
+          select: { id: true, name: true, maxCapacityRegular: true, maxCapacityPrivate: true },
+        },
+      },
+    })
+
+    // For FILL mode, exclude enrollments already scheduled (active SessionStudent for same subject)
+    let scheduledPairs = new Set<string>()
+    if (dto.mode === 'FILL_UNSCHEDULED') {
+      const scheduled = await this.prisma.sessionStudent.findMany({
+        where: {
+          isActive: true,
+          session: { isActive: true, branchId: dto.branchId },
+        },
+        select: { studentId: true, session: { select: { subjectId: true } } },
+      })
+      scheduledPairs = new Set(scheduled.map((s) => `${s.studentId}__${s.session.subjectId}`))
+    }
+
+    const demand: DemandItem[] = enrollments
+      .filter((e) =>
+        dto.mode === 'FULL_REGENERATE'
+          ? true
+          : !scheduledPairs.has(`${e.studentId}__${e.subjectId}`),
+      )
+      .map((e) => ({
+        studentId: e.student.id,
+        studentName: e.student.name,
+        classLevel: e.student.classLevel ?? null,
+        subjectId: e.subject.id,
+        subjectName: e.subject.name,
+        type: e.type as EngineSessionType,
+        maxCapacityRegular: e.subject.maxCapacityRegular,
+        maxCapacityPrivate: e.subject.maxCapacityPrivate,
+      }))
+
+    // Busy slots: existing active sessions occupy teachers (only relevant for FILL mode)
+    let busySlots: BusySlot[] = []
+    if (dto.mode === 'FILL_UNSCHEDULED') {
+      const existing = await this.prisma.session.findMany({
+        where: { isActive: true, branchId: dto.branchId },
+        select: { teacherId: true, dayOfWeek: true, startTime: true, durationMinutes: true },
+      })
+      busySlots = existing.map((s) => {
+        const start = engineTimeToMinutes(s.startTime)
+        return {
+          teacherId: s.teacherId,
+          dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
+          startMinutes: start,
+          endMinutes: start + s.durationMinutes,
+        }
+      })
+    }
+
+    const result = buildRecommendation({
+      durationMinutes: dto.durationMinutes,
+      activeDays: dto.activeDays as EngineDayOfWeek[],
+      timeWindow: dto.timeWindow,
+      breakWindow: dto.breakWindow ?? null,
+      demand,
+      teachers,
+      busySlots,
+    })
+
+    return {
+      success: true,
+      data: {
+        mode: dto.mode,
+        generatedAt: new Date().toISOString(),
+        summary: {
+          proposedSessions: result.proposals.length,
+          studentsPlaced: result.proposals.reduce((n, p) => n + p.studentIds.length, 0),
+          teachersUsed: result.teacherLoad.filter((t) => t.sessionCount > 0).length,
+          unassigned: result.unassigned.length,
+        },
+        teacherLoad: result.teacherLoad,
+        proposals: result.proposals,
+        unassigned: result.unassigned,
+      },
     }
   }
 
