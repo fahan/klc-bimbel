@@ -1492,6 +1492,145 @@ export class SessionsService {
     }
   }
 
+  async applyRecommendation(dto: ApplyRecommendationDto) {
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: dto.branchId, isActive: true },
+    })
+    if (!branch) {
+      throw new NotFoundException('Cabang tidak ditemukan')
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Snapshot of valid teachers/students for re-validation
+      const teachers = await tx.user.findMany({
+        where: {
+          role: 'GURU',
+          isActive: true,
+          branches: { some: { branchId: dto.branchId } },
+        },
+        select: { id: true },
+      })
+      const students = await tx.student.findMany({
+        where: { branchId: dto.branchId, isActive: true },
+        select: { id: true },
+      })
+      const subjects = await tx.subject.findMany({
+        select: { id: true, maxCapacityRegular: true, maxCapacityPrivate: true },
+      })
+      const subjectCapacity: Record<string, { maxCapacityRegular: number; maxCapacityPrivate: number }> = {}
+      for (const s of subjects) {
+        subjectCapacity[s.id] = {
+          maxCapacityRegular: s.maxCapacityRegular,
+          maxCapacityPrivate: s.maxCapacityPrivate,
+        }
+      }
+
+      // FULL_REGENERATE: archive existing active sessions that have NO session logs.
+      let archivedSessions = 0
+      const preservedSessions: { id: string; reason: string }[] = []
+      let remainingBusy: BusySlot[] = []
+
+      const existing = await tx.session.findMany({
+        where: { isActive: true, branchId: dto.branchId },
+        select: {
+          id: true, teacherId: true, dayOfWeek: true, startTime: true, durationMinutes: true,
+          _count: { select: { sessionLogs: true } },
+        },
+      })
+
+      if (dto.mode === 'FULL_REGENERATE') {
+        for (const s of existing) {
+          if (s._count.sessionLogs > 0) {
+            preservedSessions.push({ id: s.id, reason: 'Punya riwayat presensi' })
+            const start = engineTimeToMinutes(s.startTime)
+            remainingBusy.push({
+              teacherId: s.teacherId,
+              dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
+              startMinutes: start,
+              endMinutes: start + s.durationMinutes,
+            })
+          } else {
+            await tx.session.update({
+              where: { id: s.id },
+              data: { isActive: false, status: 'ARCHIVED' },
+            })
+            archivedSessions += 1
+          }
+        }
+      } else {
+        // FILL: all existing active sessions remain and occupy teacher slots
+        remainingBusy = existing.map((s) => {
+          const start = engineTimeToMinutes(s.startTime)
+          return {
+            teacherId: s.teacherId,
+            dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
+            startMinutes: start,
+            endMinutes: start + s.durationMinutes,
+          }
+        })
+      }
+
+      // Decide which proposals are valid (pure)
+      const plan = planApply({
+        proposals: dto.proposals.map((p) => ({
+          tempId: p.tempId,
+          subjectId: p.subjectId,
+          type: p.type as EngineSessionType,
+          teacherId: p.teacherId,
+          dayOfWeek: p.dayOfWeek as EngineDayOfWeek,
+          startTime: p.startTime,
+          durationMinutes: p.durationMinutes,
+          studentIds: p.studentIds,
+        })),
+        activeTeacherIds: teachers.map((t) => t.id),
+        activeStudentIds: students.map((s) => s.id),
+        subjectCapacity,
+        busySlots: remainingBusy,
+      })
+
+      // Write accepted proposals
+      let applied = 0
+      for (const p of plan.toCreate) {
+        const capacity =
+          p.type === 'REGULAR'
+            ? subjectCapacity[p.subjectId].maxCapacityRegular
+            : subjectCapacity[p.subjectId].maxCapacityPrivate
+        const session = await tx.session.create({
+          data: {
+            branchId: dto.branchId,
+            subjectId: p.subjectId,
+            teacherId: p.teacherId,
+            type: p.type as any,
+            dayOfWeek: p.dayOfWeek as any,
+            startTime: p.startTime,
+            durationMinutes: p.durationMinutes,
+            maxCapacity: capacity,
+            currentEnrolled: p.studentIds.length,
+            isActive: true,
+          },
+        })
+        await Promise.all(
+          p.studentIds.map((studentId) =>
+            tx.sessionStudent.create({
+              data: { sessionId: session.id, studentId, joinedAt: new Date(), isActive: true },
+            }),
+          ),
+        )
+        applied += 1
+      }
+
+      return {
+        success: true,
+        data: {
+          applied,
+          skipped: plan.skipped,
+          archivedSessions,
+          preservedSessions,
+        },
+      }
+    })
+  }
+
   // Helper: convert HH:mm to minutes
   private timeToMinutes(time: string): number {
     const [h, m] = time.split(':').map(Number)
