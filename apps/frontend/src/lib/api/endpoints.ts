@@ -161,6 +161,7 @@ export const scheduleRecommendationApi = {
     activeDays: string[]
     timeWindow: { start: string; end: string }
     breakWindow?: { start: string; end: string } | null
+    sessionsPerWeek?: number
   }) => apiClient.post('/sessions/recommendations/generate', data),
   apply: (data: {
     branchId: string

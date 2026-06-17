@@ -27,6 +27,7 @@ export default function RekomendasiJadwalPage() {
 
   const [mode, setMode] = useState<'FILL_UNSCHEDULED' | 'FULL_REGENERATE'>('FILL_UNSCHEDULED')
   const [duration, setDuration] = useState(60)
+  const [sessionsPerWeek, setSessionsPerWeek] = useState(1)
   const [start, setStart] = useState('14:00')
   const [end, setEnd] = useState('20:00')
   const [useBreak, setUseBreak] = useState(false)
@@ -48,6 +49,7 @@ export default function RekomendasiJadwalPage() {
         activeDays,
         timeWindow: { start, end },
         breakWindow: useBreak ? { start: breakStart, end: breakEnd } : null,
+        sessionsPerWeek,
       }),
     onSuccess: (res) => {
       const data = res.data.data
@@ -110,6 +112,11 @@ export default function RekomendasiJadwalPage() {
           <span className="text-sm font-medium">Durasi sesi (menit)</span>
           <input type="number" min={30} max={240} step={30} value={duration}
             onChange={(e) => setDuration(Number(e.target.value))} className="border rounded px-2 py-1.5" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium">Sesi per minggu</span>
+          <input type="number" min={1} max={7} step={1} value={sessionsPerWeek}
+            onChange={(e) => setSessionsPerWeek(Number(e.target.value))} className="border rounded px-2 py-1.5" />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Jam mulai</span>
