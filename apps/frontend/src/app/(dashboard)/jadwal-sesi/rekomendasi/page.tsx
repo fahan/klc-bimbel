@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { scheduleRecommendationApi } from '@/lib/api/endpoints'
 import { useBranch, useApiBranchId } from '@/lib/branch-context'
+import RecommendationCalendar from '@/components/RecommendationCalendar'
 
 const DAYS = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU', 'MINGGU']
 
@@ -39,6 +40,7 @@ export default function RekomendasiJadwalPage() {
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [error, setError] = useState<string | null>(null)
   const [applyResult, setApplyResult] = useState<any>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
   const generate = useMutation({
     mutationFn: () =>
@@ -94,6 +96,9 @@ export default function RekomendasiJadwalPage() {
 
   const toggleDay = (d: string) =>
     setActiveDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]))
+
+  const toggleProposal = (tempId: string) =>
+    setSelected((s) => ({ ...s, [tempId]: !s[tempId] }))
 
   return (
     <div className="p-6 space-y-6">
@@ -179,20 +184,40 @@ export default function RekomendasiJadwalPage() {
             </div>
           </div>
 
-          {/* Proposals */}
-          <div className="bg-white rounded-lg border divide-y">
-            {result.proposals.map((p: Proposal) => (
-              <label key={p.tempId} className="flex items-center gap-3 p-3 cursor-pointer">
-                <input type="checkbox" checked={!!selected[p.tempId]}
-                  onChange={(e) => setSelected((s) => ({ ...s, [p.tempId]: e.target.checked }))} />
-                <div className="text-sm">
-                  <div className="font-medium">{p.subjectName} ({p.type}) — {p.teacherName}</div>
-                  <div className="text-gray-600">{p.dayOfWeek} {p.startTime} · {p.durationMinutes} mnt · {p.studentNames.join(', ')}</div>
-                </div>
-              </label>
-            ))}
-            {result.proposals.length === 0 && <div className="p-3 text-sm text-gray-500">Tidak ada usulan.</div>}
+          {/* View toggle */}
+          <div className="flex gap-1">
+            <button type="button" onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 rounded border text-sm ${viewMode === 'list' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white'}`}>
+              Daftar
+            </button>
+            <button type="button" onClick={() => setViewMode('calendar')}
+              className={`px-3 py-1.5 rounded border text-sm ${viewMode === 'calendar' ? 'bg-orange-500 text-white border-orange-500' : 'bg-white'}`}>
+              Kalender
+            </button>
           </div>
+
+          {/* Proposals */}
+          {viewMode === 'list' ? (
+            <div className="bg-white rounded-lg border divide-y">
+              {result.proposals.map((p: Proposal) => (
+                <label key={p.tempId} className="flex items-center gap-3 p-3 cursor-pointer">
+                  <input type="checkbox" checked={!!selected[p.tempId]}
+                    onChange={() => toggleProposal(p.tempId)} />
+                  <div className="text-sm">
+                    <div className="font-medium">{p.subjectName} ({p.type}) — {p.teacherName}</div>
+                    <div className="text-gray-600">{p.dayOfWeek} {p.startTime} · {p.durationMinutes} mnt · {p.studentNames.join(', ')}</div>
+                  </div>
+                </label>
+              ))}
+              {result.proposals.length === 0 && <div className="p-3 text-sm text-gray-500">Tidak ada usulan.</div>}
+            </div>
+          ) : (
+            <RecommendationCalendar
+              proposals={result.proposals}
+              selected={selected}
+              onToggle={toggleProposal}
+            />
+          )}
 
           {/* Unassigned */}
           {result.unassigned.length > 0 && (
