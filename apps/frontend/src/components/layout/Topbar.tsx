@@ -51,6 +51,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
     if (pathname === '/dashboard' || pathname === '/master-data' || pathname.includes('dashboard')) {
       return 'Dashboard'
     }
+    if (pathname === '/jadwal-sesi/rekomendasi' || pathname.startsWith('/jadwal-sesi/rekomendasi')) return 'Rekomendasi Jadwal'
     if (pathname === '/jadwal-sesi' || pathname.startsWith('/jadwal-sesi/')) return 'Jadwal & Sesi'
     if (pathname === '/invoice-tagihan' || pathname.startsWith('/invoice-tagihan/')) return 'Invoice Tagihan'
     if (pathname === '/pembayaran-spp' || pathname.startsWith('/pembayaran-spp/')) return 'Pembayaran SPP'

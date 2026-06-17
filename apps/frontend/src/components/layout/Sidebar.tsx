@@ -91,6 +91,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       title: 'OPERASIONAL',
       items: [
         { label: 'Jadwal & Sesi', path: '/jadwal-sesi', icon: Clock },
+        { label: 'Rekomendasi Jadwal', path: '/jadwal-sesi/rekomendasi', icon: Clock },
         { label: 'Presensi', path: '/presensi', icon: CheckSquare },
         { label: 'Invoice Tagihan', path: '/invoice-tagihan', icon: Receipt },
         { label: 'Pembayaran SPP', path: '/pembayaran-spp', icon: CreditCard },
