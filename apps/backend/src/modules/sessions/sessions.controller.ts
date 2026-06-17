@@ -17,6 +17,8 @@ import { CreateCombinedSessionDto } from './dto/create-combined-session.dto'
 import { UpdateSessionDto } from './dto/update-session.dto'
 import { UpdateSessionWithStudentsDto } from './dto/update-session-with-students.dto'
 import { SessionResponseDto } from './dto/session-response.dto'
+import { GenerateRecommendationDto } from './dto/generate-recommendation.dto'
+import { ApplyRecommendationDto } from './dto/apply-recommendation.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
 import { Roles } from '@/common/decorators/roles.decorator'
@@ -153,6 +155,36 @@ export class SessionsController {
     @CurrentUser() user: any,
   ): Promise<any> {
     return this.sessionsService.createCombined(createCombinedDto, user.id)
+  }
+
+  @Post('recommendations/generate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Generate schedule recommendation (preview, no writes)',
+    description:
+      'Auto-maps enrolled students to teachers across active hours/days (with optional break), balancing teacher load. Read-only: returns proposals to preview before applying.',
+  })
+  @ApiResponse({ status: 200, description: 'Recommendation generated' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async generateRecommendation(@Body() dto: GenerateRecommendationDto): Promise<any> {
+    return this.sessionsService.generateRecommendation(dto)
+  }
+
+  @Post('recommendations/apply')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Apply selected schedule recommendations',
+    description:
+      'Creates sessions for the selected valid proposals in one transaction. Stale/conflicting proposals are skipped and reported. FULL_REGENERATE archives existing sessions without attendance history.',
+  })
+  @ApiResponse({ status: 200, description: 'Recommendations applied' })
+  @ApiResponse({ status: 404, description: 'Branch not found' })
+  async applyRecommendation(@Body() dto: ApplyRecommendationDto): Promise<any> {
+    return this.sessionsService.applyRecommendation(dto)
   }
 
   @Put(':id')
