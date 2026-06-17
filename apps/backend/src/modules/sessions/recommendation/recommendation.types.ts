@@ -36,6 +36,13 @@ export interface BusySlot {
   endMinutes: number
 }
 
+export interface StudentBusySlot {
+  studentId: string
+  dayOfWeek: EngineDayOfWeek
+  startMinutes: number
+  endMinutes: number
+}
+
 export interface ProposalItem {
   tempId: string
   subjectId: string
@@ -73,6 +80,8 @@ export interface EngineInput {
   demand: DemandItem[]
   teachers: TeacherInfo[]
   busySlots: BusySlot[]
+  sessionsPerWeek?: number
+  studentBusySlots?: StudentBusySlot[]
 }
 
 export interface EngineOutput {
@@ -100,6 +109,7 @@ export interface ApplyPlanInput {
   activeStudentIds: string[]
   subjectCapacity: Record<string, { maxCapacityRegular: number; maxCapacityPrivate: number }>
   busySlots: BusySlot[]
+  studentBusySlots?: StudentBusySlot[]
 }
 
 export interface ApplyPlan {
