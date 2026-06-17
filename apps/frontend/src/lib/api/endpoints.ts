@@ -152,6 +152,23 @@ export const sessionApi = {
   hardDelete: (id: string) => apiClient.delete(`/sessions/${id}/hard-delete`), // Permanent delete
 }
 
+// ===== SCHEDULE RECOMMENDATION API =====
+export const scheduleRecommendationApi = {
+  generate: (data: {
+    branchId: string
+    mode: 'FILL_UNSCHEDULED' | 'FULL_REGENERATE'
+    durationMinutes: number
+    activeDays: string[]
+    timeWindow: { start: string; end: string }
+    breakWindow?: { start: string; end: string } | null
+  }) => apiClient.post('/sessions/recommendations/generate', data),
+  apply: (data: {
+    branchId: string
+    mode: 'FILL_UNSCHEDULED' | 'FULL_REGENERATE'
+    proposals: any[]
+  }) => apiClient.post('/sessions/recommendations/apply', data),
+}
+
 // ===== ATTENDANCE API =====
 export const attendanceApi = {
   submit: (data: any) => apiClient.post('/attendance/submit', data),
