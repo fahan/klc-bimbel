@@ -254,6 +254,41 @@ describe('planApply', () => {
   })
 })
 
+describe('planApply - student clash', () => {
+  it('skips a proposal that clashes with a seeded student busy slot', () => {
+    const plan = planApply({
+      proposals: [proposal()],
+      activeTeacherIds: ['t1'],
+      activeStudentIds: ['s1', 's2'],
+      subjectCapacity: capacity,
+      busySlots: [],
+      studentBusySlots: [
+        { studentId: 's1', dayOfWeek: 'SENIN', startMinutes: 840, endMinutes: 900 },
+      ],
+    })
+    expect(plan.toCreate).toHaveLength(0)
+    expect(plan.skipped[0].reason).toMatch(/siswa/i)
+  })
+
+  it('skips the second of two selected proposals that share a student at the same slot', () => {
+    // Two proposals for the same student s1 at SENIN 14:00 but DIFFERENT teachers,
+    // so the second is caught by the STUDENT clash check (not the teacher-overlap check).
+    const plan2 = planApply({
+      proposals: [
+        proposal({ tempId: 'p1', subjectId: 'subjA', teacherId: 't1', studentIds: ['s1'] }),
+        proposal({ tempId: 'p2', subjectId: 'subjA', teacherId: 't2', studentIds: ['s1'] }),
+      ],
+      activeTeacherIds: ['t1', 't2'],
+      activeStudentIds: ['s1'],
+      subjectCapacity: capacity,
+      busySlots: [],
+    })
+    expect(plan2.toCreate.map((p) => p.tempId)).toEqual(['p1'])
+    expect(plan2.skipped.map((p) => p.tempId)).toEqual(['p2'])
+    expect(plan2.skipped[0].reason).toMatch(/siswa/i)
+  })
+})
+
 describe('buildRecommendation - sessionsPerWeek & student clash', () => {
   it('creates N sessions per batch on different days', () => {
     const out = buildRecommendation({

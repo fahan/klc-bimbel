@@ -251,10 +251,17 @@ export function buildRecommendation(input: EngineInput): EngineOutput {
 
 export function planApply(input: ApplyPlanInput): ApplyPlan {
   const { proposals, activeTeacherIds, activeStudentIds, subjectCapacity, busySlots } = input
+  const studentBusyInput = input.studentBusySlots ?? []
   const teacherSet = new Set(activeTeacherIds)
   const studentSet = new Set(activeStudentIds)
 
   const running: BusySlot[] = busySlots.map((b) => ({ ...b }))
+  const studentRunning = new Map<string, { dayOfWeek: EngineDayOfWeek; start: number; end: number }[]>()
+  for (const sb of studentBusyInput) {
+    const list = studentRunning.get(sb.studentId) ?? []
+    list.push({ dayOfWeek: sb.dayOfWeek, start: sb.startMinutes, end: sb.endMinutes })
+    studentRunning.set(sb.studentId, list)
+  }
 
   const toCreate: ApplyProposal[] = []
   const skipped: { tempId: string; reason: string }[] = []
@@ -277,14 +284,22 @@ export function planApply(input: ApplyPlanInput): ApplyPlan {
     }
     const start = timeToMinutes(p.startTime)
     const end = start + p.durationMinutes
-    const conflict = running.some(
+    const teacherConflict = running.some(
       (b) =>
         b.teacherId === p.teacherId &&
         b.dayOfWeek === p.dayOfWeek &&
         overlaps(start, end, b.startMinutes, b.endMinutes),
     )
-    if (conflict) {
+    if (teacherConflict) {
       skipped.push({ tempId: p.tempId, reason: 'Guru bentrok dengan sesi lain' })
+      continue
+    }
+    const studentConflict = p.studentIds.some((id) => {
+      const list = studentRunning.get(id)
+      return !!list && list.some((iv) => iv.dayOfWeek === p.dayOfWeek && overlaps(start, end, iv.start, iv.end))
+    })
+    if (studentConflict) {
+      skipped.push({ tempId: p.tempId, reason: 'Bentrok jadwal siswa' })
       continue
     }
     running.push({
@@ -293,6 +308,11 @@ export function planApply(input: ApplyPlanInput): ApplyPlan {
       startMinutes: start,
       endMinutes: end,
     })
+    for (const id of p.studentIds) {
+      const list = studentRunning.get(id) ?? []
+      list.push({ dayOfWeek: p.dayOfWeek, start, end })
+      studentRunning.set(id, list)
+    }
     toCreate.push(p)
   }
 
