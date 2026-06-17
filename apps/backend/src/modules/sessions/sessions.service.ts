@@ -17,6 +17,7 @@ import {
   DemandItem,
   EngineDayOfWeek,
   EngineSessionType,
+  StudentBusySlot,
 } from './recommendation/recommendation.types'
 
 @Injectable()
@@ -1446,22 +1447,29 @@ export class SessionsService {
         maxCapacityPrivate: e.subject.maxCapacityPrivate,
       }))
 
-    // Busy slots: existing active sessions occupy teachers (only relevant for FILL mode)
-    let busySlots: BusySlot[] = []
+    // Busy slots: existing active sessions occupy teachers AND their students (FILL mode only)
+    const busySlots: BusySlot[] = []
+    const studentBusySlots: StudentBusySlot[] = []
     if (dto.mode === 'FILL_UNSCHEDULED') {
       const existing = await this.prisma.session.findMany({
         where: { isActive: true, branchId: dto.branchId },
-        select: { teacherId: true, dayOfWeek: true, startTime: true, durationMinutes: true },
+        select: {
+          teacherId: true,
+          dayOfWeek: true,
+          startTime: true,
+          durationMinutes: true,
+          studentSessions: { where: { isActive: true }, select: { studentId: true } },
+        },
       })
-      busySlots = existing.map((s) => {
+      for (const s of existing) {
         const start = engineTimeToMinutes(s.startTime)
-        return {
-          teacherId: s.teacherId,
-          dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
-          startMinutes: start,
-          endMinutes: start + s.durationMinutes,
+        const end = start + s.durationMinutes
+        const dayOfWeek = s.dayOfWeek as EngineDayOfWeek
+        busySlots.push({ teacherId: s.teacherId, dayOfWeek, startMinutes: start, endMinutes: end })
+        for (const ss of s.studentSessions) {
+          studentBusySlots.push({ studentId: ss.studentId, dayOfWeek, startMinutes: start, endMinutes: end })
         }
-      })
+      }
     }
 
     const result = buildRecommendation({
@@ -1472,6 +1480,8 @@ export class SessionsService {
       demand,
       teachers,
       busySlots,
+      sessionsPerWeek: dto.sessionsPerWeek ?? 1,
+      studentBusySlots,
     })
 
     return {
@@ -1528,27 +1538,33 @@ export class SessionsService {
       // FULL_REGENERATE: archive existing active sessions that have NO session logs.
       let archivedSessions = 0
       const preservedSessions: { id: string; reason: string }[] = []
-      let remainingBusy: BusySlot[] = []
+      const remainingBusy: BusySlot[] = []
+      const remainingStudentBusy: StudentBusySlot[] = []
 
       const existing = await tx.session.findMany({
         where: { isActive: true, branchId: dto.branchId },
         select: {
           id: true, teacherId: true, dayOfWeek: true, startTime: true, durationMinutes: true,
           _count: { select: { sessionLogs: true } },
+          studentSessions: { where: { isActive: true }, select: { studentId: true } },
         },
       })
+
+      const keepAsBusy = (s: (typeof existing)[number]) => {
+        const start = engineTimeToMinutes(s.startTime)
+        const end = start + s.durationMinutes
+        const dayOfWeek = s.dayOfWeek as EngineDayOfWeek
+        remainingBusy.push({ teacherId: s.teacherId, dayOfWeek, startMinutes: start, endMinutes: end })
+        for (const ss of s.studentSessions) {
+          remainingStudentBusy.push({ studentId: ss.studentId, dayOfWeek, startMinutes: start, endMinutes: end })
+        }
+      }
 
       if (dto.mode === 'FULL_REGENERATE') {
         for (const s of existing) {
           if (s._count.sessionLogs > 0) {
             preservedSessions.push({ id: s.id, reason: 'Punya riwayat presensi' })
-            const start = engineTimeToMinutes(s.startTime)
-            remainingBusy.push({
-              teacherId: s.teacherId,
-              dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
-              startMinutes: start,
-              endMinutes: start + s.durationMinutes,
-            })
+            keepAsBusy(s)
           } else {
             await tx.session.update({
               where: { id: s.id },
@@ -1558,16 +1574,8 @@ export class SessionsService {
           }
         }
       } else {
-        // FILL: all existing active sessions remain and occupy teacher slots
-        remainingBusy = existing.map((s) => {
-          const start = engineTimeToMinutes(s.startTime)
-          return {
-            teacherId: s.teacherId,
-            dayOfWeek: s.dayOfWeek as EngineDayOfWeek,
-            startMinutes: start,
-            endMinutes: start + s.durationMinutes,
-          }
-        })
+        // FILL: all existing active sessions remain and occupy teacher + student slots
+        for (const s of existing) keepAsBusy(s)
       }
 
       // Decide which proposals are valid (pure)
@@ -1586,6 +1594,7 @@ export class SessionsService {
         activeStudentIds: students.map((s) => s.id),
         subjectCapacity,
         busySlots: remainingBusy,
+        studentBusySlots: remainingStudentBusy,
       })
 
       // Write accepted proposals
