@@ -47,4 +47,11 @@ export class GenerateRecommendationDto {
   @IsOptional()
   @IsObject()
   breakWindow?: TimeRangeDto | null
+
+  @ApiPropertyOptional({ example: 1, minimum: 1, maximum: 7 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(7)
+  sessionsPerWeek?: number
 }
