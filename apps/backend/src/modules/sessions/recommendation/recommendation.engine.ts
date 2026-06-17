@@ -10,6 +10,7 @@ import {
   EngineOutput,
   EngineSessionType,
   ProposalItem,
+  StudentBusySlot,
   TeacherInfo,
   TeacherLoadItem,
   TimeRange,
@@ -134,6 +135,8 @@ function isTeacherFree(
 
 export function buildRecommendation(input: EngineInput): EngineOutput {
   const { durationMinutes, activeDays, timeWindow, breakWindow, demand, teachers, busySlots } = input
+  const sessionsPerWeek = Math.max(1, input.sessionsPerWeek ?? 1)
+  const studentBusyInput = input.studentBusySlots ?? []
 
   const slots = buildCandidateSlots({ activeDays, timeWindow, breakWindow, durationMinutes })
   const groups = groupDemand(demand)
@@ -151,6 +154,22 @@ export function buildRecommendation(input: EngineInput): EngineOutput {
     }
   }
 
+  // Per-student busy intervals across all subjects, seeded from existing commitments.
+  const studentBusy = new Map<string, { dayOfWeek: EngineDayOfWeek; start: number; end: number }[]>()
+  const addStudentBusy = (studentId: string, dayOfWeek: EngineDayOfWeek, start: number, end: number) => {
+    const list = studentBusy.get(studentId) ?? []
+    list.push({ dayOfWeek, start, end })
+    studentBusy.set(studentId, list)
+  }
+  for (const sb of studentBusyInput) {
+    addStudentBusy(sb.studentId, sb.dayOfWeek, sb.startMinutes, sb.endMinutes)
+  }
+  const areStudentsFree = (ids: string[], day: EngineDayOfWeek, start: number, end: number): boolean =>
+    ids.every((id) => {
+      const list = studentBusy.get(id)
+      return !list || !list.some((iv) => iv.dayOfWeek === day && overlaps(start, end, iv.start, iv.end))
+    })
+
   const proposals: ProposalItem[] = []
   const unassigned: UnassignedItem[] = []
   let counter = 0
@@ -158,49 +177,65 @@ export function buildRecommendation(input: EngineInput): EngineOutput {
   for (const group of groups) {
     const batches = chunk(group.students, group.capacity)
     for (const batch of batches) {
-      const candidates = [...states].sort(
-        (a, b) => a.load - b.load || a.teacherId.localeCompare(b.teacherId),
-      )
-      let assigned = false
-      for (const teacher of candidates) {
-        const slot = slots.find((s) =>
-          isTeacherFree(teacher, s.dayOfWeek, s.startMinutes, s.startMinutes + durationMinutes),
+      const studentIds = batch.map((s) => s.studentId)
+      const studentNames = batch.map((s) => s.studentName)
+      const placedDays = new Set<EngineDayOfWeek>()
+
+      for (let i = 0; i < sessionsPerWeek; i++) {
+        const candidates = [...states].sort(
+          (a, b) => a.load - b.load || a.teacherId.localeCompare(b.teacherId),
         )
-        if (!slot) continue
-        teacher.intervals.push({
-          dayOfWeek: slot.dayOfWeek,
-          start: slot.startMinutes,
-          end: slot.startMinutes + durationMinutes,
-        })
-        teacher.load += 1
-        counter += 1
-        proposals.push({
-          tempId: `p${counter}`,
-          subjectId: group.subjectId,
-          subjectName: group.subjectName,
-          type: group.type,
-          teacherId: teacher.teacherId,
-          teacherName: teacher.name,
-          dayOfWeek: slot.dayOfWeek,
-          startTime: minutesToTime(slot.startMinutes),
-          durationMinutes,
-          studentIds: batch.map((s) => s.studentId),
-          studentNames: batch.map((s) => s.studentName),
-        })
-        assigned = true
-        break
-      }
-      if (!assigned) {
-        unassigned.push({
-          subjectId: group.subjectId,
-          subjectName: group.subjectName,
-          type: group.type,
-          studentIds: batch.map((s) => s.studentId),
-          studentNames: batch.map((s) => s.studentName),
-          reason: teachers.length === 0
-            ? 'Tidak ada guru di cabang'
-            : 'Tidak ada guru yang tersedia di slot jam aktif',
-        })
+        let assigned = false
+        for (const teacher of candidates) {
+          const slot = slots.find((s) => {
+            const start = s.startMinutes
+            const end = start + durationMinutes
+            return (
+              !placedDays.has(s.dayOfWeek) &&
+              isTeacherFree(teacher, s.dayOfWeek, start, end) &&
+              areStudentsFree(studentIds, s.dayOfWeek, start, end)
+            )
+          })
+          if (!slot) continue
+          const start = slot.startMinutes
+          const end = start + durationMinutes
+          teacher.intervals.push({ dayOfWeek: slot.dayOfWeek, start, end })
+          teacher.load += 1
+          for (const id of studentIds) addStudentBusy(id, slot.dayOfWeek, start, end)
+          placedDays.add(slot.dayOfWeek)
+          counter += 1
+          proposals.push({
+            tempId: `p${counter}`,
+            subjectId: group.subjectId,
+            subjectName: group.subjectName,
+            type: group.type,
+            teacherId: teacher.teacherId,
+            teacherName: teacher.name,
+            dayOfWeek: slot.dayOfWeek,
+            startTime: minutesToTime(start),
+            durationMinutes,
+            studentIds,
+            studentNames,
+          })
+          assigned = true
+          break
+        }
+        if (!assigned) {
+          unassigned.push({
+            subjectId: group.subjectId,
+            subjectName: group.subjectName,
+            type: group.type,
+            studentIds,
+            studentNames,
+            reason:
+              teachers.length === 0
+                ? 'Tidak ada guru di cabang'
+                : i > 0
+                  ? 'Tidak ada slot/guru tersedia untuk sesi tambahan'
+                  : 'Tidak ada guru yang tersedia di slot jam aktif',
+          })
+          break
+        }
       }
     }
   }

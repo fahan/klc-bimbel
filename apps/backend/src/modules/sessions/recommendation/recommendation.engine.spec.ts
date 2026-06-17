@@ -253,3 +253,68 @@ describe('planApply', () => {
     expect(plan.skipped.map((p) => p.tempId)).toEqual(['p2'])
   })
 })
+
+describe('buildRecommendation - sessionsPerWeek & student clash', () => {
+  it('creates N sessions per batch on different days', () => {
+    const out = buildRecommendation({
+      durationMinutes: 60,
+      activeDays: ['SENIN', 'SELASA', 'RABU'],
+      timeWindow: { start: '14:00', end: '16:00' },
+      demand: [demand({ studentId: 's1', subjectId: 'subjA', subjectName: 'AHE' })],
+      teachers: [teacherA],
+      busySlots: [],
+      sessionsPerWeek: 2,
+    })
+    expect(out.proposals).toHaveLength(2)
+    const days = out.proposals.map((p) => p.dayOfWeek)
+    expect(new Set(days).size).toBe(2)
+    expect(out.unassigned).toHaveLength(0)
+  })
+
+  it('caps N by available days and reports the surplus as unassigned', () => {
+    const out = buildRecommendation({
+      durationMinutes: 60,
+      activeDays: ['SENIN'],
+      timeWindow: { start: '14:00', end: '16:00' },
+      demand: [demand({ studentId: 's1', subjectId: 'subjA', subjectName: 'AHE' })],
+      teachers: [teacherA],
+      busySlots: [],
+      sessionsPerWeek: 2,
+    })
+    expect(out.proposals).toHaveLength(1)
+    expect(out.unassigned).toHaveLength(1)
+    expect(out.unassigned[0].reason).toMatch(/tambahan/i)
+  })
+
+  it('does not place two subjects for the same student at the same slot', () => {
+    const out = buildRecommendation({
+      durationMinutes: 60,
+      activeDays: ['SENIN'],
+      timeWindow: { start: '14:00', end: '15:00' },
+      demand: [
+        demand({ studentId: 's1', subjectId: 'subjA', subjectName: 'AHE' }),
+        demand({ studentId: 's1', subjectId: 'subjB', subjectName: 'BING' }),
+      ],
+      teachers: [teacherA, teacherB],
+      busySlots: [],
+    })
+    expect(out.proposals).toHaveLength(1)
+    expect(out.unassigned).toHaveLength(1)
+  })
+
+  it('respects seeded studentBusySlots', () => {
+    const out = buildRecommendation({
+      durationMinutes: 60,
+      activeDays: ['SENIN'],
+      timeWindow: { start: '14:00', end: '15:00' },
+      demand: [demand({ studentId: 's1', subjectId: 'subjA', subjectName: 'AHE' })],
+      teachers: [teacherA],
+      busySlots: [],
+      studentBusySlots: [
+        { studentId: 's1', dayOfWeek: 'SENIN', startMinutes: 840, endMinutes: 900 },
+      ],
+    })
+    expect(out.proposals).toHaveLength(0)
+    expect(out.unassigned).toHaveLength(1)
+  })
+})
