@@ -183,8 +183,8 @@ export default function StudentEnrollmentPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Topbar */}
       <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <h1 className="text-2xl font-semibold text-gray-900">Pendaftaran Siswa Baru</h1>
+        <div className="px-4 sm:px-6 py-4">
+          <h1 className="text-xl sm:text-2xl font-semibold text-gray-900">Pendaftaran Siswa Baru</h1>
           {fromLanding && (
             <p className="text-sm text-blue-600 mt-1">
               Data diisi otomatis dari pendaftar landing page. Periksa dan lengkapi sebelum menyimpan.
@@ -195,22 +195,22 @@ export default function StudentEnrollmentPage() {
 
       {/* Stepper */}
       <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
+        <div className="px-4 sm:px-6 py-4 overflow-x-auto">
           <EnrollmentStepper currentStep={currentStep} steps={stepTitles} />
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="px-6 py-6">
+      <div className="px-4 sm:px-6 py-6">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-700">{error}</p>
           </div>
         )}
 
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column - Data Summary */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {currentStep >= 1 && studentData.name && (
               <div className="mb-6">
                 <EnrollmentStep1Display
@@ -231,7 +231,7 @@ export default function StudentEnrollmentPage() {
           </div>
 
           {/* Right Column - Active Step */}
-          <div className="w-96">
+          <div className="w-full lg:w-96 order-first lg:order-none">
             {currentStep === 1 && (
               <EnrollmentStep1
                 initialData={studentData}
@@ -272,8 +272,8 @@ export default function StudentEnrollmentPage() {
       </div>
 
       {/* Footer - Hidden as forms have their own submit buttons */}
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <div className="bg-white border-t border-gray-200 px-4 sm:px-6 py-4">
+        <div className="flex items-center justify-between gap-3">
           <span className="text-sm text-gray-600">
             Langkah {currentStep} dari 4 · {stepTitles[currentStep - 1]}
           </span>
