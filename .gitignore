@@ -52,6 +52,7 @@ evaluate/
 
 # Claude Code local config
 .claude/settings.local.json
+.claude/worktrees/
 memory/
 
 # PWA build output
