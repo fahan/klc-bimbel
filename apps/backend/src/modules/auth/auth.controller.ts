@@ -21,7 +21,7 @@ export class AuthController {
   @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: 'Login dengan email dan password' })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Login successful',
     type: AuthResponseDto,
   })

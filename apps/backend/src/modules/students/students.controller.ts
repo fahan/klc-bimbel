@@ -187,7 +187,7 @@ export class StudentsController {
     description: 'Enroll student to one or more subjects with selected sessions. SPP rates are locked on enrollment date. Registration fee is applied.',
   })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Student enrolled successfully with cost summary',
     type: EnrollmentResponseDto,
   })
@@ -220,7 +220,7 @@ export class StudentsController {
     description: 'Add a single subject to a student who is already enrolled. Charges registration fee (200k) + SPP rate. SPP rate is locked on this date.',
   })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Subject added successfully with cost summary',
     type: AddSubjectResponseDto,
   })

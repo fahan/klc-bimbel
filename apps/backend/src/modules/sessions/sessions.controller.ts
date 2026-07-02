@@ -166,7 +166,7 @@ export class SessionsController {
     description:
       'Auto-maps enrolled students to teachers across active hours/days (with optional break), balancing teacher load. Read-only: returns proposals to preview before applying.',
   })
-  @ApiResponse({ status: 200, description: 'Recommendation generated' })
+  @ApiResponse({ status: 201, description: 'Recommendation generated' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
   async generateRecommendation(@Body() dto: GenerateRecommendationDto): Promise<any> {
     return this.sessionsService.generateRecommendation(dto)
@@ -181,7 +181,7 @@ export class SessionsController {
     description:
       'Creates sessions for the selected valid proposals in one transaction. Stale/conflicting proposals are skipped and reported. FULL_REGENERATE archives existing sessions without attendance history.',
   })
-  @ApiResponse({ status: 200, description: 'Recommendations applied' })
+  @ApiResponse({ status: 201, description: 'Recommendations applied' })
   @ApiResponse({ status: 404, description: 'Branch not found' })
   async applyRecommendation(@Body() dto: ApplyRecommendationDto): Promise<any> {
     return this.sessionsService.applyRecommendation(dto)
