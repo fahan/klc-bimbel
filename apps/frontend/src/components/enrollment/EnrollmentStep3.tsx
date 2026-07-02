@@ -204,13 +204,21 @@ export default function EnrollmentStep3({
         )
       })}
 
-      {/* Submit Button */}
-      <button
-        onClick={handleSubmit}
-        className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-      >
-        Lanjut ke Konfirmasi →
-      </button>
+      {/* Submit / Skip Buttons */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={() => onComplete && onComplete([])}
+          className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
+        >
+          Lewati, jadwalkan nanti →
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+        >
+          Lanjut ke Konfirmasi →
+        </button>
+      </div>
     </div>
   )
 }
