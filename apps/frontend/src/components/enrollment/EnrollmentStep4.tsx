@@ -4,9 +4,10 @@ import { AlertCircle } from 'lucide-react'
 interface EnrollmentStep4Props {
   onConfirm: () => Promise<void> | void
   loading?: boolean
+  hasUnscheduledSubjects?: boolean
 }
 
-export default function EnrollmentStep4({ onConfirm, loading }: EnrollmentStep4Props) {
+export default function EnrollmentStep4({ onConfirm, loading, hasUnscheduledSubjects }: EnrollmentStep4Props) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-5">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Konfirmasi Pendaftaran</h3>
@@ -19,6 +20,19 @@ export default function EnrollmentStep4({ onConfirm, loading }: EnrollmentStep4P
             menyelesaikan proses pendaftaran.
           </p>
         </div>
+
+        {hasUnscheduledSubjects && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-900">Belum ada jadwal dipilih</p>
+              <p className="text-xs text-amber-800 mt-1">
+                Siswa akan didaftarkan tanpa jadwal sesi. Anda bisa menambahkan jadwal nanti dari
+                halaman Detail Siswa.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />

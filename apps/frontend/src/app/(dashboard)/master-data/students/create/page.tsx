@@ -253,7 +253,11 @@ export default function StudentEnrollmentPage() {
             )}
 
             {currentStep === 4 && (
-              <EnrollmentStep4 onConfirm={handleStep4Submit} loading={loading} />
+              <EnrollmentStep4
+                onConfirm={handleStep4Submit}
+                loading={loading}
+                hasUnscheduledSubjects={selectedSubjects.length > 0 && selectedSessions.length === 0}
+              />
             )}
 
             {/* Summary Card */}
