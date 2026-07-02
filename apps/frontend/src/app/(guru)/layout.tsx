@@ -46,7 +46,8 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
     router.push('/guru/panduan')
   }
 
-  const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
+  const isActive = (path: string) =>
+    path === '/guru' ? pathname === '/guru' : pathname === path || pathname.startsWith(path + '/')
 
   const navItems = [
     { label: 'Dashboard', path: '/guru', icon: LayoutDashboard },
