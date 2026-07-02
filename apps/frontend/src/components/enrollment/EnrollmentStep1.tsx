@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { branchApi } from '@/lib/api/endpoints'
 import { useForm } from 'react-hook-form'
+import { Lock } from 'lucide-react'
+import { useBranch } from '@/lib/branch-context'
 
 interface StudentData {
   name: string
@@ -44,6 +44,9 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
     },
   })
 
+  const { branches, isRestrictedToBranch } = useBranch()
+  const lockedBranch = isRestrictedToBranch ? branches[0] : null
+
   useEffect(() => {
     if (initialData) {
       reset({
@@ -55,18 +58,11 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
         parentName: initialData.parentName || '',
         parentPhone: initialData.parentPhone || '',
         address: initialData.address || '',
-        branchId: initialData.branchId || '',
+        branchId: lockedBranch ? lockedBranch.id : (initialData.branchId || ''),
         enrolledAt: initialData.enrolledAt || '',
       })
     }
-  }, [initialData, reset])
-
-  const { data: branchesData } = useQuery({
-    queryKey: ['branches'],
-    queryFn: () => branchApi.getAll(),
-  })
-
-  const branches = branchesData?.data?.data || []
+  }, [initialData, reset, lockedBranch])
 
   const onSubmit = (formData: any) => {
     onComplete(formData)
@@ -178,17 +174,27 @@ export default function EnrollmentStep1({ onComplete, initialData }: EnrollmentS
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Cabang <span className="text-red-500">*</span>
           </label>
-          <select
-            {...register('branchId', { required: 'Cabang wajib dipilih' })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Pilih cabang...</option>
-            {branches.map((branch: any) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
+          {lockedBranch ? (
+            <div
+              className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg flex items-center justify-between text-gray-700"
+              title="Anda terbatas pada cabang ini"
+            >
+              <span>{lockedBranch.name}</span>
+              <Lock className="w-3.5 h-3.5 text-gray-400" />
+            </div>
+          ) : (
+            <select
+              {...register('branchId', { required: 'Cabang wajib dipilih' })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Pilih cabang...</option>
+              {branches.map((branch: any) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+          )}
           {errors.branchId && (
             <p className="text-red-500 text-xs mt-1">{errors.branchId.message}</p>
           )}
