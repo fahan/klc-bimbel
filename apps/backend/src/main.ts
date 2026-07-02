@@ -1,11 +1,15 @@
 import { NestFactory } from '@nestjs/core'
+import { NestExpressApplication } from '@nestjs/platform-express'
 import { ValidationPipe } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { AppModule } from './app.module'
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule)
+  const app = await NestFactory.create<NestExpressApplication>(AppModule)
+
+  // Trust the reverse proxy's X-Forwarded-For so ThrottlerGuard rate-limits by real client IP, not the proxy's IP
+  app.set('trust proxy', 1)
 
   // Enable CORS for frontend
   // FRONTEND_URL supports comma-separated list, e.g. "https://www.example.com,https://example.com"
