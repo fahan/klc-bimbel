@@ -122,7 +122,7 @@ export const teacherApi = {
 
 // ===== SESSIONS API =====
 export const sessionApi = {
-  getAll: (page?: number, limit?: number, filters?: { branchId?: string; teacherId?: string; subjectId?: string; dayOfWeek?: string }) => {
+  getAll: (page?: number, limit?: number, filters?: { branchId?: string; teacherId?: string; subjectId?: string; dayOfWeek?: string; date?: string }) => {
     const params = new URLSearchParams()
     if (page) params.append('page', String(page))
     if (limit) params.append('limit', String(limit))
@@ -130,6 +130,7 @@ export const sessionApi = {
     if (filters?.teacherId) params.append('teacherId', filters.teacherId)
     if (filters?.subjectId) params.append('subjectId', filters.subjectId)
     if (filters?.dayOfWeek) params.append('dayOfWeek', filters.dayOfWeek)
+    if (filters?.date) params.append('date', filters.date)
     const queryString = params.toString()
     return apiClient.get(`/sessions${queryString ? `?${queryString}` : ''}`)
   },
