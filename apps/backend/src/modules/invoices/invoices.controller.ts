@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
+import { STRICT_THROTTLE } from '@/common/config/throttler.config'
 import { InvoicesService } from './invoices.service'
 import { CreateInvoiceDto } from './dto/create-invoice.dto'
 import { InvoiceResponseDto } from './dto/invoice-response.dto'
@@ -15,6 +17,7 @@ export class InvoicesController {
 
   // ===== PUBLIC ENDPOINT (no auth) =====
   @Get('public/:token')
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({
     summary: 'Get invoice by public token (PUBLIC, no auth)',
     description: 'Public endpoint to view invoice via shared link. Used by parents to view invoice from WhatsApp link.',

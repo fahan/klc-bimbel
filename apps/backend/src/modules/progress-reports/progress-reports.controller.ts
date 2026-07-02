@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
+import { STRICT_THROTTLE } from '@/common/config/throttler.config'
 import { ProgressReportsService } from './progress-reports.service'
 import { CreateReportLinkDto } from './dto/create-report-link.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
@@ -14,6 +16,7 @@ export class ProgressReportsController {
 
   // ===== PUBLIC ENDPOINT (no auth) =====
   @Get('public/:token')
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({
     summary: 'Get progress report by token (PUBLIC)',
     description: 'Public endpoint for parents to view student progress via shared link.',

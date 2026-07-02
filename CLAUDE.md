@@ -642,7 +642,7 @@ When approaching production, address:
 3. **Use service role key**, not publishable key, for `SUPABASE_SERVICE_ROLE_KEY`
 4. **Enable RLS** on all Supabase tables + write policies
 5. **Server-side branch isolation** — currently relies on frontend BranchContext for ADMIN_CABANG
-6. **Rate limiting** — add `@nestjs/throttler` to public endpoints
+6. ~~**Rate limiting**~~ — ✅ done (`@nestjs/throttler`: global default 100 req/min per IP, 5 req/min override on `/auth/login` + both `public/:token` endpoints)
 7. **Error logging** — integrate Sentry or similar
 8. **Database backups** — verify Supabase backup schedule meets requirements
 9. **Migrate to Supabase Auth** if email verification / SSO is needed

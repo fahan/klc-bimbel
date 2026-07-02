@@ -1,0 +1,38 @@
+import { INestApplication } from '@nestjs/common'
+import { APP_GUARD } from '@nestjs/core'
+import { Test } from '@nestjs/testing'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import request from 'supertest'
+import { THROTTLER_CONFIG } from '@/common/config/throttler.config'
+import { InvoicesController } from './invoices.controller'
+import { InvoicesService } from './invoices.service'
+
+describe('GET /invoices/public/:token rate limit', () => {
+  let app: INestApplication
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot(THROTTLER_CONFIG)],
+      controllers: [InvoicesController],
+      providers: [
+        { provide: InvoicesService, useValue: { findByToken: jest.fn().mockResolvedValue({ success: true, data: {} }) } },
+        { provide: APP_GUARD, useClass: ThrottlerGuard },
+      ],
+    }).compile()
+
+    app = moduleRef.createNestApplication()
+    await app.init()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  it('allows 5 requests per minute per IP then blocks the 6th with 429', async () => {
+    for (let i = 0; i < 5; i++) {
+      await request(app.getHttpServer()).get('/invoices/public/some-token').expect(200)
+    }
+
+    await request(app.getHttpServer()).get('/invoices/public/some-token').expect(429)
+  }, 10000)
+})
