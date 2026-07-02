@@ -1,5 +1,7 @@
 import { Controller, Post, Get, Patch, Body, UseGuards } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
+import { STRICT_THROTTLE } from '@/common/config/throttler.config'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
@@ -16,6 +18,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: 'Login dengan email dan password' })
   @ApiResponse({
     status: 200,
