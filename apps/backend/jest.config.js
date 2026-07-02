@@ -8,6 +8,5 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
     '^@common/(.*)$': '<rootDir>/src/common/$1',
-    '^@prisma/(.*)$': '<rootDir>/src/prisma/$1',
   },
 }
