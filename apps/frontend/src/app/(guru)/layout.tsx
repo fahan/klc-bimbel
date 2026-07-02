@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, CheckSquare, Calendar, TrendingUp, LogOut, Monitor } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, Calendar, TrendingUp, LogOut, Monitor, HelpCircle } from 'lucide-react'
 import { usePermission } from '@/lib/use-permissions'
 
 export default function GuruLayout({ children }: { children: React.ReactNode }) {
@@ -42,7 +42,12 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
     router.push('/dashboard')
   }
 
-  const isActive = (path: string) => pathname === path || pathname.startsWith(path + '/')
+  const handleOpenPanduan = () => {
+    router.push('/guru/panduan')
+  }
+
+  const isActive = (path: string) =>
+    path === '/guru' ? pathname === '/guru' : pathname === path || pathname.startsWith(path + '/')
 
   const navItems = [
     { label: 'Dashboard', path: '/guru', icon: LayoutDashboard },
@@ -72,6 +77,13 @@ export default function GuruLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={handleOpenPanduan}
+              className="p-2 hover:bg-white/10 rounded-full transition"
+              title="Panduan Penggunaan"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
             {hasAdminRole && (
               <button
                 onClick={handleSwitchToAdmin}
