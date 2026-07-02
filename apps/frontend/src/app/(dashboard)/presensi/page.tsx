@@ -93,36 +93,7 @@ export default function AttendancePage() {
   } = usePagination({
     queryKey: ['sessions-attendance', selectedDate],
     queryFn: async (page, limit) => {
-      const response = await sessionApi.getAll(page, limit, {
-        // Add filters here if backend supports them
-      })
-
-      // Load attendance status for each session
-      const sessionsWithAttendance = await Promise.all(
-        (response.data?.data || []).map(async (session: any) => {
-          try {
-            const attendanceLog = await attendanceApi.getSessionLog(session.id, selectedDate)
-            return {
-              ...session,
-              attendanceStatus: attendanceLog.data?.data?.status || 'SCHEDULED',
-            }
-          } catch (error) {
-            // If no attendance log, default to SCHEDULED
-            return {
-              ...session,
-              attendanceStatus: 'SCHEDULED',
-            }
-          }
-        })
-      )
-
-      return {
-        ...response,
-        data: {
-          ...response.data,
-          data: sessionsWithAttendance,
-        },
-      }
+      return sessionApi.getAll(page, limit, { date: selectedDate })
     },
     initialLimit: 10,
   })
