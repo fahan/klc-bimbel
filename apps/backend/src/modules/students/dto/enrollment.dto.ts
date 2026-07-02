@@ -21,9 +21,14 @@ export class EnrollSubjectDto {
   @IsEnum(['FLAT_MONTHLY', 'PER_SESSION'])
   billingType?: string
 
-  @ApiProperty({ example: 'session_id_123' })
+  @ApiProperty({
+    example: 'session_id_123',
+    required: false,
+    description: 'ID sesi jadwal. Kosongkan untuk mendaftarkan tanpa jadwal (bisa dijadwalkan nanti dari halaman Detail Siswa).',
+  })
+  @IsOptional()
   @IsString()
-  sessionId!: string
+  sessionId?: string
 }
 
 export class EnrollmentRequestDto {
@@ -56,14 +61,14 @@ export class EnrolledSubjectSummaryDto {
   @ApiProperty()
   sppAmount!: string
 
-  @ApiProperty()
-  sessionDay!: string
+  @ApiProperty({ required: false, nullable: true, description: 'Null jika mata pelajaran ini belum dijadwalkan.' })
+  sessionDay!: string | null
 
-  @ApiProperty()
-  sessionTime!: string
+  @ApiProperty({ required: false, nullable: true })
+  sessionTime!: string | null
 
-  @ApiProperty()
-  teacherName!: string
+  @ApiProperty({ required: false, nullable: true })
+  teacherName!: string | null
 }
 
 export class EnrollmentResponseDto {
