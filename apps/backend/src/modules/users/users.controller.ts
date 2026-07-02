@@ -76,7 +76,7 @@ export class UsersController {
   @Roles("OWNER", "ADMIN_GLOBAL")
   @ApiBearerAuth()
   @ApiOperation({ summary: "Reset user password and send via email" })
-  @ApiResponse({ status: 200, description: "Password reset and emailed" })
+  @ApiResponse({ status: 201, description: "Password reset and emailed" })
   async resetPassword(@Param("id") id: string): Promise<any> {
     return this.usersService.resetPassword(id)
   }

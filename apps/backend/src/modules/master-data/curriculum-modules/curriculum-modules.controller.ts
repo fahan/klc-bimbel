@@ -113,7 +113,7 @@ export class CurriculumModulesController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reorder curriculum modules' })
   @ApiResponse({
-    status: 200,
+    status: 201,
     description: 'Curriculum modules reordered',
     type: CurriculumModuleResponseDto,
   })
