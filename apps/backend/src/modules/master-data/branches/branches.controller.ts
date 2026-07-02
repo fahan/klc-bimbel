@@ -51,7 +51,19 @@ export class BranchesController {
     @Query('limit') limit?: number,
     @CurrentUser() user?: any,
   ): Promise<any> {
-    return this.branchesService.findAll(page || 1, limit || 10, user.id, user.role, user.branchId)
+    // Dual-role users (e.g. GURU also assigned ADMIN_CABANG) have their extra
+    // roles only in `user.roles`, not in the legacy singular `user.role` column —
+    // resolve branch-scoping from the full roles array, same precedence RolesGuard uses.
+    const userRoles: string[] = user.roles ?? [user.role]
+    const effectiveRole = userRoles.includes('OWNER')
+      ? 'OWNER'
+      : userRoles.includes('ADMIN_GLOBAL')
+        ? 'ADMIN_GLOBAL'
+        : userRoles.includes('ADMIN_CABANG')
+          ? 'ADMIN_CABANG'
+          : user.role
+
+    return this.branchesService.findAll(page || 1, limit || 10, user.id, effectiveRole, user.branchId)
   }
 
   @Get(':id')
