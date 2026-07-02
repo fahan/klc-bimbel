@@ -220,19 +220,22 @@ export class StudentsService {
         throw new BadRequestException(`Subject ${subjectEnroll.subjectId} not found`)
       }
 
-      // Get session
-      const session = await this.prisma.session.findUnique({
-        relationLoadStrategy: 'join',
-        where: { id: subjectEnroll.sessionId },
-        include: { teacher: true },
-      })
-      if (!session) {
-        throw new BadRequestException(`Session ${subjectEnroll.sessionId} not found`)
-      }
+      // Get session (optional — scheduling can be done later from the student detail page)
+      let session: any = null
+      if (subjectEnroll.sessionId) {
+        session = await this.prisma.session.findUnique({
+          relationLoadStrategy: 'join',
+          where: { id: subjectEnroll.sessionId },
+          include: { teacher: true },
+        })
+        if (!session) {
+          throw new BadRequestException(`Session ${subjectEnroll.sessionId} not found`)
+        }
 
-      // Verify session belongs to correct subject and branch
-      if (session.subjectId !== subjectEnroll.subjectId || session.branchId !== student.branchId) {
-        throw new BadRequestException('Session does not match subject or branch')
+        // Verify session belongs to correct subject and branch
+        if (session.subjectId !== subjectEnroll.subjectId || session.branchId !== student.branchId) {
+          throw new BadRequestException('Session does not match subject or branch')
+        }
       }
 
       // Get SPP rate at enrollment date (supports historical data entry)
@@ -287,18 +290,20 @@ export class StudentsService {
       ),
     )
 
-    // Create session_students entries
+    // Create session_students entries (only for subjects that were assigned a session)
     await Promise.all(
-      enrollmentData.map(data =>
-        this.prisma.sessionStudent.create({
-          data: {
-            sessionId: data.sessionId,
-            studentId,
-            joinedAt: new Date(),
-            isActive: true,
-          },
-        } as any),
-      ),
+      enrollmentData
+        .filter(data => data.session)
+        .map(data =>
+          this.prisma.sessionStudent.create({
+            data: {
+              sessionId: data.sessionId,
+              studentId,
+              joinedAt: new Date(),
+              isActive: true,
+            },
+          } as any),
+        ),
     )
 
     // Calculate fees
@@ -311,9 +316,11 @@ export class StudentsService {
       subjectName: data.subject.name,
       type: data.type,
       sppAmount: data.sppRate.amount.toString(),
-      sessionDay: data.session.dayOfWeek,
-      sessionTime: `${data.session.startTime.toString().substring(0, 5)} (${data.session.durationMinutes} min)`,
-      teacherName: data.session.teacher.name,
+      sessionDay: data.session ? data.session.dayOfWeek : null,
+      sessionTime: data.session
+        ? `${data.session.startTime.toString().substring(0, 5)} (${data.session.durationMinutes} min)`
+        : null,
+      teacherName: data.session ? data.session.teacher.name : null,
     }))
 
     return {
