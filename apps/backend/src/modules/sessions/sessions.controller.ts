@@ -42,6 +42,7 @@ export class SessionsController {
   @ApiQuery({ name: 'teacherId', required: false })
   @ApiQuery({ name: 'subjectId', required: false })
   @ApiQuery({ name: 'dayOfWeek', required: false })
+  @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD — when provided, each session includes attendanceStatus for that date' })
   @ApiResponse({ status: 200, description: 'Sessions retrieved successfully', type: SessionResponseDto })
   async findAll(
     @Query('page') page?: number,
@@ -50,13 +51,14 @@ export class SessionsController {
     @Query('teacherId') teacherId?: string,
     @Query('subjectId') subjectId?: string,
     @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('date') date?: string,
   ): Promise<any> {
     return this.sessionsService.findAll(page || 1, limit || 10, {
       branchId,
       teacherId,
       subjectId,
       dayOfWeek,
-    })
+    }, date)
   }
 
   @Get('today/me')

@@ -28,8 +28,15 @@ export class SessionsService {
     page: number = 1,
     limit: number = 10,
     filters?: { branchId?: string; teacherId?: string; subjectId?: string; dayOfWeek?: string },
+    date?: string,
   ) {
     const skip = (page - 1) * limit
+
+    let normalizedDate: Date | undefined
+    if (date) {
+      normalizedDate = new Date(date)
+      normalizedDate.setHours(0, 0, 0, 0)
+    }
 
     const [sessions, total] = await Promise.all([
       this.prisma.session.findMany({
@@ -52,6 +59,12 @@ export class SessionsService {
               student: true,
             },
           },
+          ...(normalizedDate && {
+            sessionLogs: {
+              where: { sessionDate: normalizedDate, isAdHoc: false },
+              select: { status: true },
+            },
+          }),
         },
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
         skip,
@@ -80,7 +93,12 @@ export class SessionsService {
 
     return {
       success: true,
-      data: sessions.map(s => this.formatSession(s)),
+      data: sessions.map(s => ({
+        ...this.formatSession(s),
+        ...(normalizedDate && {
+          attendanceStatus: (s as any).sessionLogs?.[0]?.status || 'SCHEDULED',
+        }),
+      })),
       pagination,
     }
   }
