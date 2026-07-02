@@ -86,6 +86,7 @@ export class AuthService {
       where: { id: payload.id },
       include: {
         roles: true,
+        branches: true,
       },
     })
 
@@ -98,11 +99,17 @@ export class AuthService {
       ? user.roles.map((ur: any) => ur.role)
       : [user.role])
 
+    // Primary branch (used for ADMIN_CABANG branch-scoped access)
+    const branchId = (user as any).branches?.find((ub: any) => ub.isPrimary)?.branchId
+      || (user as any).branches?.[0]?.branchId
+      || null
+
     return {
       id: user.id,
       email: user.email,
       role: user.role, // Keep for backward compatibility
       roles, // New: array of all roles
+      branchId,
     }
   }
 
