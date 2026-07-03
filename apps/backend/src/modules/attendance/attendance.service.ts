@@ -360,22 +360,25 @@ export class AttendanceService {
       )
     }
 
-    // Validate branch exists
-    const branch = await this.prisma.branch.findUnique({ where: { id: dto.branchId } })
-    if (!branch) throw new NotFoundException('Cabang tidak ditemukan')
+    const studentIds = dto.attendances.map(a => a.studentId)
 
-    // Validate subject exists
-    const subject = await this.prisma.subject.findUnique({ where: { id: dto.subjectId } })
+    // Validate branch/subject/students in one round-trip instead of three serial ones —
+    // the DB is latency-bound (see perf-db-latency-seoul memory), so each serial await here
+    // used to cost a full network round-trip.
+    const [branch, subject, existingStudents, teacher] = await Promise.all([
+      this.prisma.branch.findUnique({ where: { id: dto.branchId } }),
+      this.prisma.subject.findUnique({ where: { id: dto.subjectId } }),
+      this.prisma.student.findMany({
+        where: { id: { in: studentIds }, isActive: true },
+        select: { id: true, name: true },
+      }),
+      this.prisma.user.findUnique({ where: { id: teacherId }, select: { id: true, name: true } }),
+    ])
+    if (!branch) throw new NotFoundException('Cabang tidak ditemukan')
     if (!subject) throw new NotFoundException('Mata pelajaran tidak ditemukan')
 
-    // Validate all student IDs exist (basic existence check — enrollment not required for ad-hoc)
-    const studentIds = dto.attendances.map(a => a.studentId)
-    const existingStudents = await this.prisma.student.findMany({
-      where: { id: { in: studentIds }, isActive: true },
-      select: { id: true },
-    })
-    const existingIds = new Set(existingStudents.map(s => s.id))
-    const notFound = studentIds.filter(id => !existingIds.has(id))
+    const studentById = new Map(existingStudents.map(s => [s.id, s]))
+    const notFound = studentIds.filter(id => !studentById.has(id))
     if (notFound.length > 0) {
       throw new BadRequestException(`${notFound.length} siswa tidak ditemukan di sistem.`)
     }
@@ -384,47 +387,71 @@ export class AttendanceService {
 
     const sessionDate = new Date(dto.sessionDate)
     sessionDate.setHours(0, 0, 0, 0)
-
-    // Create the ad-hoc session log with PENDING_APPROVAL status
-    const sessionLog = await this.prisma.sessionLog.create({
-      data: {
-        sessionId: null,
-        sessionDate,
-        scheduledTeacherId: teacherId,
-        actualTeacherId: teacherId,
-        isReplacement: false,
-        isAdHoc: true,
-        adHocBranchId: dto.branchId,
-        adHocSubjectId: dto.subjectId,
-        adHocStartTime: dto.startTime,
-        adHocDuration: dto.durationMinutes ?? 60,
-        adHocNotes: dto.notes ?? null,
-        status: 'PENDING_APPROVAL',
-      },
-    })
-
-    // Create attendance records
     const recordedAt = new Date()
-    await this.prisma.attendance.createMany({
-      data: dto.attendances.map(att => ({
-        sessionLogId: sessionLog.id,
-        studentId: att.studentId,
-        status: att.status as any,
-        recordedById: teacherId,
-        recordedAt,
-      })),
+
+    // Create the session log + its attendance rows atomically — previously these were two
+    // unguarded writes, so a failed createMany left an orphaned PENDING_APPROVAL log with no attendances.
+    const { sessionLog, attendances } = await this.prisma.$transaction(async tx => {
+      const sessionLog = await tx.sessionLog.create({
+        data: {
+          sessionId: null,
+          sessionDate,
+          scheduledTeacherId: teacherId,
+          actualTeacherId: teacherId,
+          isReplacement: false,
+          isAdHoc: true,
+          adHocBranchId: dto.branchId,
+          adHocSubjectId: dto.subjectId,
+          adHocStartTime: dto.startTime,
+          adHocDuration: dto.durationMinutes ?? 60,
+          adHocNotes: dto.notes ?? null,
+          status: 'PENDING_APPROVAL',
+        },
+      })
+
+      const attendances = await tx.attendance.createManyAndReturn({
+        data: dto.attendances.map(att => ({
+          sessionLogId: sessionLog.id,
+          studentId: att.studentId,
+          status: att.status as any,
+          recordedById: teacherId,
+          recordedAt,
+        })),
+      })
+
+      return { sessionLog, attendances }
     })
 
-    const result = await this.prisma.sessionLog.findUnique({
-      relationLoadStrategy: 'join',
-      where: { id: sessionLog.id },
-      include: {
-        actualTeacher: true,
-        adHocBranch: true,
-        adHocSubject: true,
-        attendances: { include: { student: true } },
-      },
-    })
+    // Build the response from data already in hand instead of re-fetching the session log
+    // with joins — that final round-trip was pure overhead since nothing here changed underneath us.
+    const result = {
+      id: sessionLog.id,
+      sessionDate,
+      adHocBranchId: dto.branchId,
+      adHocBranch: branch,
+      adHocSubjectId: dto.subjectId,
+      adHocSubject: subject,
+      adHocStartTime: dto.startTime,
+      adHocDuration: dto.durationMinutes ?? 60,
+      adHocNotes: dto.notes ?? null,
+      actualTeacherId: teacherId,
+      actualTeacher: teacher,
+      status: 'PENDING_APPROVAL',
+      reviewedById: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+      createdAt: sessionLog.createdAt,
+      attendances: attendances.map(att => {
+        const student = studentById.get(att.studentId)
+        return {
+          id: att.id,
+          studentId: att.studentId,
+          student: { name: student?.name },
+          status: att.status,
+        }
+      }),
+    }
 
     return {
       success: true,
