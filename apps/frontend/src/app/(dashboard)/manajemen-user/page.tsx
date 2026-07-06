@@ -12,7 +12,7 @@ import {
 import { useBranch } from '@/lib/branch-context'
 import { Card, SectionCard } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { LoadingState, EmptyState, SkeletonCard } from '@/components/ui/States'
+import { LoadingState, EmptyState, SkeletonCard, ErrorState } from '@/components/ui/States'
 import { usersApi, branchApi } from '@/lib/api/endpoints'
 
 // ── schemas ──────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export default function UsersManagementPage() {
   }
 
   // ── queries ────────────────────────────────────────────────────────────────
-  const { data: usersData, isLoading } = useQuery({
+  const { data: usersData, isLoading, error, refetch: refetchUsers } = useQuery({
     queryKey: ['users', { page, limit, search: searchTerm, role: roleFilter }],
     queryFn: async () => {
       const res = await usersApi.getAll(page, limit, {
@@ -89,6 +89,7 @@ export default function UsersManagementPage() {
       })
       return res.data
     },
+    networkMode: 'always',
   })
 
   const { data: branchesData = [] } = useQuery({
@@ -302,7 +303,13 @@ export default function UsersManagementPage() {
 
         {/* Table */}
         <Card>
-          {isLoading ? (
+          {error ? (
+            <ErrorState
+              title="Gagal memuat data"
+              description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+              action={{ label: 'Coba Lagi', onClick: refetchUsers }}
+            />
+          ) : isLoading ? (
             <div className="space-y-3">{[1, 2, 3].map((i) => <SkeletonCard key={i} />)}</div>
           ) : users.length === 0 ? (
             <EmptyState icon={<User className="w-12 h-12 text-gray-400" />} title="Tidak ada pengguna" description="Tidak ada pengguna yang cocok dengan filter" />
