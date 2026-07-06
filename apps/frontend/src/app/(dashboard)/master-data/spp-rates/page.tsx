@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { sppRateApi, subjectApi } from '@/lib/api/endpoints'
 import { usePagination } from '@/hooks/usePagination'
 import { Pagination } from '@/components/ui/Pagination'
+import { ErrorState } from '@/components/ui/States'
 
 interface SppRate {
   id: string
@@ -23,7 +24,7 @@ interface Subject {
 export default function SppRatesPage() {
   const [subjects, setSubjects] = useState<Map<string, string>>(new Map())
   const [error, setError] = useState('')
-  const { items: rates, page, limit, setPage, setLimit, pagination, isLoading, refetch } = usePagination({
+  const { items: rates, page, limit, setPage, setLimit, pagination, isLoading, error: queryError, refetch } = usePagination({
     queryKey: ['spp-rates'],
     queryFn: (page, limit) => sppRateApi.getAll(page, limit),
     initialLimit: 10,
@@ -105,15 +106,18 @@ export default function SppRatesPage() {
         </div>
       )}
 
-      {/* Loading State */}
-      {isLoading && (
+      {/* Query Error State */}
+      {queryError ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <p className="text-gray-600">Loading SPP rates...</p>
         </div>
-      )}
-
-      {/* SPP Rates Table */}
-      {!isLoading && (
+      ) : (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {rates.length === 0 ? (
             <div className="p-8 text-center text-gray-600">
