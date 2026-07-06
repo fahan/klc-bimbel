@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { commissionFormulaApi } from '@/lib/api/endpoints'
 import { Settings2, Save, RotateCcw, Info } from 'lucide-react'
+import { ErrorState } from '@/components/ui/States'
 
 type FormulaType = 'MONTHLY_RATE' | 'PER_SESSION'
 type SessionType = 'REGULAR' | 'PRIVATE'
@@ -158,9 +159,10 @@ function FormulaCell({
 export default function FormulaKomisiPage() {
   const qc = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['commission-formulas'],
     queryFn: () => commissionFormulaApi.getAll(),
+    networkMode: 'always',
   })
 
   const subjects: SubjectFormula[] = data?.data?.data ?? []
@@ -194,7 +196,13 @@ export default function FormulaKomisiPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <div className="text-center py-12 text-gray-500">Memuat data...</div>
       ) : subjects.length === 0 ? (
         <div className="text-center py-12 text-gray-400">Belum ada mata pelajaran aktif</div>
