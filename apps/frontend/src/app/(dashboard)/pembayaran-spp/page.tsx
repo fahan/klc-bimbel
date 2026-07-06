@@ -18,7 +18,7 @@ import {
   TrendingUp,
   X,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 
 const MONTHS = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -86,7 +86,7 @@ export default function PembayaranSPPPage() {
   const [paymentLoading, setPaymentLoading] = useState(false)
 
   // Queries
-  const { data: invoicesData, isLoading: invoicesLoading, refetch: refetchInvoices } = useQuery({
+  const { data: invoicesData, isLoading: invoicesLoading, error: invoicesError, refetch: refetchInvoices } = useQuery({
     queryKey: ['invoices-payment', branchId, filterMonth, filterYear],
     queryFn: () => invoiceApi.getAll({
       branchId,
@@ -95,6 +95,7 @@ export default function PembayaranSPPPage() {
       year: filterYear,
       studentId: filterStudentId || undefined,
     }),
+    networkMode: 'always',
   })
 
   const { data: studentsData } = useQuery({
@@ -233,6 +234,16 @@ export default function PembayaranSPPPage() {
       case 'UNPAID': return 'Belum Lunas'
       default: return status
     }
+  }
+
+  if (invoicesError) {
+    return (
+      <ErrorState
+        title="Gagal memuat data"
+        description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+        action={{ label: 'Coba Lagi', onClick: refetchInvoices }}
+      />
+    )
   }
 
   if (invoicesLoading) return <LoadingState />
