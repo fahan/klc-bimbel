@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { teacherApi, branchApi } from '@/lib/api/endpoints'
 import { Plus, Eye, Trash2, Search, Filter, Mail, Phone, BookOpen } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/Badge'
-import { EmptyState, LoadingState } from '@/components/ui/States'
+import { EmptyState, LoadingState, ErrorState } from '@/components/ui/States'
 import { usePagination } from '@/hooks/usePagination'
 import { Pagination } from '@/components/ui/Pagination'
 
@@ -19,7 +19,7 @@ export default function TeachersListPage() {
   const [searchTerm, setSearchTerm] = React.useState('')
   const [filterBranchId, setFilterBranchId] = React.useState<string>('')
 
-  const { items: teachers, page, limit, setPage, setLimit, pagination, isLoading, refetch } = usePagination({
+  const { items: teachers, page, limit, setPage, setLimit, pagination, isLoading, error, refetch } = usePagination({
     queryKey: ['teachers', filterBranchId],
     queryFn: (page, limit) => teacherApi.getAll(page, limit, filterBranchId || undefined),
     initialLimit: 10,
@@ -183,7 +183,13 @@ export default function TeachersListPage() {
       )}
 
       {/* Teachers Table */}
-      {isLoading ? (
+      {error ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <LoadingState />
       ) : teachers.length === 0 && !searchTerm ? (
         <EmptyState
