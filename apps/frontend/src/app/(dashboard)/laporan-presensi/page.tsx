@@ -14,7 +14,7 @@ import {
   TrendingUp,
   ChevronRight,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 import { Pagination } from '@/components/ui/Pagination'
 
 interface ReportData {
@@ -59,7 +59,7 @@ export default function LaporanPresensiPage() {
   const [teacherId, setTeacherId] = useState('')
 
   // Load report data
-  const { data: reportData, isLoading, refetch } = useQuery({
+  const { data: reportData, isLoading, error, refetch } = useQuery({
     queryKey: ['attendance-report', dateFrom, dateTo, branchId, teacherId, page, limit],
     queryFn: () =>
       attendanceApi.getReport({
@@ -70,6 +70,7 @@ export default function LaporanPresensiPage() {
         page,
         limit,
       }),
+    networkMode: 'always',
   })
 
   // Load branches
@@ -329,7 +330,13 @@ export default function LaporanPresensiPage() {
       </div>
 
       {/* Data Table */}
-      {isLoading ? (
+      {error ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <LoadingState />
       ) : reportItems.length === 0 ? (
         <EmptyState
