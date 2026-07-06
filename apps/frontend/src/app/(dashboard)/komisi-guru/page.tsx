@@ -19,7 +19,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 
 const MONTHS = [
   'Januari',
@@ -62,10 +62,11 @@ export default function KomisiGuruPage() {
   const [bonusForm, setBonusForm] = useState({ teacherId: '', amount: '', reason: '' })
   const qc = useQueryClient()
 
-  const { data: commissionsData, isLoading, refetch } = useQuery({
+  const { data: commissionsData, isLoading, error, refetch } = useQuery({
     queryKey: ['commissions', branchId, month, year],
     queryFn: () => commissionApi.getByMonth(branchId, month, year),
     enabled: !!branchId,
+    networkMode: 'always',
   })
 
   const { data: detailData } = useQuery({
@@ -396,7 +397,13 @@ export default function KomisiGuruPage() {
       )}
 
       {/* Commissions Table */}
-      {isLoading ? (
+      {error ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <LoadingState />
       ) : commissions.length === 0 ? (
         <EmptyState
