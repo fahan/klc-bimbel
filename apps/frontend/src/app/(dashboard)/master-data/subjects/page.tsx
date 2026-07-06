@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { subjectApi } from '@/lib/api/endpoints'
 import { usePagination } from '@/hooks/usePagination'
 import { Pagination } from '@/components/ui/Pagination'
+import { ErrorState } from '@/components/ui/States'
 
 interface Subject {
   id: string
@@ -18,7 +19,7 @@ interface Subject {
 
 export default function SubjectsPage() {
   const [error, setError] = useState('')
-  const { items: subjects, page, limit, setPage, setLimit, pagination, isLoading, refetch } = usePagination({
+  const { items: subjects, page, limit, setPage, setLimit, pagination, isLoading, error: queryError, refetch } = usePagination({
     queryKey: ['subjects'],
     queryFn: (page, limit) => subjectApi.getAll(page, limit),
     initialLimit: 10,
@@ -59,15 +60,18 @@ export default function SubjectsPage() {
         </div>
       )}
 
-      {/* Loading State */}
-      {isLoading && (
+      {/* Query Error State */}
+      {queryError ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <p className="text-gray-600">Loading subjects...</p>
         </div>
-      )}
-
-      {/* Subjects Table */}
-      {!isLoading && (
+      ) : (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           {subjects.length === 0 ? (
             <div className="p-8 text-center text-gray-600">
