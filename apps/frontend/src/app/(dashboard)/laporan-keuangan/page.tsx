@@ -15,7 +15,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react'
-import { LoadingState } from '@/components/ui/States'
+import { LoadingState, ErrorState } from '@/components/ui/States'
 
 const MONTHS = [
   'Januari',
@@ -67,9 +67,10 @@ export default function LaporanKeuanganPage() {
   const branchId = useApiBranchId()
   const { selectedBranch, canViewAllBranches } = useBranch()
 
-  const { data: overviewData, isLoading } = useQuery({
+  const { data: overviewData, isLoading, error, refetch } = useQuery({
     queryKey: ['finance-overview', month, year, branchId],
     queryFn: () => financeApi.getOverview(month, year, branchId),
+    networkMode: 'always',
   })
 
   const { data: txData } = useQuery({
@@ -100,6 +101,16 @@ export default function LaporanKeuanganPage() {
     } else {
       setMonth(month + 1)
     }
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Gagal memuat data"
+        description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+        action={{ label: 'Coba Lagi', onClick: refetch }}
+      />
+    )
   }
 
   if (isLoading) return <LoadingState />
