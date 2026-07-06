@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { branchApi } from '@/lib/api/endpoints'
 import { usePagination } from '@/hooks/usePagination'
 import { Pagination } from '@/components/ui/Pagination'
+import { ErrorState } from '@/components/ui/States'
 
 interface Branch {
   id: string
@@ -18,7 +19,7 @@ interface Branch {
 
 export default function BranchesPage() {
   const [error, setError] = useState('')
-  const { items: branches, page, limit, setPage, setLimit, pagination, isLoading, refetch } = usePagination({
+  const { items: branches, page, limit, setPage, setLimit, pagination, isLoading, error: queryError, refetch } = usePagination({
     queryKey: ['branches'],
     queryFn: (page, limit) => branchApi.getAll(page, limit),
     initialLimit: 10,
@@ -55,15 +56,18 @@ export default function BranchesPage() {
         </div>
       )}
 
-      {/* Loading State */}
-      {isLoading && (
+      {/* Query Error State */}
+      {queryError ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <p className="text-gray-600">Loading branches...</p>
         </div>
-      )}
-
-      {/* Branches Table */}
-      {!isLoading && (
+      ) : (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <div className="overflow-x-auto">
           {branches.length === 0 ? (
