@@ -24,6 +24,12 @@ export function usePagination(props: UsePaginationProps) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [...props.queryKey, page, limit, props.searchTerm || ''],
     queryFn: () => props.queryFn(page, limit, props.searchTerm),
+    // Without this, React Query's default networkMode ('online') pauses retries
+    // indefinitely instead of settling into an error state when a request fails
+    // with a plain network error (backend unreachable, CORS-blocked, etc.) — the
+    // query gets stuck at fetchStatus 'paused' and `error` never populates, so
+    // ErrorState (which depends on `error`) never renders.
+    networkMode: 'always',
   })
 
   const pagination: PaginationMeta | undefined = data?.data?.pagination
