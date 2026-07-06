@@ -14,7 +14,7 @@ import { usePermission } from '@/lib/use-permissions'
 import { usePagination } from '@/hooks/usePagination'
 import { useAttendanceFilter } from '@/hooks/useAttendanceFilter'
 import { Pagination } from '@/components/ui/Pagination'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 import { Badge } from '@/components/ui/Badge'
 import { SessionAttendanceStatusBadge } from '@/components/attendance/AttendanceStatusBadge'
 import { AttendanceDetailModal } from '@/components/attendance/AttendanceDetailModal'
@@ -89,6 +89,7 @@ export default function AttendancePage() {
     setLimit,
     pagination,
     isLoading: sessionsLoading,
+    error: sessionsError,
     refetch: refetchSessions,
   } = usePagination({
     queryKey: ['sessions-attendance', selectedDate],
@@ -627,7 +628,13 @@ export default function AttendancePage() {
       </div>
 
       {/* Sessions Table */}
-      {sessionsLoading ? (
+      {sessionsError ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetchSessions }}
+        />
+      ) : sessionsLoading ? (
         <LoadingState />
       ) : filteredSessions.length === 0 ? (
         <EmptyState
