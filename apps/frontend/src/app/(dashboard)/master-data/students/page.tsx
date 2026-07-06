@@ -8,7 +8,7 @@ import { studentApi, branchApi } from '@/lib/api/endpoints'
 import { useApiBranchId } from '@/lib/branch-context'
 import { Plus, Eye, Trash2, Search, Filter, Upload, X, ChevronDown } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/Badge'
-import { EmptyState, LoadingState } from '@/components/ui/States'
+import { EmptyState, LoadingState, ErrorState } from '@/components/ui/States'
 import { ImportStudentsModal } from '@/components/students/ImportStudentsModal'
 import { Pagination } from '@/components/ui/Pagination'
 
@@ -44,9 +44,10 @@ export default function StudentsListPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['students', page, limit, searchTerm, branchId ?? '', statusFilter],
     queryFn: () => studentApi.getAll(page, limit, branchId, searchTerm || undefined, statusFilter),
+    networkMode: 'always',
   })
 
   const { data: branchesData } = useQuery({
@@ -234,7 +235,13 @@ export default function StudentsListPage() {
       )}
 
       {/* Student List */}
-      {isLoading ? (
+      {error ? (
+        <ErrorState
+          title="Gagal memuat data"
+          description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+          action={{ label: 'Coba Lagi', onClick: refetch }}
+        />
+      ) : isLoading ? (
         <LoadingState />
       ) : studentsArray.length === 0 && !searchTerm && statusFilter === 'true' && !branchId ? (
         <EmptyState
