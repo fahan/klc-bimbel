@@ -13,7 +13,7 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 import { useApiBranchId } from '@/lib/branch-context'
 
 const DURATION_PRESETS = [
@@ -85,9 +85,10 @@ export default function ManageLinksTab({
     }
   }, [formStudentSearch])
 
-  const { data: linksData, isLoading, refetch } = useQuery({
+  const { data: linksData, isLoading, error: queryError, refetch } = useQuery({
     queryKey: ['progress-report-links', branchId, filterStatus],
     queryFn: () => progressReportApi.getAll({ branchId, status: filterStatus || undefined }),
+    networkMode: 'always',
   })
 
   const { data: metricsData } = useQuery({
@@ -264,7 +265,13 @@ ${expiryText} Hubungi kami jika ada pertanyaan.`
         )}
 
         {/* Links Table */}
-        {isLoading ? (
+        {queryError ? (
+          <ErrorState
+            title="Gagal memuat data"
+            description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+            action={{ label: 'Coba Lagi', onClick: refetch }}
+          />
+        ) : isLoading ? (
           <LoadingState />
         ) : links.length === 0 ? (
           <EmptyState
