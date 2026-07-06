@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, Trash2, X, Filter } from 'lucide-react'
 import { useBranch, useApiBranchId } from '@/lib/branch-context'
+import { ErrorState } from '@/components/ui/States'
 import { expenseApi } from '@/lib/api/endpoints'
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -48,7 +49,7 @@ export default function PengeluaranPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error: queryError, refetch } = useQuery({
     queryKey: ['expenses', branchId, filterMonth, filterYear, filterCategory],
     queryFn: () =>
       expenseApi.getAll({
@@ -57,6 +58,7 @@ export default function PengeluaranPage() {
         year: filterYear,
         category: filterCategory || undefined,
       }),
+    networkMode: 'always',
   })
 
   const expenses: any[] = data?.data?.data || []
@@ -227,7 +229,13 @@ export default function PengeluaranPage() {
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-        {isLoading ? (
+        {queryError ? (
+          <ErrorState
+            title="Gagal memuat data"
+            description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+            action={{ label: 'Coba Lagi', onClick: refetch }}
+          />
+        ) : isLoading ? (
           <div className="p-12 text-center text-gray-400 text-sm">Memuat data...</div>
         ) : expenses.length === 0 ? (
           <div className="p-12 text-center">
