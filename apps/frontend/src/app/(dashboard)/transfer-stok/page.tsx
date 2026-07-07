@@ -43,9 +43,10 @@ export default function TransferStokPage() {
   })
   const products = productsData?.data?.data || []
 
-  const { data: historyData, refetch: refetchHistory } = useQuery({
+  const { data: historyData, error: historyError, refetch: refetchHistory } = useQuery({
     queryKey: ['transfer-history'],
     queryFn: () => storeApi.getTransferHistory(),
+    networkMode: 'always',
   })
   const history = historyData?.data?.data || []
 
@@ -351,7 +352,25 @@ export default function TransferStokPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {history.length === 0 ? (
+              {historyError ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8">
+                    <div className="text-center">
+                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <AlertCircle className="w-6 h-6 text-red-500" />
+                      </div>
+                      <p className="text-gray-900 font-medium">Gagal memuat riwayat transfer</p>
+                      <p className="text-sm text-gray-500 mt-1">Terjadi kesalahan saat memuat data. Silakan coba lagi.</p>
+                      <button
+                        onClick={() => refetchHistory()}
+                        className="mt-3 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Coba Lagi
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : history.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8">
                     <div className="text-center">
