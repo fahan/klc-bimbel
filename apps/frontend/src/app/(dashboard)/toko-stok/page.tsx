@@ -18,7 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 
 const PAGE_SIZE = 10
 
@@ -99,7 +99,7 @@ export default function TokoStokPage() {
   // Reset page when filters change
   useEffect(() => { setPage(1) }, [filterCategory, filterLowStock, branchId])
 
-  const { data: productsData, isLoading, refetch } = useQuery({
+  const { data: productsData, isLoading, error, refetch } = useQuery({
     queryKey: ['store-products', branchId, filterCategory, filterLowStock, debouncedSearch, page],
     queryFn: () =>
       storeApi.getProducts({
@@ -112,6 +112,7 @@ export default function TokoStokPage() {
       }),
     enabled: !!branchId,
     placeholderData: (prev) => prev,
+    networkMode: 'always',
   })
 
   // Separate query for sale form dropdown (all products, no pagination)
@@ -446,7 +447,13 @@ export default function TokoStokPage() {
           )}
 
           {/* Products Table */}
-          {isLoading ? (
+          {error ? (
+            <ErrorState
+              title="Gagal memuat data"
+              description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+              action={{ label: 'Coba Lagi', onClick: () => refetch() }}
+            />
+          ) : isLoading ? (
             <LoadingState />
           ) : products.length === 0 ? (
             <EmptyState
