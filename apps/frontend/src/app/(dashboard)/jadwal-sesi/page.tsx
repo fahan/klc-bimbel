@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { sessionApi, branchApi } from '@/lib/api/endpoints'
 import { useApiBranchId, useBranch } from '@/lib/branch-context'
 import { Plus, ChevronLeft, ChevronRight, Search, Calendar, Clock, MapPin, Users, X, Settings, Layers } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 
 const DAYS_OF_WEEK = ['SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU', 'MINGGU']
 const DAY_LABELS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
@@ -93,10 +93,11 @@ export default function JadwalSesiPage() {
     localStorage.setItem('jadwal-column-settings', JSON.stringify(DEFAULT_COLUMN_SETTINGS))
   }
 
-  const { data: sessionsData, isLoading, refetch } = useQuery({
+  const { data: sessionsData, isLoading, error, refetch } = useQuery({
     queryKey: ['sessions', filterBranchId],
     queryFn: () =>
       sessionApi.getAll(undefined, 1000, filterBranchId ? { branchId: filterBranchId } : undefined),
+    networkMode: 'always',
   })
 
   const { data: branchesData } = useQuery({
@@ -197,6 +198,16 @@ export default function JadwalSesiPage() {
   // Get current day for highlighting
   const today = new Date()
   const todayDayIdx = today.getDay() === 0 ? 6 : today.getDay() - 1 // Convert to SENIN-MINGGU
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Gagal memuat data"
+        description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+        action={{ label: 'Coba Lagi', onClick: () => refetch() }}
+      />
+    )
+  }
 
   if (isLoading) {
     return <LoadingState />
