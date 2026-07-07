@@ -20,7 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { LoadingState, EmptyState } from '@/components/ui/States'
+import { LoadingState, EmptyState, ErrorState } from '@/components/ui/States'
 import { useApiBranchId, useBranch } from '@/lib/branch-context'
 
 const MONTHS = [
@@ -98,7 +98,7 @@ export default function InvoiceTagihanPage() {
   const LIMIT = 20
 
   // Data queries
-  const { data: invoicesData, isLoading, refetch } = useQuery({
+  const { data: invoicesData, isLoading, error: queryError, refetch } = useQuery({
     queryKey: ['invoices', branchId, filterStatus, filterType, debouncedSearchTerm, page],
     queryFn: () =>
       invoiceApi.getAll({
@@ -109,6 +109,7 @@ export default function InvoiceTagihanPage() {
         page,
         limit: LIMIT,
       }),
+    networkMode: 'always',
   })
 
   const { data: metricsData } = useQuery({
@@ -417,7 +418,13 @@ Mohon segera dilunasi. Terima kasih 🙏`
           )}
 
           {/* Invoices Table */}
-          {isLoading ? (
+          {queryError ? (
+            <ErrorState
+              title="Gagal memuat data"
+              description="Terjadi kesalahan saat memuat data. Silakan coba lagi."
+              action={{ label: 'Coba Lagi', onClick: () => refetch() }}
+            />
+          ) : isLoading ? (
             <LoadingState />
           ) : invoices.length === 0 ? (
             <EmptyState
