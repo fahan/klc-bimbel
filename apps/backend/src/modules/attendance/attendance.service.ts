@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException 
 import { PrismaService } from '@/prisma/prisma.service'
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
 import { SubmitAdHocAttendanceDto } from './dto/submit-adhoc-attendance.dto'
+import { SubmitQuickAttendanceDto } from './dto/submit-quick-attendance.dto'
 
 @Injectable()
 export class AttendanceService {
@@ -457,6 +458,163 @@ export class AttendanceService {
       success: true,
       data: this.formatAdHocLog(result),
       message: 'Sesi darurat berhasil dicatat. Menunggu persetujuan admin.',
+    }
+  }
+
+  /** Tag prepended to adHocNotes so admin can distinguish Presensi Cepat from Sesi Darurat. */
+  static readonly QUICK_TAG = '[PRESENSI-CEPAT]'
+
+  /**
+   * Presensi Cepat: teacher submits students + statuses only. Subject is resolved
+   * from active enrollments, date/time from submission time, duration fixed at 30min.
+   * Students are grouped per subject; one PENDING_APPROVAL SessionLog per group.
+   */
+  async submitQuickAttendance(dto: SubmitQuickAttendanceDto, teacherId: string) {
+    const studentIds = [...new Set(dto.students.map(s => s.studentId))]
+    if (studentIds.length !== dto.students.length) {
+      throw new BadRequestException('Terdapat siswa duplikat dalam satu submit')
+    }
+
+    const [branch, students, enrollments] = await Promise.all([
+      this.prisma.branch.findUnique({ where: { id: dto.branchId } }),
+      this.prisma.student.findMany({
+        where: { id: { in: studentIds }, isActive: true },
+        select: { id: true, name: true, sureName: true },
+      }),
+      this.prisma.studentSubject.findMany({
+        where: { studentId: { in: studentIds }, isActive: true },
+        select: { studentId: true, subjectId: true },
+      }),
+    ])
+    if (!branch) throw new NotFoundException('Cabang tidak ditemukan')
+
+    const studentById = new Map(students.map(s => [s.id, s]))
+    const missing = studentIds.filter(id => !studentById.has(id))
+    if (missing.length > 0) {
+      throw new BadRequestException(`${missing.length} siswa tidak ditemukan atau tidak aktif.`)
+    }
+
+    const enrollmentsByStudent = new Map<string, string[]>()
+    for (const e of enrollments) {
+      const arr = enrollmentsByStudent.get(e.studentId) ?? []
+      arr.push(e.subjectId)
+      enrollmentsByStudent.set(e.studentId, arr)
+    }
+
+    // Resolve subject per student
+    const resolved: { studentId: string; subjectId: string; status: string }[] = []
+    for (const s of dto.students) {
+      const active = enrollmentsByStudent.get(s.studentId) ?? []
+      let subjectId: string
+      if (active.length === 1) {
+        subjectId = active[0]
+      } else {
+        if (!s.subjectId) {
+          const name = studentById.get(s.studentId)?.name
+          throw new BadRequestException(`Pilih mata pelajaran untuk siswa ${name}.`)
+        }
+        if (active.length > 1 && !active.includes(s.subjectId)) {
+          const name = studentById.get(s.studentId)?.name
+          throw new BadRequestException(`Mapel yang dipilih tidak sesuai enrollment aktif siswa ${name}.`)
+        }
+        subjectId = s.subjectId
+      }
+      resolved.push({ studentId: s.studentId, subjectId, status: s.status as unknown as string })
+    }
+
+    const subjectIds = [...new Set(resolved.map(r => r.subjectId))]
+    const subjects = await this.prisma.subject.findMany({ where: { id: { in: subjectIds } } })
+    const subjectById = new Map(subjects.map(s => [s.id, s]))
+    const missingSubjects = subjectIds.filter(id => !subjectById.has(id))
+    if (missingSubjects.length > 0) {
+      throw new NotFoundException('Mata pelajaran tidak ditemukan')
+    }
+
+    // Date/time from submission moment (server local time)
+    const now = new Date()
+    const sessionDate = new Date(now)
+    sessionDate.setHours(0, 0, 0, 0)
+    const startTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+    // Duplicate detection: same student + subject + date, any flow (not blocking)
+    const existingToday = await this.prisma.attendance.findMany({
+      where: {
+        studentId: { in: studentIds },
+        sessionLog: { sessionDate, status: { in: ['PENDING_APPROVAL', 'COMPLETED'] } },
+      },
+      select: {
+        studentId: true,
+        sessionLog: { select: { adHocSubjectId: true, session: { select: { subjectId: true } } } },
+      },
+    })
+    const duplicates = resolved.filter(r =>
+      existingToday.some(
+        d =>
+          d.studentId === r.studentId &&
+          (d.sessionLog.adHocSubjectId ?? d.sessionLog.session?.subjectId) === r.subjectId,
+      ),
+    )
+
+    // Group per subject
+    const groups = new Map<string, typeof resolved>()
+    for (const r of resolved) {
+      const g = groups.get(r.subjectId) ?? []
+      g.push(r)
+      groups.set(r.subjectId, g)
+    }
+
+    const recordedAt = new Date()
+    const createdLogs = await this.prisma.$transaction(async tx => {
+      const logs: { log: any; subjectId: string; members: typeof resolved }[] = []
+      for (const [subjectId, members] of groups) {
+        const log = await tx.sessionLog.create({
+          data: {
+            sessionId: null,
+            sessionDate,
+            scheduledTeacherId: teacherId,
+            actualTeacherId: teacherId,
+            isReplacement: false,
+            isAdHoc: true,
+            adHocBranchId: dto.branchId,
+            adHocSubjectId: subjectId,
+            adHocStartTime: startTime,
+            adHocDuration: 30,
+            adHocNotes: AttendanceService.QUICK_TAG,
+            status: 'PENDING_APPROVAL',
+          },
+        })
+        await tx.attendance.createMany({
+          data: members.map(m => ({
+            sessionLogId: log.id,
+            studentId: m.studentId,
+            status: m.status as any,
+            recordedById: teacherId,
+            recordedAt,
+          })),
+        })
+        logs.push({ log, subjectId, members })
+      }
+      return logs
+    })
+
+    return {
+      success: true,
+      data: {
+        sessionLogs: createdLogs.map(({ log, subjectId, members }) => ({
+          id: log.id,
+          subjectId,
+          subjectName: subjectById.get(subjectId)!.name,
+          trackingType: subjectById.get(subjectId)!.trackingType,
+          studentCount: members.length,
+          hadirCount: members.filter(m => m.status === 'HADIR').length,
+        })),
+        duplicateWarnings: duplicates.map(d => ({
+          studentId: d.studentId,
+          studentName: studentById.get(d.studentId)?.name,
+          subjectName: subjectById.get(d.subjectId)?.name,
+        })),
+      },
+      message: `Presensi tercatat (${createdLogs.length} sesi). Menunggu persetujuan admin.`,
     }
   }
 
