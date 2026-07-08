@@ -1123,7 +1123,7 @@ export class AttendanceService {
       subjectName: log.adHocSubject?.name,
       startTime: log.adHocStartTime,
       durationMinutes: log.adHocDuration,
-      notes: log.adHocNotes,
+      notes: log.adHocNotes === AttendanceService.QUICK_TAG ? null : log.adHocNotes,
       teacherId: log.actualTeacherId,
       teacherName: log.actualTeacher?.name,
       status: log.status,
