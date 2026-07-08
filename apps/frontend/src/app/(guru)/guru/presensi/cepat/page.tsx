@@ -137,7 +137,7 @@ export default function PresensiCepatPage() {
 
       const logs: any[] = result.data?.data?.sessionLogs || []
       // Sequential progress input: first log now, rest via queue param (logId:subjectId,...)
-      const withPresent = logs
+      const withPresent = logs.filter((l: any) => l.hadirCount > 0)
       if (withPresent.length === 0) {
         router.push('/guru/presensi/darurat/selesai')
         return
