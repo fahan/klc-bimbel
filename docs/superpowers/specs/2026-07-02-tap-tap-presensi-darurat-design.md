@@ -1,7 +1,7 @@
 # Desain: "Presensi Cepat" — Alur Tap-Tap Berdampingan dengan Sesi Darurat
 
 **Tanggal:** 2026-07-02 (revisi 2026-07-08)
-**Status:** Disetujui, menunggu review akhir pengguna
+**Status:** Implemented — lihat docs/superpowers/plans/2026-07-08-presensi-cepat.md
 
 ## 1. Latar Belakang & Masalah
 
