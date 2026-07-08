@@ -137,7 +137,7 @@ export default function AttendancePage() {
     refetch: refetchPendingAdHoc,
   } = useQuery({
     queryKey: ['adhoc-pending', filters.branchId],
-    queryFn: () => attendanceApi.getAdHocPending(filters.branchId || undefined),
+    queryFn: () => attendanceApi.getAdHocPending({ branchId: filters.branchId || undefined }),
   })
 
   const pendingAdHocLogs = pendingAdHocData?.data?.data || []

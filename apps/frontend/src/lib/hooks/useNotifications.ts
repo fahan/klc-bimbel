@@ -18,7 +18,7 @@ export function useNotifications(branchId?: string) {
 
   const { data: adHocData } = useQuery({
     queryKey: ['notifications-adhoc', branchId],
-    queryFn: () => attendanceApi.getAdHocPending(branchId),
+    queryFn: () => attendanceApi.getAdHocPending({ branchId }),
     staleTime: 60_000,
   })
 
