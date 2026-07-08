@@ -198,6 +198,53 @@ export default function PublicProgressReportPage() {
           </div>
         )}
 
+        {/* Ringkasan Bulan Ini */}
+        {data.monthlySummary && (
+          <div className="mx-4 mt-4 bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <h2 className="text-sm font-bold text-gray-900">Ringkasan Bulan Ini</h2>
+            <p className="text-sm text-gray-700">
+              Kehadiran:{' '}
+              <span className="font-semibold">
+                {data.monthlySummary.hadir}/{data.monthlySummary.totalSessions} sesi
+                {data.monthlySummary.totalSessions > 0 &&
+                  ` (${Math.round((data.monthlySummary.hadir / data.monthlySummary.totalSessions) * 100)}%)`}
+              </span>
+            </p>
+            {data.subjectReports?.map((subj: any) => (
+              <div key={subj.subjectId} className="space-y-1">
+                <p className="text-sm font-medium text-gray-800">{subj.subjectName}</p>
+                {subj.trackingType === 'MODULE_BASED' ? (
+                  <>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div
+                        className="bg-blue-500 rounded-full h-2 transition-all"
+                        style={{
+                          width: `${subj.totalModules > 0 ? Math.round((subj.completedModules / subj.totalModules) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Modul {subj.completedModules} dari {subj.totalModules} selesai
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    {subj.recentSessions?.length || 0} sesi terakhir tercatat
+                  </p>
+                )}
+                {subj.lastPredicate && (
+                  <p className="text-xs text-gray-600">
+                    Predikat terakhir:{' '}
+                    <span className="font-medium">
+                      {PREDICATE_LABEL[subj.lastPredicate] || subj.lastPredicate}
+                    </span>
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Subject Reports */}
         <div className="p-4 space-y-4">
           {data.subjectReports?.length === 0 ? (
