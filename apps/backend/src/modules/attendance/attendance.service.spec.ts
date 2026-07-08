@@ -228,3 +228,86 @@ describe('AttendanceService.submitQuickAttendance', () => {
     expect(result.data.duplicateWarnings[0]).toMatchObject({ studentId: 'student-1' })
   })
 })
+
+describe('AttendanceService batch approval', () => {
+  let service: AttendanceService
+  let prisma: any
+
+  beforeEach(async () => {
+    prisma = {
+      sessionLog: {
+        // Keyed by id (not a fixed call sequence) so it stays correct regardless of
+        // how many times approveAdHoc/rejectAdHoc internally re-fetch the same log.
+        findUnique: jest.fn(),
+        update: jest.fn().mockImplementation(async ({ where }: any) => ({
+          id: where.id,
+          sessionDate: new Date('2026-07-08'),
+          attendances: [],
+        })),
+      },
+    }
+    const moduleRef = await Test.createTestingModule({
+      providers: [AttendanceService, { provide: PrismaService, useValue: prisma }],
+    }).compile()
+    service = moduleRef.get(AttendanceService)
+  })
+
+  it('approves valid items and skips already-processed ones', async () => {
+    prisma.sessionLog.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.id === 'log-1') return { id: 'log-1', isAdHoc: true, status: 'PENDING_APPROVAL' }
+      if (where.id === 'log-2') return { id: 'log-2', isAdHoc: true, status: 'COMPLETED' }
+      return null
+    })
+
+    const result = await service.approveAdHocBatch(
+      [{ sessionLogId: 'log-1' }, { sessionLogId: 'log-2' }],
+      'admin-1',
+    )
+
+    expect(result.data.approved).toEqual(['log-1'])
+    expect(result.data.skipped).toHaveLength(1)
+    expect(result.data.skipped[0].sessionLogId).toBe('log-2')
+  })
+
+  it('applies startTime correction before approving', async () => {
+    prisma.sessionLog.findUnique.mockResolvedValue({ id: 'log-1', isAdHoc: true, status: 'PENDING_APPROVAL' })
+
+    await service.approveAdHocBatch([{ sessionLogId: 'log-1', startTime: '14:30' }], 'admin-1')
+
+    const timeUpdate = prisma.sessionLog.update.mock.calls.find(
+      (c: any) => c[0].data.adHocStartTime === '14:30',
+    )
+    expect(timeUpdate).toBeDefined()
+  })
+
+  it('rejects valid items and skips already-processed ones, with a shared reason', async () => {
+    prisma.sessionLog.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.id === 'log-1') return { id: 'log-1', isAdHoc: true, status: 'PENDING_APPROVAL' }
+      if (where.id === 'log-2') return { id: 'log-2', isAdHoc: true, status: 'REJECTED' }
+      return null
+    })
+
+    const result = await service.rejectAdHocBatch(['log-1', 'log-2'], 'admin-1', 'Data tidak valid')
+
+    expect(result.data.rejected).toEqual(['log-1'])
+    expect(result.data.skipped).toHaveLength(1)
+    expect(result.data.skipped[0].sessionLogId).toBe('log-2')
+
+    const rejectUpdate = prisma.sessionLog.update.mock.calls.find(
+      (c: any) => c[0].where.id === 'log-1' && c[0].data.status === 'REJECTED',
+    )
+    expect(rejectUpdate).toBeDefined()
+    expect(rejectUpdate[0].data.rejectionReason).toBe('Data tidak valid')
+  })
+
+  it('falls back to a default reason when no reason is provided in batch reject', async () => {
+    prisma.sessionLog.findUnique.mockResolvedValue({ id: 'log-1', isAdHoc: true, status: 'PENDING_APPROVAL' })
+
+    await service.rejectAdHocBatch(['log-1'], 'admin-1')
+
+    const rejectUpdate = prisma.sessionLog.update.mock.calls.find(
+      (c: any) => c[0].where.id === 'log-1' && c[0].data.status === 'REJECTED',
+    )
+    expect(rejectUpdate[0].data.rejectionReason).toBe('Ditolak melalui aksi batch oleh admin')
+  })
+})
