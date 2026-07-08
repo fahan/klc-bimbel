@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { attendanceApi, progressApi, curriculumModuleApi } from '@/lib/api/endpoints'
 import { ArrowLeft, Check, CheckCircle, BookOpen, AlertTriangle } from 'lucide-react'
 
@@ -38,6 +38,20 @@ function DaruratProgressContent() {
   const searchParams = useSearchParams()
   const sessionLogId = searchParams.get('sessionLogId')
   const subjectId    = searchParams.get('subjectId')
+  const queue = searchParams.get('queue') // "logId:subjectId,logId:subjectId" — set by Presensi Cepat
+
+  const goNext = () => {
+    if (queue) {
+      const [next, ...rest] = queue.split(',')
+      const [nextLog, nextSubj] = next.split(':')
+      router.push(
+        `/guru/presensi/darurat/progress?sessionLogId=${nextLog}&subjectId=${nextSubj}` +
+          (rest.length ? `&queue=${rest.join(',')}` : ''),
+      )
+    } else {
+      router.push('/guru/presensi/darurat/selesai')
+    }
+  }
 
   const [topic, setTopic] = useState('')
   const [moduleProgress, setModuleProgress]           = useState<{ [k: string]: ModuleProgress }>({})
@@ -83,6 +97,41 @@ function DaruratProgressContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLog?.id, isModuleBased])
 
+  // Fetch each present student's last recorded module position for pre-fill
+  const lastModuleQueries = useQueries({
+    queries: presentStudents.map((s: any) => ({
+      queryKey: ['last-module', s.studentId, subjectId],
+      queryFn: () => progressApi.getStudentLastModule(s.studentId, subjectId!),
+      enabled: !!subjectId && isModuleBased && presentStudents.length > 0,
+      staleTime: 60_000,
+    })),
+  })
+
+  // Merge pre-fill once per student, only while their moduleId is still unset
+  useEffect(() => {
+    if (!isModuleBased) return
+    lastModuleQueries.forEach((q, idx) => {
+      const student = presentStudents[idx]
+      const last = (q.data as any)?.data?.data
+      if (!student || !last?.moduleId) return
+      setModuleProgress(prev => {
+        const current = prev[student.studentId]
+        if (!current || current.moduleId) return prev
+        const startChapter = Math.min((last.currentChapter ?? 0) + 1, last.totalChapters || 1)
+        return {
+          ...prev,
+          [student.studentId]: {
+            ...current,
+            moduleId: last.moduleId,
+            chapterFrom: startChapter,
+            chapterTo: startChapter,
+          },
+        }
+      })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastModuleQueries.map(q => q.dataUpdatedAt).join(','), isModuleBased])
+
   const updateModule = (studentId: string, updates: Partial<ModuleProgress>) =>
     setModuleProgress(prev => ({ ...prev, [studentId]: { ...prev[studentId], ...updates } as ModuleProgress }))
 
@@ -90,7 +139,7 @@ function DaruratProgressContent() {
     setFreeMaterialProgress(prev => ({ ...prev, [studentId]: { ...prev[studentId], ...updates } as FreeMaterialProgress }))
 
   const handleSkip = () => {
-    router.push('/guru/presensi/darurat/selesai')
+    goNext()
   }
 
   const handleSubmit = async () => {
@@ -119,7 +168,7 @@ function DaruratProgressContent() {
         })
       }
 
-      router.push('/guru/presensi/darurat/selesai')
+      goNext()
     } catch (err: any) {
       setError(err.response?.data?.message || 'Gagal menyimpan progress')
     } finally {
@@ -156,6 +205,11 @@ function DaruratProgressContent() {
         <p className="text-sm text-gray-500 mt-0.5">
           {sessionLog?.sessionDate} · {sessionLog?.adHocStartTime} · {sessionLog?.adHocBranchName}
         </p>
+        {queue && (
+          <p className="text-xs text-blue-600 mt-1 font-medium">
+            {queue.split(',').length} mapel lagi setelah ini
+          </p>
+        )}
       </div>
 
       {/* Progress Stepper */}

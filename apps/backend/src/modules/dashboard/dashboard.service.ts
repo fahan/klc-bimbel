@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
+import { jakartaNow } from '@/common/utils/jakarta-time'
 
 const DAYS = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
 
@@ -14,8 +15,7 @@ export class DashboardService {
 
   async getAnalytics(branchId: string | undefined, month: number, year: number) {
     // Jakarta timezone (UTC+7)
-    const jakartaNow = new Date(Date.now() + 7 * 60 * 60 * 1000)
-    const todayDow = DAYS[jakartaNow.getUTCDay()] as any
+    const todayDow = DAYS[jakartaNow().getUTCDay()] as any
 
     const startDate = new Date(year, month - 1, 1)
     const endDate = new Date(year, month, 1)

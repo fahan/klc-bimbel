@@ -131,16 +131,90 @@ export default function AttendancePage() {
   const [scheduleType, setScheduleType] = useState<'REGULAR' | 'PRIVATE'>('REGULAR')
   const [approveResult, setApproveResult] = useState<{ logId: string; scheduleResult: any } | null>(null)
 
+  // --- Batch selection ---
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchLoading, setBatchLoading] = useState(false)
+  const [batchRejectOpen, setBatchRejectOpen] = useState(false)
+  const [batchRejectReason, setBatchRejectReason] = useState('')
+  const [pendingTeacherId, setPendingTeacherId] = useState('')
+  const [pendingDate, setPendingDate] = useState('') // '' = all dates
+
   const {
     data: pendingAdHocData,
     isLoading: loadingPendingAdHoc,
     refetch: refetchPendingAdHoc,
   } = useQuery({
-    queryKey: ['adhoc-pending', filters.branchId],
-    queryFn: () => attendanceApi.getAdHocPending(filters.branchId || undefined),
+    queryKey: ['adhoc-pending', filters.branchId, pendingTeacherId, pendingDate],
+    queryFn: () =>
+      attendanceApi.getAdHocPending({
+        branchId: filters.branchId || undefined,
+        teacherId: pendingTeacherId || undefined,
+        dateFrom: pendingDate || undefined,
+        dateTo: pendingDate || undefined,
+      }),
   })
 
   const pendingAdHocLogs = pendingAdHocData?.data?.data || []
+
+  const toggleSelected = (id: string) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev =>
+      prev.size === pendingAdHocLogs.length
+        ? new Set()
+        : new Set(pendingAdHocLogs.map((l: any) => l.id)),
+    )
+  }
+
+  const handleApproveBatch = async () => {
+    if (selectedIds.size === 0) return
+    try {
+      setBatchLoading(true)
+      const res = await attendanceApi.approveAdHocBatch(
+        [...selectedIds].map(id => ({ sessionLogId: id })),
+      )
+      const skipped = res.data?.data?.skipped || []
+      if (skipped.length > 0) {
+        alert(`${skipped.length} sesi dilewati (sudah diproses admin lain atau berubah status).`)
+      }
+      setSelectedIds(new Set())
+      await refetchPendingAdHoc()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menyetujui batch')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  const handleRejectBatch = async () => {
+    if (selectedIds.size === 0) return
+    try {
+      setBatchLoading(true)
+      await attendanceApi.rejectAdHocBatch([...selectedIds], batchRejectReason || undefined)
+      setSelectedIds(new Set())
+      setBatchRejectOpen(false)
+      setBatchRejectReason('')
+      await refetchPendingAdHoc()
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Gagal menolak batch')
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    setSelectedIds(prev => {
+      const valid = new Set(pendingAdHocLogs.map((l: any) => l.id))
+      return new Set([...prev].filter(id => valid.has(id)))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAdHocData])
 
   const openApproveModal = (log: any) => {
     setApproveModalLog(log)
@@ -261,6 +335,59 @@ export default function AttendancePage() {
 
         {adHocExpanded && (
           <div className="p-4">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <select
+                value={pendingTeacherId}
+                onChange={e => setPendingTeacherId(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs bg-white"
+              >
+                <option value="">Semua Guru</option>
+                {teachers.map((t: any) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+              <input
+                type="date"
+                value={pendingDate}
+                onChange={e => setPendingDate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+              />
+              {pendingDate && (
+                <button onClick={() => setPendingDate('')} className="text-xs text-blue-600">Semua tanggal</button>
+              )}
+            </div>
+
+            {pendingAdHocLogs.length > 0 && (
+              <label className="flex items-center gap-2 pb-2 mb-2 border-b border-orange-100 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === pendingAdHocLogs.length && pendingAdHocLogs.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 accent-orange-600"
+                />
+                Pilih semua ({pendingAdHocLogs.length})
+              </label>
+            )}
+
+            {selectedIds.size > 0 && (
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={handleApproveBatch}
+                  disabled={batchLoading}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  {batchLoading ? 'Memproses...' : `Setujui yang Dipilih (${selectedIds.size})`}
+                </button>
+                <button
+                  onClick={() => setBatchRejectOpen(true)}
+                  disabled={batchLoading}
+                  className="flex-1 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+                >
+                  Tolak yang Dipilih
+                </button>
+              </div>
+            )}
+
             {loadingPendingAdHoc ? (
               <div className="space-y-2">
                 {[1, 2].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />)}
@@ -276,8 +403,34 @@ export default function AttendancePage() {
                   <div key={log.id} className="border border-orange-100 rounded-lg p-4 bg-orange-50/30 space-y-3">
                     {/* Log Header */}
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">{log.subjectName}</p>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(log.id)}
+                        onChange={() => toggleSelected(log.id)}
+                        className="w-4 h-4 mt-1 accent-orange-600 flex-shrink-0"
+                      />
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="font-semibold text-gray-900">{log.subjectName}</p>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            log.source === 'CEPAT' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {log.source === 'CEPAT' ? 'Cepat' : 'Darurat'}
+                          </span>
+                          {log.hasWalkIn && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-100 text-red-700">
+                              Siswa walk-in
+                            </span>
+                          )}
+                          {log.duplicateStudentNames?.length > 0 && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700"
+                              title={`Duplikat hari ini: ${log.duplicateStudentNames.join(', ')}`}
+                            >
+                              Duplikat hari ini
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
@@ -478,6 +631,37 @@ export default function AttendancePage() {
                 className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition disabled:opacity-50"
               >
                 {adHocActionLoading === rejectModalId ? 'Memproses...' : 'Tolak Sesi'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Reject Modal */}
+      {batchRejectOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-5 w-full max-w-sm space-y-3">
+            <h3 className="font-semibold text-gray-900">Tolak {selectedIds.size} sesi terpilih?</h3>
+            <textarea
+              value={batchRejectReason}
+              onChange={e => setBatchRejectReason(e.target.value)}
+              placeholder="Alasan penolakan (opsional, berlaku untuk semua)"
+              rows={3}
+              className="w-full border border-gray-300 rounded-lg p-2.5 text-sm resize-none"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBatchRejectOpen(false)}
+                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2 rounded-lg"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleRejectBatch}
+                disabled={batchLoading}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 rounded-lg disabled:opacity-50"
+              >
+                {batchLoading ? 'Memproses...' : 'Tolak Semua'}
               </button>
             </div>
           </div>

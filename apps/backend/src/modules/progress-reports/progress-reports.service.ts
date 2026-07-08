@@ -116,6 +116,28 @@ export class ProgressReportsService {
     // Get progress data per subject (shared with admin in-app view)
     const subjectReports = await this.buildSubjectReports(link.studentId, link.subjectIds)
 
+    // Monthly attendance summary across the reported subjects (current calendar month)
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthAttendances = await this.prisma.attendance.findMany({
+      where: {
+        studentId: link.studentId,
+        sessionLog: {
+          sessionDate: { gte: monthStart },
+          status: 'COMPLETED',
+          OR: [
+            { adHocSubjectId: { in: link.subjectIds } },
+            { session: { subjectId: { in: link.subjectIds } } },
+          ],
+        },
+      },
+      select: { status: true },
+    })
+    const monthlySummary = {
+      month: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+      totalSessions: monthAttendances.length,
+      hadir: monthAttendances.filter(a => a.status === 'HADIR').length,
+    }
+
     return {
       success: true,
       data: {
@@ -130,6 +152,7 @@ export class ProgressReportsService {
         expiresAt: link.expiresAt?.toISOString() || null,
         isPermanent: !link.expiresAt,
         subjectReports,
+        monthlySummary,
       },
     }
   }
@@ -208,6 +231,7 @@ export class ProgressReportsService {
             trackingType: subject.trackingType,
             totalModules,
             completedModules,
+            lastPredicate: recentLogs[0]?.predicate ?? null,
             modules: moduleList,
             recentSessions: recentLogs.map(log => ({
               date: log.recordedAt.toISOString(),
@@ -264,6 +288,7 @@ export class ProgressReportsService {
             subjectCode: subject.code,
             trackingType: subject.trackingType,
             averagePredicate,
+            lastPredicate: recentLogs[0]?.predicate ?? null,
             totalSessions: recentLogs.length,
             recentSessions: recentLogs.map(log => ({
               date: log.recordedAt.toISOString(),

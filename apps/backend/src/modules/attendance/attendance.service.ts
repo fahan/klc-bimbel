@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
-import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
+import { SubmitAttendanceDto, AttendanceStatus } from './dto/submit-attendance.dto'
 import { SubmitAdHocAttendanceDto } from './dto/submit-adhoc-attendance.dto'
+import { SubmitQuickAttendanceDto } from './dto/submit-quick-attendance.dto'
+import { jakartaNow } from '@/common/utils/jakarta-time'
 
 @Injectable()
 export class AttendanceService {
@@ -460,12 +462,193 @@ export class AttendanceService {
     }
   }
 
-  async getAdHocPending(branchId?: string) {
+  /** Tag prepended to adHocNotes so admin can distinguish Presensi Cepat from Sesi Darurat. */
+  static readonly QUICK_TAG = '[PRESENSI-CEPAT]'
+
+  /**
+   * Presensi Cepat: teacher submits students + statuses only. Subject is resolved
+   * from active enrollments, date/time from submission time, duration fixed at 30min.
+   * Students are grouped per subject; one PENDING_APPROVAL SessionLog per group.
+   */
+  async submitQuickAttendance(dto: SubmitQuickAttendanceDto, teacherId: string) {
+    const studentIds = [...new Set(dto.students.map(s => s.studentId))]
+    if (studentIds.length !== dto.students.length) {
+      throw new BadRequestException('Terdapat siswa duplikat dalam satu submit')
+    }
+
+    const [branch, students, enrollments] = await Promise.all([
+      this.prisma.branch.findUnique({ where: { id: dto.branchId } }),
+      this.prisma.student.findMany({
+        where: { id: { in: studentIds }, isActive: true },
+        select: { id: true, name: true, sureName: true },
+      }),
+      this.prisma.studentSubject.findMany({
+        where: { studentId: { in: studentIds }, isActive: true },
+        select: { studentId: true, subjectId: true },
+      }),
+    ])
+    if (!branch) throw new NotFoundException('Cabang tidak ditemukan')
+
+    const studentById = new Map(students.map(s => [s.id, s]))
+    const missing = studentIds.filter(id => !studentById.has(id))
+    if (missing.length > 0) {
+      throw new BadRequestException(`${missing.length} siswa tidak ditemukan atau tidak aktif.`)
+    }
+
+    const enrollmentsByStudent = new Map<string, string[]>()
+    for (const e of enrollments) {
+      const arr = enrollmentsByStudent.get(e.studentId) ?? []
+      arr.push(e.subjectId)
+      enrollmentsByStudent.set(e.studentId, arr)
+    }
+
+    // Resolve subject per student
+    const resolved: { studentId: string; subjectId: string; status: AttendanceStatus }[] = []
+    for (const s of dto.students) {
+      const active = enrollmentsByStudent.get(s.studentId) ?? []
+      let subjectId: string
+      if (active.length === 1) {
+        subjectId = active[0]
+      } else {
+        if (!s.subjectId) {
+          const name = studentById.get(s.studentId)?.name
+          throw new BadRequestException(`Pilih mata pelajaran untuk siswa ${name}.`)
+        }
+        if (active.length > 1 && !active.includes(s.subjectId)) {
+          const name = studentById.get(s.studentId)?.name
+          throw new BadRequestException(`Mapel yang dipilih tidak sesuai enrollment aktif siswa ${name}.`)
+        }
+        subjectId = s.subjectId
+      }
+      resolved.push({ studentId: s.studentId, subjectId, status: s.status })
+    }
+
+    const subjectIds = [...new Set(resolved.map(r => r.subjectId))]
+    const subjects = await this.prisma.subject.findMany({ where: { id: { in: subjectIds } } })
+    const subjectById = new Map(subjects.map(s => [s.id, s]))
+    const missingSubjects = subjectIds.filter(id => !subjectById.has(id))
+    if (missingSubjects.length > 0) {
+      throw new NotFoundException('Mata pelajaran tidak ditemukan')
+    }
+
+    // Date/time from submission moment in WIB (UTC+7) — server may run UTC, so a
+    // 00:30 WIB submit must still land on the WIB calendar day, not the UTC one.
+    // sessionDate is built exactly like the darurat flow builds it from its
+    // YYYY-MM-DD dto (new Date(dateStr) + setHours(0,0,0,0)), so the same-day
+    // duplicate query compares like-for-like against existing ad-hoc logs.
+    const now = jakartaNow()
+    const wibDateStr = now.toISOString().split('T')[0]
+    const sessionDate = new Date(wibDateStr)
+    sessionDate.setHours(0, 0, 0, 0)
+    const startTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`
+
+    // Duplicate detection: same student + subject + date, any flow (not blocking)
+    const existingToday = await this.prisma.attendance.findMany({
+      where: {
+        studentId: { in: studentIds },
+        sessionLog: { sessionDate, status: { in: ['PENDING_APPROVAL', 'COMPLETED'] } },
+      },
+      select: {
+        studentId: true,
+        sessionLog: { select: { adHocSubjectId: true, session: { select: { subjectId: true } } } },
+      },
+    })
+    const duplicates = resolved.filter(r =>
+      existingToday.some(
+        d =>
+          d.studentId === r.studentId &&
+          (d.sessionLog.adHocSubjectId ?? d.sessionLog.session?.subjectId) === r.subjectId,
+      ),
+    )
+
+    // Group per subject
+    const groups = new Map<string, typeof resolved>()
+    for (const r of resolved) {
+      const g = groups.get(r.subjectId) ?? []
+      g.push(r)
+      groups.set(r.subjectId, g)
+    }
+
+    const recordedAt = new Date()
+    const createdLogs = await this.prisma.$transaction(async tx => {
+      const logs: { log: any; subjectId: string; members: typeof resolved }[] = []
+      for (const [subjectId, members] of groups) {
+        const log = await tx.sessionLog.create({
+          data: {
+            sessionId: null,
+            sessionDate,
+            scheduledTeacherId: teacherId,
+            actualTeacherId: teacherId,
+            isReplacement: false,
+            isAdHoc: true,
+            adHocBranchId: dto.branchId,
+            adHocSubjectId: subjectId,
+            adHocStartTime: startTime,
+            adHocDuration: 30,
+            adHocNotes: AttendanceService.QUICK_TAG,
+            status: 'PENDING_APPROVAL',
+          },
+        })
+        await tx.attendance.createMany({
+          data: members.map(m => ({
+            sessionLogId: log.id,
+            studentId: m.studentId,
+            status: m.status as any,
+            recordedById: teacherId,
+            recordedAt,
+          })),
+        })
+        logs.push({ log, subjectId, members })
+      }
+      return logs
+    })
+
+    return {
+      success: true,
+      data: {
+        sessionLogs: createdLogs.map(({ log, subjectId, members }) => ({
+          id: log.id,
+          subjectId,
+          subjectName: subjectById.get(subjectId)!.name,
+          trackingType: subjectById.get(subjectId)!.trackingType,
+          studentCount: members.length,
+          hadirCount: members.filter(m => m.status === 'HADIR').length,
+        })),
+        duplicateWarnings: duplicates.map(d => ({
+          studentId: d.studentId,
+          studentName: studentById.get(d.studentId)?.name,
+          subjectName: subjectById.get(d.subjectId)?.name,
+        })),
+      },
+      message: `Presensi tercatat (${createdLogs.length} sesi). Menunggu persetujuan admin.`,
+    }
+  }
+
+  async getAdHocPending(filters: {
+    branchId?: string
+    teacherId?: string
+    dateFrom?: string
+    dateTo?: string
+  } = {}) {
     const where: any = {
       isAdHoc: true,
       status: 'PENDING_APPROVAL',
     }
-    if (branchId) where.adHocBranchId = branchId
+    if (filters.branchId) where.adHocBranchId = filters.branchId
+    if (filters.teacherId) where.actualTeacherId = filters.teacherId
+    if (filters.dateFrom || filters.dateTo) {
+      where.sessionDate = {}
+      if (filters.dateFrom) {
+        const d = new Date(filters.dateFrom)
+        d.setHours(0, 0, 0, 0)
+        where.sessionDate.gte = d
+      }
+      if (filters.dateTo) {
+        const d = new Date(filters.dateTo)
+        d.setHours(23, 59, 59, 999)
+        where.sessionDate.lte = d
+      }
+    }
 
     const logs = await this.prisma.sessionLog.findMany({
       // Single JOIN for relations instead of one query per relation.
@@ -480,16 +663,74 @@ export class AttendanceService {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Badge data: walk-in (no active enrollment for the log's subject) and
+    // duplicate (same student+subject+date in another pending/completed log).
+    const allStudentIds = [...new Set(logs.flatMap(l => l.attendances.map(a => a.studentId)))]
+    const logSubjectIds = [...new Set(logs.map(l => l.adHocSubjectId).filter(Boolean))] as string[]
+    // Only look up duplicates on the exact dates the pending logs span — otherwise the
+    // query pulls every attendance a student ever had. Mirrors submitQuickAttendance's
+    // sessionDate-scoped duplicate check.
+    const logDates = [...new Set(logs.map(l => l.sessionDate.getTime()))].map(t => new Date(t))
+
+    const [activeEnrollments, sameDayAttendances] = allStudentIds.length
+      ? await Promise.all([
+          this.prisma.studentSubject.findMany({
+            where: { studentId: { in: allStudentIds }, subjectId: { in: logSubjectIds }, isActive: true },
+            select: { studentId: true, subjectId: true },
+          }),
+          this.prisma.attendance.findMany({
+            where: {
+              studentId: { in: allStudentIds },
+              sessionLog: { status: { in: ['PENDING_APPROVAL', 'COMPLETED'] }, sessionDate: { in: logDates } },
+            },
+            select: {
+              studentId: true,
+              sessionLogId: true,
+              sessionLog: {
+                select: {
+                  sessionDate: true,
+                  adHocSubjectId: true,
+                  session: { select: { subjectId: true } },
+                },
+              },
+            },
+          }),
+        ])
+      : [[], []]
+
+    const enrolledSet = new Set(activeEnrollments.map(e => `${e.studentId}:${e.subjectId}`))
+
     return {
       success: true,
-      data: logs.map(l => this.formatAdHocLog(l)),
+      data: logs.map(l => {
+        const dateKey = l.sessionDate.toISOString().split('T')[0]
+        const duplicateStudentNames = l.attendances
+          .filter(att =>
+            sameDayAttendances.some(
+              other =>
+                other.sessionLogId !== l.id &&
+                other.studentId === att.studentId &&
+                other.sessionLog.sessionDate.toISOString().split('T')[0] === dateKey &&
+                (other.sessionLog.adHocSubjectId ?? other.sessionLog.session?.subjectId) === l.adHocSubjectId,
+            ),
+          )
+          .map(att => att.student?.name)
+        return {
+          ...this.formatAdHocLog(l),
+          source: l.adHocNotes?.startsWith(AttendanceService.QUICK_TAG) ? 'CEPAT' : 'DARURAT',
+          hasWalkIn: l.adHocSubjectId
+            ? l.attendances.some(att => !enrolledSet.has(`${att.studentId}:${l.adHocSubjectId}`))
+            : false,
+          duplicateStudentNames,
+        }
+      }),
     }
   }
 
   async approveAdHoc(
     sessionLogId: string,
     adminId: string,
-    options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE' },
+    options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE'; startTimeCorrection?: string },
   ) {
     const log = await this.prisma.sessionLog.findUnique({ where: { id: sessionLogId } })
     if (!log) throw new NotFoundException('Session log tidak ditemukan')
@@ -498,7 +739,9 @@ export class AttendanceService {
       throw new BadRequestException(`Status saat ini: ${log.status}. Hanya PENDING_APPROVAL yang bisa di-approve.`)
     }
 
-    // 1. Approve the session log
+    // 1. Approve the session log. An optional startTime correction is folded into
+    // this same write so status + time change atomically — if this update throws,
+    // neither the approval nor the correction persists.
     const updated = await this.prisma.sessionLog.update({
       relationLoadStrategy: 'join',
       where: { id: sessionLogId },
@@ -506,6 +749,7 @@ export class AttendanceService {
         status: 'COMPLETED',
         reviewedById: adminId,
         reviewedAt: new Date(),
+        ...(options?.startTimeCorrection ? { adHocStartTime: options.startTimeCorrection } : {}),
       },
       include: {
         actualTeacher: true,
@@ -730,6 +974,54 @@ export class AttendanceService {
     }
   }
 
+  /** Batch approve pending ad-hoc logs. Each item is independent: failures/already-processed
+   *  items are skipped and reported, the rest proceed. Optional per-item startTime correction.
+   *  Schedule generation stays a single-item action (not available in batch). */
+  async approveAdHocBatch(items: { sessionLogId: string; startTime?: string }[], adminId: string) {
+    const approved: string[] = []
+    const skipped: { sessionLogId: string; reason: string }[] = []
+
+    for (const item of items) {
+      try {
+        // Delegate validation + the atomic status/time write to approveAdHoc.
+        // The startTime correction is folded into approveAdHoc's own COMPLETED
+        // update, so a failed approval never leaves a mutated adHocStartTime behind.
+        await this.approveAdHoc(item.sessionLogId, adminId, { startTimeCorrection: item.startTime })
+        approved.push(item.sessionLogId)
+      } catch (err: any) {
+        skipped.push({ sessionLogId: item.sessionLogId, reason: err?.message ?? 'unknown error' })
+      }
+    }
+
+    return {
+      success: true,
+      data: { approved, skipped },
+      message: `${approved.length} sesi disetujui${skipped.length ? `, ${skipped.length} dilewati` : ''}.`,
+    }
+  }
+
+  /** Batch reject pending ad-hoc logs with a shared reason. Same skip semantics as approveAdHocBatch. */
+  async rejectAdHocBatch(sessionLogIds: string[], adminId: string, reason?: string) {
+    const rejected: string[] = []
+    const skipped: { sessionLogId: string; reason: string }[] = []
+    const finalReason = reason?.trim() || 'Ditolak melalui aksi batch oleh admin'
+
+    for (const id of sessionLogIds) {
+      try {
+        await this.rejectAdHoc(id, adminId, finalReason)
+        rejected.push(id)
+      } catch (err: any) {
+        skipped.push({ sessionLogId: id, reason: err?.message ?? 'unknown error' })
+      }
+    }
+
+    return {
+      success: true,
+      data: { rejected, skipped },
+      message: `${rejected.length} sesi ditolak${skipped.length ? `, ${skipped.length} dilewati` : ''}.`,
+    }
+  }
+
   async getEligibleStudents(branchId: string, subjectId: string) {
     // Students at branch who are enrolled in the given subject
     const studentSubjects = await this.prisma.studentSubject.findMany({
@@ -831,7 +1123,7 @@ export class AttendanceService {
       subjectName: log.adHocSubject?.name,
       startTime: log.adHocStartTime,
       durationMinutes: log.adHocDuration,
-      notes: log.adHocNotes,
+      notes: log.adHocNotes === AttendanceService.QUICK_TAG ? null : log.adHocNotes,
       teacherId: log.actualTeacherId,
       teacherName: log.actualTeacher?.name,
       status: log.status,

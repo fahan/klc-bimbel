@@ -208,10 +208,26 @@ export const attendanceApi = {
     attendances: Array<{ studentId: string; status: string }>
   }) => apiClient.post('/attendance/adhoc', data),
 
-  getAdHocPending: (branchId?: string) => {
-    const qs = branchId ? `?branchId=${branchId}` : ''
-    return apiClient.get(`/attendance/adhoc/pending${qs}`)
+  getAdHocPending: (filters?: { branchId?: string; teacherId?: string; dateFrom?: string; dateTo?: string }) => {
+    const params = new URLSearchParams()
+    if (filters?.branchId) params.append('branchId', filters.branchId)
+    if (filters?.teacherId) params.append('teacherId', filters.teacherId)
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo)
+    const qs = params.toString()
+    return apiClient.get(`/attendance/adhoc/pending${qs ? `?${qs}` : ''}`)
   },
+
+  submitQuick: (data: {
+    branchId: string
+    students: Array<{ studentId: string; subjectId?: string; status: string }>
+  }) => apiClient.post('/attendance/quick', data),
+
+  approveAdHocBatch: (items: Array<{ sessionLogId: string; startTime?: string }>) =>
+    apiClient.post('/attendance/adhoc/approve-batch', { items }),
+
+  rejectAdHocBatch: (sessionLogIds: string[], reason?: string) =>
+    apiClient.post('/attendance/adhoc/reject-batch', { sessionLogIds, reason }),
 
   getMyAdHocHistory: () => apiClient.get('/attendance/adhoc/my-history'),
 
@@ -489,6 +505,11 @@ export const studentApi = {
     apiClient.patch(`/students/${studentId}/subjects/${subjectId}/spp-rate`, data),
   removeSubject: (studentId: string, subjectId: string) =>
     apiClient.delete(`/students/${studentId}/subjects/${subjectId}`),
+  getActiveByBranch: (branchId: string, search?: string) => {
+    const params = new URLSearchParams({ branchId })
+    if (search) params.append('search', search)
+    return apiClient.get(`/students/active-by-branch?${params.toString()}`)
+  },
 }
 
 // ===== USERS API =====

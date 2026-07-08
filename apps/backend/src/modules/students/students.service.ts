@@ -882,6 +882,52 @@ export class StudentsService {
     }
   }
 
+  /** Search active students at a branch, including their active subject enrollments.
+   *  Used by the Presensi Cepat teacher flow. */
+  async searchActiveByBranch(branchId: string, search?: string) {
+    if (!branchId) {
+      throw new BadRequestException('branchId wajib diisi')
+    }
+
+    const students = await this.prisma.student.findMany({
+      relationLoadStrategy: 'join',
+      where: {
+        branchId,
+        isActive: true,
+        ...(search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { sureName: { contains: search, mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      include: {
+        studentSubjects: {
+          where: { isActive: true },
+          include: { subject: { select: { id: true, name: true } } },
+        },
+      },
+      orderBy: { name: 'asc' },
+      take: 20,
+    })
+
+    return {
+      success: true,
+      data: students.map(s => ({
+        studentId: s.id,
+        studentName: s.sureName?.trim() || s.name,
+        fullName: s.name,
+        classLevel: s.classLevel,
+        activeSubjects: s.studentSubjects.map(ss => ({
+          subjectId: ss.subject.id,
+          subjectName: ss.subject.name,
+        })),
+      })),
+    }
+  }
+
   private formatStudent(student: any) {
     return {
       id: student.id,

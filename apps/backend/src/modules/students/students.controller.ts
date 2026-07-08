@@ -60,6 +60,22 @@ export class StudentsController {
     return this.studentsService.findAll(page || 1, limit || 10, branchId, search, isActive)
   }
 
+  @Get('active-by-branch')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiQuery({ name: 'branchId', required: true, type: String })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiOperation({
+    summary: 'Search active students at a branch with their active subject enrollments',
+    description: 'Used by the Presensi Cepat teacher flow. Returns up to 20 students matching the search term.',
+  })
+  async searchActiveByBranch(
+    @Query('branchId') branchId: string,
+    @Query('search') search?: string,
+  ): Promise<any> {
+    return this.studentsService.searchActiveByBranch(branchId, search)
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
