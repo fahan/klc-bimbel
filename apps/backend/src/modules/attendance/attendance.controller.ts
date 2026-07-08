@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { AttendanceService } from './attendance.service'
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
 import { SubmitAdHocAttendanceDto, RejectAdHocDto, ApproveAdHocDto } from './dto/submit-adhoc-attendance.dto'
+import { SubmitQuickAttendanceDto } from './dto/submit-quick-attendance.dto'
 import { AttendanceResponseDto } from './dto/attendance-response.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
@@ -105,6 +106,25 @@ export class AttendanceController {
     @CurrentUser() user: any,
   ): Promise<any> {
     return this.attendanceService.submitAdHocAttendance(dto, user.id)
+  }
+
+  @Post('quick')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG', 'GURU')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Submit Presensi Cepat (tap-tap attendance)',
+    description:
+      'Teacher submits students + statuses only. Subject resolved from enrollments, ' +
+      'date/time from submission time, duration 30min. Students grouped per subject into ' +
+      'separate PENDING_APPROVAL session logs. Duplicate same-day submissions are flagged, not blocked.',
+  })
+  @ApiResponse({ status: 201, description: 'Attendance recorded, pending admin approval' })
+  async submitQuick(
+    @Body() dto: SubmitQuickAttendanceDto,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.submitQuickAttendance(dto, user.id)
   }
 
   @Get('log/:id')
