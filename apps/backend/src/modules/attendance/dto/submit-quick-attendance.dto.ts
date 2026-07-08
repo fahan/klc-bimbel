@@ -1,6 +1,7 @@
 import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, ArrayMinSize } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
+import { AttendanceStatus } from './submit-attendance.dto'
 
 export class QuickStudentEntryDto {
   @ApiProperty({ example: 'student_id_123' })
@@ -15,9 +16,9 @@ export class QuickStudentEntryDto {
   @IsString()
   subjectId?: string
 
-  @ApiProperty({ enum: ['HADIR', 'ABSEN', 'IZIN', 'SAKIT'], example: 'HADIR' })
-  @IsEnum(['HADIR', 'ABSEN', 'IZIN', 'SAKIT'])
-  status!: 'HADIR' | 'ABSEN' | 'IZIN' | 'SAKIT'
+  @ApiProperty({ enum: AttendanceStatus, example: 'HADIR' })
+  @IsEnum(AttendanceStatus)
+  status!: AttendanceStatus
 }
 
 export class SubmitQuickAttendanceDto {

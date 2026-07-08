@@ -885,6 +885,10 @@ export class StudentsService {
   /** Search active students at a branch, including their active subject enrollments.
    *  Used by the Presensi Cepat teacher flow. */
   async searchActiveByBranch(branchId: string, search?: string) {
+    if (!branchId) {
+      throw new BadRequestException('branchId wajib diisi')
+    }
+
     const students = await this.prisma.student.findMany({
       relationLoadStrategy: 'join',
       where: {
