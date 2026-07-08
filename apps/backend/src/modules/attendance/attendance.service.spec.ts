@@ -189,6 +189,27 @@ describe('AttendanceService.submitQuickAttendance', () => {
     ).rejects.toThrow(/mata pelajaran/i)
   })
 
+  it('accepts a walk-in student (zero enrollments) with an explicit subjectId', async () => {
+    prisma.student.findMany.mockResolvedValue([
+      { id: 'student-3', name: 'Citra Dewi', sureName: 'Citra' },
+    ])
+    // student-3 has no rows in the studentSubject mock — a walk-in
+
+    const result = await service.submitQuickAttendance(
+      {
+        branchId: 'branch-1',
+        students: [{ studentId: 'student-3', subjectId: 'subject-mat', status: 'HADIR' }],
+      } as any,
+      'teacher-1',
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.data.sessionLogs).toHaveLength(1)
+    expect(result.data.sessionLogs[0]).toMatchObject({ subjectId: 'subject-mat', studentCount: 1 })
+    expect(txSessionLogCreate).toHaveBeenCalledTimes(1)
+    expect(txSessionLogCreate.mock.calls[0][0].data.adHocSubjectId).toBe('subject-mat')
+  })
+
   it('flags duplicates (same student+subject+date already recorded) without blocking', async () => {
     prisma.attendance.findMany.mockResolvedValue([
       {

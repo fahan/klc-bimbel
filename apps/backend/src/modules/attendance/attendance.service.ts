@@ -1,8 +1,9 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
-import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
+import { SubmitAttendanceDto, AttendanceStatus } from './dto/submit-attendance.dto'
 import { SubmitAdHocAttendanceDto } from './dto/submit-adhoc-attendance.dto'
 import { SubmitQuickAttendanceDto } from './dto/submit-quick-attendance.dto'
+import { jakartaNow } from '@/common/utils/jakarta-time'
 
 @Injectable()
 export class AttendanceService {
@@ -502,7 +503,7 @@ export class AttendanceService {
     }
 
     // Resolve subject per student
-    const resolved: { studentId: string; subjectId: string; status: string }[] = []
+    const resolved: { studentId: string; subjectId: string; status: AttendanceStatus }[] = []
     for (const s of dto.students) {
       const active = enrollmentsByStudent.get(s.studentId) ?? []
       let subjectId: string
@@ -519,7 +520,7 @@ export class AttendanceService {
         }
         subjectId = s.subjectId
       }
-      resolved.push({ studentId: s.studentId, subjectId, status: s.status as unknown as string })
+      resolved.push({ studentId: s.studentId, subjectId, status: s.status })
     }
 
     const subjectIds = [...new Set(resolved.map(r => r.subjectId))]
@@ -530,11 +531,16 @@ export class AttendanceService {
       throw new NotFoundException('Mata pelajaran tidak ditemukan')
     }
 
-    // Date/time from submission moment (server local time)
-    const now = new Date()
-    const sessionDate = new Date(now)
+    // Date/time from submission moment in WIB (UTC+7) — server may run UTC, so a
+    // 00:30 WIB submit must still land on the WIB calendar day, not the UTC one.
+    // sessionDate is built exactly like the darurat flow builds it from its
+    // YYYY-MM-DD dto (new Date(dateStr) + setHours(0,0,0,0)), so the same-day
+    // duplicate query compares like-for-like against existing ad-hoc logs.
+    const now = jakartaNow()
+    const wibDateStr = now.toISOString().split('T')[0]
+    const sessionDate = new Date(wibDateStr)
     sessionDate.setHours(0, 0, 0, 0)
-    const startTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    const startTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`
 
     // Duplicate detection: same student + subject + date, any flow (not blocking)
     const existingToday = await this.prisma.attendance.findMany({
