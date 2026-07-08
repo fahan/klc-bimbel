@@ -269,15 +269,33 @@ describe('AttendanceService batch approval', () => {
     expect(result.data.skipped[0].sessionLogId).toBe('log-2')
   })
 
-  it('applies startTime correction before approving', async () => {
+  it('applies startTime correction atomically within the approval write', async () => {
     prisma.sessionLog.findUnique.mockResolvedValue({ id: 'log-1', isAdHoc: true, status: 'PENDING_APPROVAL' })
 
     await service.approveAdHocBatch([{ sessionLogId: 'log-1', startTime: '14:30' }], 'admin-1')
 
-    const timeUpdate = prisma.sessionLog.update.mock.calls.find(
-      (c: any) => c[0].data.adHocStartTime === '14:30',
+    // The correction must be folded INTO the same update that flips status to COMPLETED —
+    // not a separate pre-write that could persist even if approval later failed.
+    const approvalWrite = prisma.sessionLog.update.mock.calls.find(
+      (c: any) => c[0].data.status === 'COMPLETED',
     )
-    expect(timeUpdate).toBeDefined()
+    expect(approvalWrite).toBeDefined()
+    expect(approvalWrite[0].data.adHocStartTime).toBe('14:30')
+
+    // There is exactly one update call — no standalone time-only pre-write.
+    expect(prisma.sessionLog.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not persist the startTime correction when approval fails', async () => {
+    // findUnique reports an already-processed log → approveAdHoc throws before any write.
+    prisma.sessionLog.findUnique.mockResolvedValue({ id: 'log-1', isAdHoc: true, status: 'COMPLETED' })
+
+    const result = await service.approveAdHocBatch([{ sessionLogId: 'log-1', startTime: '14:30' }], 'admin-1')
+
+    expect(result.data.approved).toEqual([])
+    expect(result.data.skipped).toHaveLength(1)
+    // No update at all — the correction never touched the row.
+    expect(prisma.sessionLog.update).not.toHaveBeenCalled()
   })
 
   it('rejects valid items and skips already-processed ones, with a shared reason', async () => {

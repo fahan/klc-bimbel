@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, ArrayMinSize } from 'class-validator'
+import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, ArrayMinSize, Matches } from 'class-validator'
 import { Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
 import { AttendanceStatus } from './submit-attendance.dto'
@@ -42,6 +42,7 @@ export class BatchApproveItemDto {
   @ApiProperty({ required: false, description: 'Optional corrected start time (HH:mm) applied before approval' })
   @IsOptional()
   @IsString()
+  @Matches(/^([01]\d|2[0-3]):([0-5]\d)$/, { message: 'startTime must be in HH:mm format' })
   startTime?: string
 }
 

@@ -667,6 +667,10 @@ export class AttendanceService {
     // duplicate (same student+subject+date in another pending/completed log).
     const allStudentIds = [...new Set(logs.flatMap(l => l.attendances.map(a => a.studentId)))]
     const logSubjectIds = [...new Set(logs.map(l => l.adHocSubjectId).filter(Boolean))] as string[]
+    // Only look up duplicates on the exact dates the pending logs span — otherwise the
+    // query pulls every attendance a student ever had. Mirrors submitQuickAttendance's
+    // sessionDate-scoped duplicate check.
+    const logDates = [...new Set(logs.map(l => l.sessionDate.getTime()))].map(t => new Date(t))
 
     const [activeEnrollments, sameDayAttendances] = allStudentIds.length
       ? await Promise.all([
@@ -677,7 +681,7 @@ export class AttendanceService {
           this.prisma.attendance.findMany({
             where: {
               studentId: { in: allStudentIds },
-              sessionLog: { status: { in: ['PENDING_APPROVAL', 'COMPLETED'] } },
+              sessionLog: { status: { in: ['PENDING_APPROVAL', 'COMPLETED'] }, sessionDate: { in: logDates } },
             },
             select: {
               studentId: true,
@@ -714,7 +718,9 @@ export class AttendanceService {
         return {
           ...this.formatAdHocLog(l),
           source: l.adHocNotes?.startsWith(AttendanceService.QUICK_TAG) ? 'CEPAT' : 'DARURAT',
-          hasWalkIn: l.attendances.some(att => !enrolledSet.has(`${att.studentId}:${l.adHocSubjectId}`)),
+          hasWalkIn: l.adHocSubjectId
+            ? l.attendances.some(att => !enrolledSet.has(`${att.studentId}:${l.adHocSubjectId}`))
+            : false,
           duplicateStudentNames,
         }
       }),
@@ -724,7 +730,7 @@ export class AttendanceService {
   async approveAdHoc(
     sessionLogId: string,
     adminId: string,
-    options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE' },
+    options?: { generateSchedule?: boolean; sessionType?: 'REGULAR' | 'PRIVATE'; startTimeCorrection?: string },
   ) {
     const log = await this.prisma.sessionLog.findUnique({ where: { id: sessionLogId } })
     if (!log) throw new NotFoundException('Session log tidak ditemukan')
@@ -733,7 +739,9 @@ export class AttendanceService {
       throw new BadRequestException(`Status saat ini: ${log.status}. Hanya PENDING_APPROVAL yang bisa di-approve.`)
     }
 
-    // 1. Approve the session log
+    // 1. Approve the session log. An optional startTime correction is folded into
+    // this same write so status + time change atomically — if this update throws,
+    // neither the approval nor the correction persists.
     const updated = await this.prisma.sessionLog.update({
       relationLoadStrategy: 'join',
       where: { id: sessionLogId },
@@ -741,6 +749,7 @@ export class AttendanceService {
         status: 'COMPLETED',
         reviewedById: adminId,
         reviewedAt: new Date(),
+        ...(options?.startTimeCorrection ? { adHocStartTime: options.startTimeCorrection } : {}),
       },
       include: {
         actualTeacher: true,
@@ -974,18 +983,10 @@ export class AttendanceService {
 
     for (const item of items) {
       try {
-        const log = await this.prisma.sessionLog.findUnique({ where: { id: item.sessionLogId } })
-        if (!log) throw new NotFoundException('Session log tidak ditemukan')
-        if (!log.isAdHoc || log.status !== 'PENDING_APPROVAL') {
-          throw new BadRequestException(`Status saat ini: ${log?.status}`)
-        }
-        if (item.startTime) {
-          await this.prisma.sessionLog.update({
-            where: { id: item.sessionLogId },
-            data: { adHocStartTime: item.startTime },
-          })
-        }
-        await this.approveAdHoc(item.sessionLogId, adminId)
+        // Delegate validation + the atomic status/time write to approveAdHoc.
+        // The startTime correction is folded into approveAdHoc's own COMPLETED
+        // update, so a failed approval never leaves a mutated adHocStartTime behind.
+        await this.approveAdHoc(item.sessionLogId, adminId, { startTimeCorrection: item.startTime })
         approved.push(item.sessionLogId)
       } catch (err: any) {
         skipped.push({ sessionLogId: item.sessionLogId, reason: err?.message ?? 'unknown error' })
