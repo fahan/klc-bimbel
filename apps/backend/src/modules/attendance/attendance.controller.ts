@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { AttendanceService } from './attendance.service'
 import { SubmitAttendanceDto } from './dto/submit-attendance.dto'
 import { SubmitAdHocAttendanceDto, RejectAdHocDto, ApproveAdHocDto } from './dto/submit-adhoc-attendance.dto'
-import { SubmitQuickAttendanceDto } from './dto/submit-quick-attendance.dto'
+import { SubmitQuickAttendanceDto, ApproveAdHocBatchDto, RejectAdHocBatchDto } from './dto/submit-quick-attendance.dto'
 import { AttendanceResponseDto } from './dto/attendance-response.dto'
 import { JwtAuthGuard } from '@/common/guards/jwt.guard'
 import { RolesGuard } from '@/common/guards/roles.guard'
@@ -144,10 +144,18 @@ export class AttendanceController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get pending ad-hoc sessions awaiting approval',
-    description: 'Returns all ad-hoc session logs with status PENDING_APPROVAL. Filter by branchId for ADMIN_CABANG.',
+    description:
+      'Returns ad-hoc session logs with status PENDING_APPROVAL, from both Sesi Darurat and Presensi Cepat. ' +
+      'Each item carries source (CEPAT/DARURAT), hasWalkIn, and duplicateStudentNames badges. ' +
+      'Optional filters: branchId, teacherId, dateFrom, dateTo.',
   })
-  async getAdHocPending(@Query('branchId') branchId?: string): Promise<any> {
-    return this.attendanceService.getAdHocPending(branchId)
+  async getAdHocPending(
+    @Query('branchId') branchId?: string,
+    @Query('teacherId') teacherId?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ): Promise<any> {
+    return this.attendanceService.getAdHocPending({ branchId, teacherId, dateFrom, dateTo })
   }
 
   @Get('adhoc/my-history')
@@ -208,5 +216,34 @@ export class AttendanceController {
     @CurrentUser() user: any,
   ): Promise<any> {
     return this.attendanceService.rejectAdHoc(id, user.id, dto.reason)
+  }
+
+  @Post('adhoc/approve-batch')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Batch approve pending ad-hoc sessions',
+    description:
+      'Approves multiple PENDING_APPROVAL ad-hoc logs. Already-processed items are skipped and reported. ' +
+      'Supports optional per-item startTime correction. Schedule generation is not available in batch mode.',
+  })
+  async approveAdHocBatch(
+    @Body() dto: ApproveAdHocBatchDto,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.approveAdHocBatch(dto.items, user.id)
+  }
+
+  @Post('adhoc/reject-batch')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('OWNER', 'ADMIN_GLOBAL', 'ADMIN_CABANG')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Batch reject pending ad-hoc sessions with a shared reason' })
+  async rejectAdHocBatch(
+    @Body() dto: RejectAdHocBatchDto,
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.attendanceService.rejectAdHocBatch(dto.sessionLogIds, user.id, dto.reason)
   }
 }

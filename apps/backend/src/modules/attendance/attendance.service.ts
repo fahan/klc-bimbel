@@ -624,12 +624,31 @@ export class AttendanceService {
     }
   }
 
-  async getAdHocPending(branchId?: string) {
+  async getAdHocPending(filters: {
+    branchId?: string
+    teacherId?: string
+    dateFrom?: string
+    dateTo?: string
+  } = {}) {
     const where: any = {
       isAdHoc: true,
       status: 'PENDING_APPROVAL',
     }
-    if (branchId) where.adHocBranchId = branchId
+    if (filters.branchId) where.adHocBranchId = filters.branchId
+    if (filters.teacherId) where.actualTeacherId = filters.teacherId
+    if (filters.dateFrom || filters.dateTo) {
+      where.sessionDate = {}
+      if (filters.dateFrom) {
+        const d = new Date(filters.dateFrom)
+        d.setHours(0, 0, 0, 0)
+        where.sessionDate.gte = d
+      }
+      if (filters.dateTo) {
+        const d = new Date(filters.dateTo)
+        d.setHours(23, 59, 59, 999)
+        where.sessionDate.lte = d
+      }
+    }
 
     const logs = await this.prisma.sessionLog.findMany({
       // Single JOIN for relations instead of one query per relation.
@@ -644,9 +663,61 @@ export class AttendanceService {
       orderBy: { createdAt: 'desc' },
     })
 
+    // Badge data: walk-in (no active enrollment for the log's subject) and
+    // duplicate (same student+subject+date in another pending/completed log).
+    const allStudentIds = [...new Set(logs.flatMap(l => l.attendances.map(a => a.studentId)))]
+    const logSubjectIds = [...new Set(logs.map(l => l.adHocSubjectId).filter(Boolean))] as string[]
+
+    const [activeEnrollments, sameDayAttendances] = allStudentIds.length
+      ? await Promise.all([
+          this.prisma.studentSubject.findMany({
+            where: { studentId: { in: allStudentIds }, subjectId: { in: logSubjectIds }, isActive: true },
+            select: { studentId: true, subjectId: true },
+          }),
+          this.prisma.attendance.findMany({
+            where: {
+              studentId: { in: allStudentIds },
+              sessionLog: { status: { in: ['PENDING_APPROVAL', 'COMPLETED'] } },
+            },
+            select: {
+              studentId: true,
+              sessionLogId: true,
+              sessionLog: {
+                select: {
+                  sessionDate: true,
+                  adHocSubjectId: true,
+                  session: { select: { subjectId: true } },
+                },
+              },
+            },
+          }),
+        ])
+      : [[], []]
+
+    const enrolledSet = new Set(activeEnrollments.map(e => `${e.studentId}:${e.subjectId}`))
+
     return {
       success: true,
-      data: logs.map(l => this.formatAdHocLog(l)),
+      data: logs.map(l => {
+        const dateKey = l.sessionDate.toISOString().split('T')[0]
+        const duplicateStudentNames = l.attendances
+          .filter(att =>
+            sameDayAttendances.some(
+              other =>
+                other.sessionLogId !== l.id &&
+                other.studentId === att.studentId &&
+                other.sessionLog.sessionDate.toISOString().split('T')[0] === dateKey &&
+                (other.sessionLog.adHocSubjectId ?? other.sessionLog.session?.subjectId) === l.adHocSubjectId,
+            ),
+          )
+          .map(att => att.student?.name)
+        return {
+          ...this.formatAdHocLog(l),
+          source: l.adHocNotes?.startsWith(AttendanceService.QUICK_TAG) ? 'CEPAT' : 'DARURAT',
+          hasWalkIn: l.attendances.some(att => !enrolledSet.has(`${att.studentId}:${l.adHocSubjectId}`)),
+          duplicateStudentNames,
+        }
+      }),
     }
   }
 
@@ -891,6 +962,62 @@ export class AttendanceService {
       success: true,
       data: this.formatAdHocLog(updated),
       message: 'Sesi darurat ditolak.',
+    }
+  }
+
+  /** Batch approve pending ad-hoc logs. Each item is independent: failures/already-processed
+   *  items are skipped and reported, the rest proceed. Optional per-item startTime correction.
+   *  Schedule generation stays a single-item action (not available in batch). */
+  async approveAdHocBatch(items: { sessionLogId: string; startTime?: string }[], adminId: string) {
+    const approved: string[] = []
+    const skipped: { sessionLogId: string; reason: string }[] = []
+
+    for (const item of items) {
+      try {
+        const log = await this.prisma.sessionLog.findUnique({ where: { id: item.sessionLogId } })
+        if (!log) throw new NotFoundException('Session log tidak ditemukan')
+        if (!log.isAdHoc || log.status !== 'PENDING_APPROVAL') {
+          throw new BadRequestException(`Status saat ini: ${log?.status}`)
+        }
+        if (item.startTime) {
+          await this.prisma.sessionLog.update({
+            where: { id: item.sessionLogId },
+            data: { adHocStartTime: item.startTime },
+          })
+        }
+        await this.approveAdHoc(item.sessionLogId, adminId)
+        approved.push(item.sessionLogId)
+      } catch (err: any) {
+        skipped.push({ sessionLogId: item.sessionLogId, reason: err?.message ?? 'unknown error' })
+      }
+    }
+
+    return {
+      success: true,
+      data: { approved, skipped },
+      message: `${approved.length} sesi disetujui${skipped.length ? `, ${skipped.length} dilewati` : ''}.`,
+    }
+  }
+
+  /** Batch reject pending ad-hoc logs with a shared reason. Same skip semantics as approveAdHocBatch. */
+  async rejectAdHocBatch(sessionLogIds: string[], adminId: string, reason?: string) {
+    const rejected: string[] = []
+    const skipped: { sessionLogId: string; reason: string }[] = []
+    const finalReason = reason?.trim() || 'Ditolak melalui aksi batch oleh admin'
+
+    for (const id of sessionLogIds) {
+      try {
+        await this.rejectAdHoc(id, adminId, finalReason)
+        rejected.push(id)
+      } catch (err: any) {
+        skipped.push({ sessionLogId: id, reason: err?.message ?? 'unknown error' })
+      }
+    }
+
+    return {
+      success: true,
+      data: { rejected, skipped },
+      message: `${rejected.length} sesi ditolak${skipped.length ? `, ${skipped.length} dilewati` : ''}.`,
     }
   }
 
