@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { sessionApi, branchApi, usersApi } from '@/lib/api/endpoints'
 import { useBranch } from '@/lib/branch-context'
-import { Clock, Users, CheckCircle, AlertCircle, Check, Search, MapPin, Plus, History } from 'lucide-react'
+import { Clock, Users, CheckCircle, AlertCircle, Check, Search, MapPin, Plus, History, Zap } from 'lucide-react'
 
 export default function PresensiListPage() {
   const router = useRouter()
@@ -194,6 +194,20 @@ export default function PresensiListPage() {
           </Link>
         </div>
       </div>
+
+      {/* Presensi Cepat */}
+      <Link
+        href="/guru/presensi/cepat"
+        className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3 hover:bg-blue-100 transition"
+      >
+        <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+          <Zap className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-blue-900">Presensi Cepat</p>
+          <p className="text-xs text-blue-700">Tap-tap: cari siswa, tandai hadir, selesai</p>
+        </div>
+      </Link>
 
       {/* My Sessions */}
       <div>
