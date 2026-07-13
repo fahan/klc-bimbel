@@ -40,6 +40,7 @@ const studentSchema = z.object({
   address: z.string().optional(),
   endDate: z.string().optional(),
   isActive: z.boolean().optional(),
+  branchId: z.string().min(1, 'Cabang wajib dipilih'),
 })
 
 type StudentFormData = z.infer<typeof studentSchema>
@@ -118,6 +119,7 @@ export default function StudentDetailPage() {
         address: student.address || '',
         endDate: student.endDate ? student.endDate.split('T')[0] : '',
         isActive: student.isActive,
+        branchId: student.branchId || '',
       })
       document.title = `${student.name} - Detail Siswa`
     }
@@ -139,6 +141,7 @@ export default function StudentDetailPage() {
         address: data.address || null,
         endDate: data.endDate || null,
         isActive: data.isActive,
+        branchId: data.branchId,
       })
 
       await queryClient.invalidateQueries({ queryKey: ['students'] })
@@ -288,6 +291,7 @@ export default function StudentDetailPage() {
         address: student.address || '',
         endDate: student.endDate ? student.endDate.split('T')[0] : '',
         isActive: student.isActive,
+        branchId: student.branchId || '',
       })
     }
     setIsEditing(false)
@@ -535,11 +539,24 @@ export default function StudentDetailPage() {
                 className={inputClass()} />
             </div>
 
-            {/* Cabang (read-only) */}
+            {/* Cabang */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cabang</label>
-              <input type="text" value={branchName} disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed text-gray-600" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cabang <span className="text-red-500">*</span>
+              </label>
+              <select {...register('branchId')} disabled={!isEditing || isLoading}
+                className={inputClass(!!errors.branchId)}>
+                <option value="">Pilih cabang</option>
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              {errors.branchId && <p className="text-red-500 text-xs mt-1">{errors.branchId.message}</p>}
+              {isEditing && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Memindahkan cabang tidak mengubah sesi/jadwal yang sudah terdaftar.
+                </p>
+              )}
             </div>
 
             {/* Alamat */}

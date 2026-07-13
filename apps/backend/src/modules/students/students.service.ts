@@ -142,10 +142,21 @@ export class StudentsService {
       throw new NotFoundException('Student not found')
     }
 
+    // Verify target branch exists when moving the student to another branch
+    if (updateStudentDto.branchId && updateStudentDto.branchId !== student.branchId) {
+      const branch = await this.prisma.branch.findUnique({
+        where: { id: updateStudentDto.branchId },
+      })
+      if (!branch) {
+        throw new BadRequestException('Branch not found')
+      }
+    }
+
     const updated = await this.prisma.student.update({
       relationLoadStrategy: 'join',
       where: { id },
       data: {
+        ...(updateStudentDto.branchId && { branchId: updateStudentDto.branchId }),
         ...(updateStudentDto.name && { name: updateStudentDto.name }),
         ...(updateStudentDto.sureName !== undefined && { sureName: updateStudentDto.sureName }),
         ...(updateStudentDto.classLevel !== undefined && { classLevel: updateStudentDto.classLevel }),
