@@ -53,4 +53,9 @@ export class UpdateStudentDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean
+
+  @ApiProperty({ example: 'clx123abc', required: false, description: 'Pindahkan siswa ke cabang lain' })
+  @IsOptional()
+  @IsString()
+  branchId?: string
 }
