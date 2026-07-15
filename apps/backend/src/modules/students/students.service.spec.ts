@@ -7,21 +7,23 @@ describe('StudentsService.enrollStudent', () => {
   let service: StudentsService
   let prisma: {
     student: { findUnique: jest.Mock }
-    subject: { findUnique: jest.Mock }
-    session: { findUnique: jest.Mock }
-    sppRate: { findFirst: jest.Mock }
-    studentSubject: { create: jest.Mock }
-    sessionStudent: { create: jest.Mock }
+    subject: { findMany: jest.Mock }
+    session: { findMany: jest.Mock }
+    sppRate: { findMany: jest.Mock }
+    studentSubject: { createMany: jest.Mock }
+    sessionStudent: { createMany: jest.Mock }
+    $transaction: jest.Mock
   }
 
   beforeEach(async () => {
     prisma = {
       student: { findUnique: jest.fn() },
-      subject: { findUnique: jest.fn() },
-      session: { findUnique: jest.fn() },
-      sppRate: { findFirst: jest.fn() },
-      studentSubject: { create: jest.fn() },
-      sessionStudent: { create: jest.fn() },
+      subject: { findMany: jest.fn() },
+      session: { findMany: jest.fn() },
+      sppRate: { findMany: jest.fn() },
+      studentSubject: { createMany: jest.fn() },
+      sessionStudent: { createMany: jest.fn() },
+      $transaction: jest.fn(),
     }
 
     const moduleRef = await Test.createTestingModule({
@@ -31,15 +33,22 @@ describe('StudentsService.enrollStudent', () => {
     service = moduleRef.get(StudentsService)
 
     prisma.student.findUnique.mockResolvedValue({ id: 'student-1', name: 'Budi', branchId: 'branch-1' })
-    prisma.subject.findUnique.mockResolvedValue({ id: 'subject-1', name: 'Matematika' })
-    prisma.sppRate.findFirst.mockResolvedValue({
-      id: 'rate-1',
-      amount: '300000',
-      effectiveFrom: new Date('2020-01-01'),
-      effectiveUntil: null,
-    })
-    prisma.studentSubject.create.mockResolvedValue({ id: 'studentSubject-1' })
-    prisma.sessionStudent.create.mockResolvedValue({ id: 'sessionStudent-1' })
+    prisma.subject.findMany.mockResolvedValue([{ id: 'subject-1', name: 'Matematika' }])
+    prisma.session.findMany.mockResolvedValue([])
+    // Validation is now batched: rates are keyed by subject|type|billingType in JS.
+    prisma.sppRate.findMany.mockResolvedValue([
+      {
+        id: 'rate-1',
+        subjectId: 'subject-1',
+        type: 'REGULAR',
+        billingType: 'FLAT_MONTHLY',
+        amount: '300000',
+        effectiveFrom: new Date('2020-01-01'),
+        effectiveUntil: null,
+      },
+    ])
+    // Run the transaction callback against the same mock (which exposes createMany).
+    prisma.$transaction.mockImplementation(async (cb: any) => cb(prisma))
   })
 
   it('enrolls a subject without a session when sessionId is omitted', async () => {
@@ -54,21 +63,24 @@ describe('StudentsService.enrollStudent', () => {
       sessionTime: null,
       teacherName: null,
     })
-    expect(prisma.session.findUnique).not.toHaveBeenCalled()
-    expect(prisma.sessionStudent.create).not.toHaveBeenCalled()
-    expect(prisma.studentSubject.create).toHaveBeenCalledTimes(1)
+    // No sessionId → no session lookup and no SessionStudent rows.
+    expect(prisma.session.findMany).not.toHaveBeenCalled()
+    expect(prisma.sessionStudent.createMany).not.toHaveBeenCalled()
+    expect(prisma.studentSubject.createMany).toHaveBeenCalledTimes(1)
   })
 
   it('enrolls a subject with a session and links it via SessionStudent', async () => {
-    prisma.session.findUnique.mockResolvedValue({
-      id: 'session-1',
-      subjectId: 'subject-1',
-      branchId: 'branch-1',
-      dayOfWeek: 'SENIN',
-      startTime: '15:00:00',
-      durationMinutes: 90,
-      teacher: { name: 'Pak Andi' },
-    })
+    prisma.session.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        subjectId: 'subject-1',
+        branchId: 'branch-1',
+        dayOfWeek: 'SENIN',
+        startTime: '15:00:00',
+        durationMinutes: 90,
+        teacher: { name: 'Pak Andi' },
+      },
+    ])
 
     const result = await service.enrollStudent('student-1', {
       subjects: [{ subjectId: 'subject-1', type: 'REGULAR', sessionId: 'session-1' } as any],
@@ -78,15 +90,17 @@ describe('StudentsService.enrollStudent', () => {
       sessionDay: 'SENIN',
       teacherName: 'Pak Andi',
     })
-    expect(prisma.sessionStudent.create).toHaveBeenCalledWith(
+    expect(prisma.sessionStudent.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ sessionId: 'session-1', studentId: 'student-1' }),
+        data: expect.arrayContaining([
+          expect.objectContaining({ sessionId: 'session-1', studentId: 'student-1' }),
+        ]),
       }),
     )
   })
 
   it('rejects an unknown sessionId instead of silently skipping it', async () => {
-    prisma.session.findUnique.mockResolvedValue(null)
+    prisma.session.findMany.mockResolvedValue([]) // requested session not found
 
     await expect(
       service.enrollStudent('student-1', {

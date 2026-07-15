@@ -284,17 +284,24 @@ export class ProgressService {
   }
 
   async getStudentLastModule(studentId: string, subjectId: string) {
-    // Find current module being worked on
-    const inProgress = await this.prisma.studentModuleProgress.findFirst({
-      relationLoadStrategy: 'join',
-      where: {
-        studentId,
-        status: 'IN_PROGRESS',
-        module: { subjectId },
-      },
-      include: { module: true },
-      orderBy: { module: { orderNumber: 'asc' } },
-    })
+    // One round-trip: all modules for the subject + this student's progress on
+    // them. Everything below is decided in JS (was up to 3 sequential queries).
+    const [modules, progress] = await Promise.all([
+      this.prisma.curriculumModule.findMany({
+        where: { subjectId },
+        orderBy: { orderNumber: 'asc' },
+      }),
+      this.prisma.studentModuleProgress.findMany({
+        relationLoadStrategy: 'join',
+        where: { studentId, module: { subjectId } },
+        include: { module: true },
+      }),
+    ])
+
+    // Current module being worked on — lowest orderNumber among IN_PROGRESS.
+    const inProgress = progress
+      .filter(p => p.status === 'IN_PROGRESS')
+      .sort((a, b) => a.module.orderNumber - b.module.orderNumber)[0]
 
     if (inProgress) {
       return {
@@ -310,27 +317,11 @@ export class ProgressService {
       }
     }
 
-    // No in-progress, get next module to start
-    const completedModules = await this.prisma.studentModuleProgress.findMany({
-      relationLoadStrategy: 'join',
-      where: {
-        studentId,
-        status: 'COMPLETED',
-        module: { subjectId },
-      },
-      include: { module: true },
-    })
-
-    const completedOrders = completedModules.map(m => m.module.orderNumber)
-    const nextModule = await this.prisma.curriculumModule.findFirst({
-      where: {
-        subjectId,
-        orderNumber: {
-          notIn: completedOrders.length > 0 ? completedOrders : [-1],
-        },
-      },
-      orderBy: { orderNumber: 'asc' },
-    })
+    // Otherwise the next module to start = lowest-order module not yet completed.
+    const completedOrders = new Set(
+      progress.filter(p => p.status === 'COMPLETED').map(p => p.module.orderNumber),
+    )
+    const nextModule = modules.find(m => !completedOrders.has(m.orderNumber))
 
     if (nextModule) {
       return {

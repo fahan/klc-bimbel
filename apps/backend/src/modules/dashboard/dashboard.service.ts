@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '@/prisma/prisma.service'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
 import { jakartaNow } from '@/common/utils/jakarta-time'
 
 const DAYS = ['MINGGU', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU']
+// Master-data counts change rarely; a short TTL keeps the dashboard tiles cheap.
+// Bounded staleness (up to this long) is fine for a count display.
+const COUNT_TTL_MS = 60_000
 
 function toNum(val: any): number {
   if (val === null || val === undefined) return 0
@@ -11,7 +15,10 @@ function toNum(val: any): number {
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: TtlCacheService,
+  ) {}
 
   async getAnalytics(branchId: string | undefined, month: number, year: number) {
     // Jakarta timezone (UTC+7)
@@ -74,9 +81,13 @@ export class DashboardService {
         select: { id: true, name: true, code: true },
         orderBy: { name: 'asc' },
       }),
-      this.prisma.subject.count({ where: { isActive: true } }),
-      this.prisma.sppRate.count(),
-      this.prisma.curriculumModule.count(),
+      this.cache.wrap('dash:count:subjects', COUNT_TTL_MS, () =>
+        this.prisma.subject.count({ where: { isActive: true } }),
+      ),
+      this.cache.wrap('dash:count:sppRates', COUNT_TTL_MS, () => this.prisma.sppRate.count()),
+      this.cache.wrap('dash:count:curriculumModules', COUNT_TTL_MS, () =>
+        this.prisma.curriculumModule.count(),
+      ),
 
       // Invoice status counts for current month
       this.prisma.invoice.groupBy({

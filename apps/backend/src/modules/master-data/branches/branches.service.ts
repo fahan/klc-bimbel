@@ -5,7 +5,9 @@ import { UpdateBranchDto } from './dto/update-branch.dto'
 import { Role } from '@prisma/client'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
 import { TtlCacheService } from '@/common/cache/ttl-cache.service'
-import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
+import { LANDING_CACHE_KEYS, MASTER_CACHE_KEYS } from '@/common/cache/cache-keys'
+
+const MASTER_TTL_MS = 60_000
 
 @Injectable()
 export class BranchesService {
@@ -15,15 +17,17 @@ export class BranchesService {
   ) {}
 
   async getAllSystemBranches() {
-    const branches = await this.prisma.branch.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    return this.cache.wrap(`${MASTER_CACHE_KEYS.branchesPrefix}all-system`, MASTER_TTL_MS, async () => {
+      const branches = await this.prisma.branch.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+      })
 
-    return {
-      success: true,
-      data: branches.map(b => this.formatBranch(b)),
-    }
+      return {
+        success: true,
+        data: branches.map(b => this.formatBranch(b)),
+      }
+    })
   }
 
   async findAll(
@@ -136,6 +140,7 @@ export class BranchesService {
 
     // Public /landing/branches lists active branches — invalidate it.
     this.cache.delete(LANDING_CACHE_KEYS.branches)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.branchesPrefix)
 
     return {
       success: true,
@@ -184,6 +189,7 @@ export class BranchesService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.branches)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.branchesPrefix)
 
     return {
       success: true,
@@ -207,6 +213,7 @@ export class BranchesService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.branches)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.branchesPrefix)
 
     return {
       success: true,

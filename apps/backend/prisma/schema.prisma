@@ -236,6 +236,7 @@ model UserBranch {
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@unique([userId, branchId])
+  @@index([branchId])
   @@map("user_branches")
 }
 
@@ -278,6 +279,7 @@ model Subject {
   commissionDetails     CommissionDetail[]
   commissionFormulas    SubjectCommissionFormula[]
   adHocSessionLogs      SessionLog[] @relation("adhoc_subject")
+  invoiceItems          InvoiceItem[]
 
   @@map("subjects")
 }
@@ -312,6 +314,7 @@ model SppRate {
   subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   studentSubjects StudentSubject[]
 
+  @@index([subjectId])
   @@map("spp_rates")
 }
 
@@ -363,6 +366,7 @@ model Student {
   progressReportLinks   ProgressReportLink[]
   commissionDetails     CommissionDetail[]
 
+  @@index([branchId])
   @@map("students")
 }
 
@@ -388,6 +392,8 @@ model StudentSubject {
   sppRate      SppRate  @relation(fields: [sppRateId], references: [id])
 
   @@unique([studentId, subjectId])
+  @@index([subjectId])
+  @@index([sppRateId])
   @@map("student_subjects")
 }
 
@@ -431,6 +437,8 @@ model Session {
   // Replaced with partial unique index in migration (applies only to SINGLE sessions)
   @@index([sessionGroupId])
   @@index([branchId, dayOfWeek])
+  @@index([subjectId])
+  @@index([teacherId])
   @@map("sessions")
 }
 
@@ -446,6 +454,7 @@ model SessionStudent {
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, studentId])
+  @@index([studentId])
   @@map("session_students")
 }
 
@@ -489,6 +498,10 @@ model SessionLog {
   @@index([sessionId, sessionDate])
   @@index([isAdHoc, status])
   @@index([adHocBranchId, status])
+  @@index([scheduledTeacherId])
+  @@index([actualTeacherId])
+  @@index([adHocSubjectId])
+  @@index([reviewedById])
   @@map("session_logs")
 }
 
@@ -526,6 +539,8 @@ model Attendance {
   recordedBy    User?      @relation("recorded_by", fields: [recordedById], references: [id])
 
   @@unique([sessionLogId, studentId])
+  @@index([studentId])
+  @@index([recordedById])
   @@map("attendances")
 }
 
@@ -552,6 +567,11 @@ model ProgressLog {
   module         CurriculumModule? @relation("module", fields: [moduleId], references: [id])
   recordedBy     User?      @relation("recorded_by", fields: [recordedById], references: [id])
 
+  @@index([sessionLogId])
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([moduleId])
+  @@index([recordedById])
   @@map("progress_logs")
 }
 
@@ -570,6 +590,7 @@ model StudentModuleProgress {
   module        CurriculumModule @relation(fields: [moduleId], references: [id])
 
   @@unique([studentId, moduleId])
+  @@index([moduleId])
   @@map("student_module_progress")
 }
 
@@ -589,6 +610,9 @@ model ProgressReportLink {
   branch        Branch   @relation(fields: [branchId], references: [id])
   generatedBy   User     @relation("generated_by", fields: [generatedById], references: [id])
 
+  @@index([studentId])
+  @@index([branchId])
+  @@index([generatedById])
   @@map("progress_report_links")
 }
 
@@ -615,6 +639,8 @@ model Commission {
   commissionDetails CommissionDetail[]
 
   @@unique([branchId, teacherId, month, year])
+  @@index([teacherId])
+  @@index([approvedById])
   @@map("commissions")
 }
 
@@ -638,6 +664,10 @@ model CommissionDetail {
   student             Student    @relation(fields: [studentId], references: [id])
   subject             Subject    @relation(fields: [subjectId], references: [id])
 
+  @@index([commissionId])
+  @@index([sessionLogId])
+  @@index([studentId])
+  @@index([subjectId])
   @@map("commission_details")
 }
 
@@ -662,6 +692,10 @@ model TeacherBonus {
   approvedBy   User?       @relation("bonus_approved_by", fields: [approvedById], references: [id])
   createdBy    User        @relation("bonus_created_by", fields: [createdById], references: [id])
 
+  @@index([branchId])
+  @@index([teacherId])
+  @@index([approvedById])
+  @@index([createdById])
   @@map("teacher_bonuses")
 }
 
@@ -691,6 +725,9 @@ model Invoice {
   invoiceItems  InvoiceItem[]
   payments      Payment[]
 
+  @@index([branchId])
+  @@index([studentId])
+  @@index([generatedById])
   @@map("invoices")
 }
 
@@ -706,7 +743,10 @@ model InvoiceItem {
 
   // Relations
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  subject   Subject? @relation(fields: [subjectId], references: [id])
 
+  @@index([invoiceId])
+  @@index([subjectId])
   @@map("invoice_items")
 }
 
@@ -725,6 +765,9 @@ model Payment {
   branch    Branch   @relation(fields: [branchId], references: [id])
   recordedBy User    @relation("recorded_by", fields: [recordedById], references: [id])
 
+  @@index([invoiceId])
+  @@index([branchId])
+  @@index([recordedById])
   @@map("payments")
 }
 
@@ -747,6 +790,7 @@ model Product {
   stockMutations StockMutation[]
   saleItems SaleItem[]
 
+  @@index([branchId])
   @@map("products")
 }
 
@@ -765,6 +809,9 @@ model StockMutation {
   branch    Branch   @relation(fields: [branchId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
 
+  @@index([productId])
+  @@index([branchId])
+  @@index([createdById])
   @@map("stock_mutations")
 }
 
@@ -783,6 +830,9 @@ model Sale {
   createdBy      User     @relation(fields: [createdById], references: [id])
   saleItems      SaleItem[]
 
+  @@index([branchId])
+  @@index([studentId])
+  @@index([createdById])
   @@map("sales")
 }
 
@@ -798,6 +848,8 @@ model SaleItem {
   sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id])
 
+  @@index([saleId])
+  @@index([productId])
   @@map("sale_items")
 }
 
@@ -860,5 +912,6 @@ model Expense {
   recordedBy   User            @relation("expense_recorded_by", fields: [recordedById], references: [id])
 
   @@index([branchId, date])
+  @@index([recordedById])
   @@map("expenses")
 }

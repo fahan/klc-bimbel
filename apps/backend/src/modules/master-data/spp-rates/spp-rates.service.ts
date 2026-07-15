@@ -5,7 +5,9 @@ import { UpdateSppRateDto } from './dto/update-spp-rate.dto'
 import { Decimal } from '@prisma/client/runtime/library'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
 import { TtlCacheService } from '@/common/cache/ttl-cache.service'
-import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
+import { LANDING_CACHE_KEYS, MASTER_CACHE_KEYS } from '@/common/cache/cache-keys'
+
+const MASTER_TTL_MS = 60_000
 
 @Injectable()
 export class SppRatesService {
@@ -15,6 +17,11 @@ export class SppRatesService {
   ) {}
 
   async findAll(page: number = 1, limit: number = 10, filters?: { subjectId?: string }) {
+    const key = `${MASTER_CACHE_KEYS.sppRatesPrefix}list:p${page}:l${limit}:s${filters?.subjectId ?? ''}`
+    return this.cache.wrap(key, MASTER_TTL_MS, () => this._findAll(page, limit, filters))
+  }
+
+  private async _findAll(page: number, limit: number, filters?: { subjectId?: string }) {
     const skip = (page - 1) * limit
 
     const [sppRates, total] = await Promise.all([
@@ -146,6 +153,7 @@ export class SppRatesService {
 
     // Public /landing/spp-rates is derived from active REGULAR rates — invalidate it.
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,
@@ -202,6 +210,7 @@ export class SppRatesService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,
@@ -224,6 +233,7 @@ export class SppRatesService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,

@@ -2,6 +2,8 @@
 import * as bcrypt from 'bcryptjs'
 import { PrismaService } from "@/prisma/prisma.service"
 import { MailService } from "@/modules/mail/mail.service"
+import { TtlCacheService } from "@/common/cache/ttl-cache.service"
+import { AUTH_CACHE_KEYS } from "@/common/cache/cache-keys"
 import { UpdateRoleDto } from "./dto/update-role.dto"
 import { AssignBranchDto } from "./dto/assign-branch.dto"
 import { UpdateUserInfoDto } from "./dto/update-user-info.dto"
@@ -12,7 +14,13 @@ export class UsersService {
   constructor(
     private prisma: PrismaService,
     private mail: MailService,
+    private cache: TtlCacheService,
   ) {}
+
+  /** Drop the cached auth payload so role/branch/active/email changes take effect at once. */
+  private invalidateAuthCache(userId: string) {
+    this.cache.delete(AUTH_CACHE_KEYS.user(userId))
+  }
 
   async findAll(
     page: number = 1,
@@ -139,6 +147,8 @@ export class UsersService {
       },
     })
 
+    this.invalidateAuthCache(userId)
+
     return {
       success: true,
       data: this.formatUser(updated),
@@ -207,6 +217,8 @@ export class UsersService {
       },
     })
 
+    this.invalidateAuthCache(userId)
+
     return {
       success: true,
       data: this.formatUser(updated),
@@ -265,6 +277,8 @@ export class UsersService {
       },
     })
 
+    this.invalidateAuthCache(userId)
+
     return {
       success: true,
       data: this.formatUser(updated),
@@ -302,6 +316,8 @@ export class UsersService {
       },
     })
 
+    this.invalidateAuthCache(userId)
+
     return {
       success: true,
       data: this.formatUser(updated),
@@ -334,6 +350,8 @@ export class UsersService {
         },
       },
     })
+
+    this.invalidateAuthCache(userId)
 
     return {
       success: true,
@@ -396,6 +414,8 @@ export class UsersService {
         roles: true,
       },
     })
+
+    this.invalidateAuthCache(userId)
 
     return {
       success: true,
@@ -461,6 +481,8 @@ export class UsersService {
       },
     })
 
+    this.invalidateAuthCache(userId)
+
     return {
       success: true,
       data: this.formatUser(updated),
@@ -487,6 +509,8 @@ export class UsersService {
         roles: true,
       },
     })
+
+    this.invalidateAuthCache(userId)
 
     return {
       success: true,

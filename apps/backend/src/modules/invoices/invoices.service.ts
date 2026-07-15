@@ -81,7 +81,9 @@ export class InvoicesService {
       include: {
         branch: true,
         student: true,
-        invoiceItems: true,
+        // Item subjects resolved in the same JOIN via the InvoiceItem.subject
+        // relation (was a separate batched query, before that an N+1).
+        invoiceItems: { include: { subject: true } },
         generatedBy: true,
         payments: {
           include: { recordedBy: true },
@@ -92,20 +94,9 @@ export class InvoicesService {
 
     if (!invoice) throw new NotFoundException('Invoice not found')
 
-    // Get subjects for items
-    const itemsWithSubjects = await Promise.all(
-      invoice.invoiceItems.map(async (item: any) => {
-        if (item.subjectId) {
-          const subject = await this.prisma.subject.findUnique({ where: { id: item.subjectId } })
-          return { ...item, subject }
-        }
-        return item
-      }),
-    )
-
     return {
       success: true,
-      data: this.formatInvoice({ ...invoice, invoiceItems: itemsWithSubjects }),
+      data: this.formatInvoice(invoice),
     }
   }
 
@@ -116,7 +107,7 @@ export class InvoicesService {
       include: {
         branch: true,
         student: true,
-        invoiceItems: true,
+        invoiceItems: { include: { subject: true } },
         generatedBy: true,
         payments: { orderBy: { paidAt: 'desc' } },
       },
@@ -124,20 +115,9 @@ export class InvoicesService {
 
     if (!invoice) throw new NotFoundException('Invoice not found')
 
-    // Get subjects for items
-    const itemsWithSubjects = await Promise.all(
-      invoice.invoiceItems.map(async (item: any) => {
-        if (item.subjectId) {
-          const subject = await this.prisma.subject.findUnique({ where: { id: item.subjectId } })
-          return { ...item, subject }
-        }
-        return item
-      }),
-    )
-
     return {
       success: true,
-      data: this.formatInvoice({ ...invoice, invoiceItems: itemsWithSubjects }, true),
+      data: this.formatInvoice(invoice, true),
     }
   }
 

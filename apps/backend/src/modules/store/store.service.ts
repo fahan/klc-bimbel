@@ -136,23 +136,25 @@ export class StoreService {
   }
 
   async getProductMetrics(branchId?: string) {
-    const products = await this.prisma.product.findMany({
-      where: {
-        isActive: true,
-        ...(branchId && { branchId }),
-      },
-    })
-
     const startOfMonth = new Date()
     startOfMonth.setDate(1)
     startOfMonth.setHours(0, 0, 0, 0)
 
-    const sales = await this.prisma.sale.findMany({
-      where: {
-        ...(branchId && { branchId }),
-        createdAt: { gte: startOfMonth },
-      },
-    })
+    // Independent queries — run them in one round-trip instead of sequentially.
+    const [products, sales] = await Promise.all([
+      this.prisma.product.findMany({
+        where: {
+          isActive: true,
+          ...(branchId && { branchId }),
+        },
+      }),
+      this.prisma.sale.findMany({
+        where: {
+          ...(branchId && { branchId }),
+          createdAt: { gte: startOfMonth },
+        },
+      }),
+    ])
 
     const lowStock = products.filter(p => p.stock <= p.minStock && p.stock > 0).length
     const outOfStock = products.filter(p => p.stock === 0).length

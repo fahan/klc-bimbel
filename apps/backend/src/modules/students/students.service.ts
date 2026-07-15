@@ -218,53 +218,71 @@ export class StudentsService {
       throw new NotFoundException('Student not found')
     }
 
+    const enrollmentDate = enrollmentRequestDto.enrolledAt
+      ? new Date(enrollmentRequestDto.enrolledAt)
+      : new Date()
+
+    // Batch-fetch everything needed for validation in 3 queries instead of 3
+    // per subject (subject + optional session + spp-rate were serial awaits in
+    // the loop). The per-subject validation below is now pure in-memory lookup.
+    const subjectIds = [...new Set(enrollmentRequestDto.subjects.map(s => s.subjectId))]
+    const sessionIds = enrollmentRequestDto.subjects
+      .map(s => s.sessionId)
+      .filter((id): id is string => !!id)
+    const [subjects, sessions, sppRates] = await Promise.all([
+      this.prisma.subject.findMany({ where: { id: { in: subjectIds } } }),
+      sessionIds.length
+        ? this.prisma.session.findMany({
+            relationLoadStrategy: 'join',
+            where: { id: { in: sessionIds } },
+            include: { teacher: true },
+          })
+        : Promise.resolve([] as any[]),
+      this.prisma.sppRate.findMany({
+        where: {
+          subjectId: { in: subjectIds },
+          effectiveFrom: { lte: enrollmentDate },
+          OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
+        },
+        orderBy: { effectiveFrom: 'desc' },
+      }),
+    ])
+    const subjectById = new Map(subjects.map(s => [s.id, s]))
+    const sessionById = new Map(sessions.map((s: any) => [s.id, s]))
+    // First hit per (subject|type|billingType) = latest effectiveFrom (desc order),
+    // mirroring the original findFirst({ orderBy: { effectiveFrom: 'desc' } }).
+    const rateByKey = new Map<string, any>()
+    for (const r of sppRates) {
+      const key = `${r.subjectId}|${r.type}|${r.billingType}`
+      if (!rateByKey.has(key)) rateByKey.set(key, r)
+    }
+
     // Validate all subjects and sessions exist
     const enrollmentData: any[] = []
     let totalSpp = 0
 
     for (const subjectEnroll of enrollmentRequestDto.subjects) {
-      // Get subject
-      const subject = await this.prisma.subject.findUnique({
-        where: { id: subjectEnroll.subjectId },
-      })
+      const subject = subjectById.get(subjectEnroll.subjectId)
       if (!subject) {
         throw new BadRequestException(`Subject ${subjectEnroll.subjectId} not found`)
       }
 
-      // Get session (optional — scheduling can be done later from the student detail page)
+      // Session is optional — scheduling can be done later from the student detail page
       let session: any = null
       if (subjectEnroll.sessionId) {
-        session = await this.prisma.session.findUnique({
-          relationLoadStrategy: 'join',
-          where: { id: subjectEnroll.sessionId },
-          include: { teacher: true },
-        })
+        session = sessionById.get(subjectEnroll.sessionId)
         if (!session) {
           throw new BadRequestException(`Session ${subjectEnroll.sessionId} not found`)
         }
-
         // Verify session belongs to correct subject and branch
         if (session.subjectId !== subjectEnroll.subjectId || session.branchId !== student.branchId) {
           throw new BadRequestException('Session does not match subject or branch')
         }
       }
 
-      // Get SPP rate at enrollment date (supports historical data entry)
-      const enrollmentDate = enrollmentRequestDto.enrolledAt
-        ? new Date(enrollmentRequestDto.enrolledAt)
-        : new Date()
+      // SPP rate at enrollment date (supports historical data entry)
       const billingType = subjectEnroll.billingType ?? 'FLAT_MONTHLY'
-      const sppRate = await this.prisma.sppRate.findFirst({
-        where: {
-          subjectId: subjectEnroll.subjectId,
-          type: subjectEnroll.type as any,
-          billingType: billingType as any,
-          effectiveFrom: { lte: enrollmentDate },
-          OR: [{ effectiveUntil: null }, { effectiveUntil: { gte: enrollmentDate } }],
-        },
-        orderBy: { effectiveFrom: 'desc' },
-      })
-
+      const sppRate = rateByKey.get(`${subjectEnroll.subjectId}|${subjectEnroll.type}|${billingType}`)
       if (!sppRate) {
         throw new BadRequestException(`No active SPP rate for subject ${subject.name} (${subjectEnroll.type})`)
       }
@@ -282,40 +300,33 @@ export class StudentsService {
       })
     }
 
-    // Create student_subjects entries
-    const enrollmentDate = enrollmentRequestDto.enrolledAt
-      ? new Date(enrollmentRequestDto.enrolledAt)
-      : new Date()
-    const enrolledSubjects = await Promise.all(
-      enrollmentData.map(data =>
-        this.prisma.studentSubject.create({
-          data: {
-            studentId,
-            subjectId: data.subjectId,
-            type: data.type as any,
-            sppRateId: data.sppRateId,
-            enrolledAt: enrollmentDate,
-            isActive: true,
-          },
-        }),
-      ),
-    )
+    // Persist student_subjects + session_students atomically (was two unguarded
+    // Promise.all create batches — a failure could leave a partial enrollment).
+    const joinedAt = new Date()
+    await this.prisma.$transaction(async tx => {
+      await tx.studentSubject.createMany({
+        data: enrollmentData.map(data => ({
+          studentId,
+          subjectId: data.subjectId,
+          type: data.type as any,
+          sppRateId: data.sppRateId,
+          enrolledAt: enrollmentDate,
+          isActive: true,
+        })),
+      })
 
-    // Create session_students entries (only for subjects that were assigned a session)
-    await Promise.all(
-      enrollmentData
+      const sessionRows = enrollmentData
         .filter(data => data.session)
-        .map(data =>
-          this.prisma.sessionStudent.create({
-            data: {
-              sessionId: data.sessionId,
-              studentId,
-              joinedAt: new Date(),
-              isActive: true,
-            },
-          } as any),
-        ),
-    )
+        .map(data => ({
+          sessionId: data.sessionId,
+          studentId,
+          joinedAt,
+          isActive: true,
+        }))
+      if (sessionRows.length) {
+        await tx.sessionStudent.createMany({ data: sessionRows })
+      }
+    })
 
     // Calculate fees
     const registrationFee = 200000 // Fixed registration fee (could be from config)
