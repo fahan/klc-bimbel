@@ -21,28 +21,43 @@ export class FinanceService {
       const tMonth = tDate.getMonth() + 1
       return { year: tYear, month: tMonth, start: tDate, end: new Date(tYear, tMonth, 1) }
     })
+    // The whole trend window (oldest month start .. current month end). Current
+    // month is trendRanges[5], so its start/end equal startDate/endDate.
+    const windowStart = trendRanges[0].start
 
-    // Phase 1: current month — 9 queries parallel
-    const [sppAgg, regAgg, salesAgg, commissionAgg, bonusAgg, stockIn, unpaidInvoices, expenseOperational, expenseAsset] = await Promise.all([
-      this.prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'SPP' } },
+    // Fetch every row needed for the 6-month window in ONE parallel batch, then
+    // bucket per month in JS. This replaces 51 sequential aggregate() round-trips
+    // (9 + 6×7) with 7 queries — the same date/category boundaries are applied
+    // in-memory below, so the numbers are identical.
+    const [payments, sales, commissions, bonuses, expenses, stockIn, unpaidInvoices] = await Promise.all([
+      this.prisma.payment.findMany({
+        relationLoadStrategy: 'join',
+        where: { ...branchFilter, paidAt: { gte: windowStart, lt: endDate } },
+        select: { paidAt: true, amount: true, invoice: { select: { type: true } } },
       }),
-      this.prisma.payment.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, paidAt: { gte: startDate, lt: endDate }, invoice: { type: 'REGISTRATION' } },
+      this.prisma.sale.findMany({
+        where: { ...branchFilter, createdAt: { gte: windowStart, lt: endDate } },
+        select: { createdAt: true, totalAmount: true },
       }),
-      this.prisma.sale.aggregate({
-        _sum: { totalAmount: true },
-        where: { ...branchFilter, createdAt: { gte: startDate, lt: endDate } },
+      this.prisma.commission.findMany({
+        where: {
+          ...branchFilter,
+          status: 'APPROVED',
+          OR: trendRanges.map(r => ({ month: r.month, year: r.year })),
+        },
+        select: { month: true, year: true, totalAmount: true },
       }),
-      this.prisma.commission.aggregate({
-        _sum: { totalAmount: true },
-        where: { ...branchFilter, month, year, status: 'APPROVED' },
+      this.prisma.teacherBonus.findMany({
+        where: {
+          ...branchFilter,
+          status: 'APPROVED',
+          OR: trendRanges.map(r => ({ month: r.month, year: r.year })),
+        },
+        select: { month: true, year: true, amount: true },
       }),
-      this.prisma.teacherBonus.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, month, year, status: 'APPROVED' },
+      this.prisma.expense.findMany({
+        where: { ...branchFilter, date: { gte: windowStart, lt: endDate } },
+        select: { date: true, category: true, amount: true },
       }),
       this.prisma.stockMutation.findMany({
         where: { ...branchFilter, type: 'IN', createdAt: { gte: startDate, lt: endDate } },
@@ -52,76 +67,53 @@ export class FinanceService {
         where: { ...branchFilter, status: { in: ['UNPAID', 'PARTIAL'] }, type: 'SPP' },
         select: { studentId: true, totalAmount: true, paidAmount: true },
       }),
-      this.prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, category: 'OPERATIONAL', date: { gte: startDate, lt: endDate } },
-      }),
-      this.prisma.expense.aggregate({
-        _sum: { amount: true },
-        where: { ...branchFilter, category: 'ASSET', date: { gte: startDate, lt: endDate } },
-      }),
     ])
 
-    // Phase 2: trend — each month runs 7 queries in parallel, 6 months concurrently
-    const trend = await Promise.all(
-      trendRanges.map(async r => {
-        const [tSpp, tReg, tSales, tComm, tBonus, tExpOp, tExpAsset] = await Promise.all([
-          this.prisma.payment.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'SPP' } },
-          }),
-          this.prisma.payment.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, paidAt: { gte: r.start, lt: r.end }, invoice: { type: 'REGISTRATION' } },
-          }),
-          this.prisma.sale.aggregate({
-            _sum: { totalAmount: true },
-            where: { ...branchFilter, createdAt: { gte: r.start, lt: r.end } },
-          }),
-          this.prisma.commission.aggregate({
-            _sum: { totalAmount: true },
-            where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
-          }),
-          this.prisma.teacherBonus.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, month: r.month, year: r.year, status: 'APPROVED' },
-          }),
-          this.prisma.expense.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, category: 'OPERATIONAL', date: { gte: r.start, lt: r.end } },
-          }),
-          this.prisma.expense.aggregate({
-            _sum: { amount: true },
-            where: { ...branchFilter, category: 'ASSET', date: { gte: r.start, lt: r.end } },
-          }),
-        ])
-        const tIncome =
-          parseFloat((tSpp._sum.amount || 0).toString()) +
-          parseFloat((tReg._sum.amount || 0).toString()) +
-          parseFloat((tSales._sum.totalAmount || 0).toString())
-        const tExpense =
-          parseFloat((tComm._sum.totalAmount || 0).toString()) +
-          parseFloat((tBonus._sum.amount || 0).toString()) +
-          parseFloat((tExpOp._sum.amount || 0).toString()) +
-          parseFloat((tExpAsset._sum.amount || 0).toString())
-        return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
-      }),
-    )
+    const num = (v: any) => parseFloat((v ?? 0).toString())
+    // Per-range JS reducers mirror the original WHERE clauses exactly.
+    const sumPayments = (start: Date, end: Date, type: string) =>
+      payments.reduce(
+        (s, p) => (p.paidAt >= start && p.paidAt < end && p.invoice.type === type ? s + num(p.amount) : s),
+        0,
+      )
+    const sumSales = (start: Date, end: Date) =>
+      sales.reduce((s, x) => (x.createdAt >= start && x.createdAt < end ? s + num(x.totalAmount) : s), 0)
+    const sumCommission = (m: number, y: number) =>
+      commissions.reduce((s, c) => (c.month === m && c.year === y ? s + num(c.totalAmount) : s), 0)
+    const sumBonus = (m: number, y: number) =>
+      bonuses.reduce((s, b) => (b.month === m && b.year === y ? s + num(b.amount) : s), 0)
+    const sumExpense = (start: Date, end: Date, category: string) =>
+      expenses.reduce(
+        (s, e) => (e.date >= start && e.date < end && e.category === category ? s + num(e.amount) : s),
+        0,
+      )
+
+    // Phase 2: trend (stock is intentionally excluded from trend expense, as before)
+    const trend = trendRanges.map(r => {
+      const tIncome =
+        sumPayments(r.start, r.end, 'SPP') + sumPayments(r.start, r.end, 'REGISTRATION') + sumSales(r.start, r.end)
+      const tExpense =
+        sumCommission(r.month, r.year) +
+        sumBonus(r.month, r.year) +
+        sumExpense(r.start, r.end, 'OPERATIONAL') +
+        sumExpense(r.start, r.end, 'ASSET')
+      return { month: r.month, year: r.year, income: tIncome, expense: tExpense, net: tIncome - tExpense }
+    })
 
     // Current month calculations
-    const sppIncome = parseFloat((sppAgg._sum.amount || 0).toString())
-    const regIncome = parseFloat((regAgg._sum.amount || 0).toString())
-    const storeIncome = parseFloat((salesAgg._sum.totalAmount || 0).toString())
+    const sppIncome = sumPayments(startDate, endDate, 'SPP')
+    const regIncome = sumPayments(startDate, endDate, 'REGISTRATION')
+    const storeIncome = sumSales(startDate, endDate)
     const totalIncome = sppIncome + regIncome + storeIncome
 
-    const commissionExpense = parseFloat((commissionAgg._sum.totalAmount || 0).toString())
-    const bonusExpense = parseFloat((bonusAgg._sum.amount || 0).toString())
+    const commissionExpense = sumCommission(month, year)
+    const bonusExpense = sumBonus(month, year)
     const stockExpense = stockIn.reduce(
       (sum, m) => sum + m.quantity * parseFloat(m.product.price.toString()),
       0,
     )
-    const operationalExpense = parseFloat((expenseOperational._sum.amount || 0).toString())
-    const assetExpense = parseFloat((expenseAsset._sum.amount || 0).toString())
+    const operationalExpense = sumExpense(startDate, endDate, 'OPERATIONAL')
+    const assetExpense = sumExpense(startDate, endDate, 'ASSET')
     const totalExpense = commissionExpense + bonusExpense + stockExpense + operationalExpense + assetExpense
     const netBalance = totalIncome - totalExpense
 
