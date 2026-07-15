@@ -74,6 +74,27 @@ export class InvoicesService {
     }
   }
 
+  /**
+   * InvoiceItem has no `subject` relation (only a `subjectId` column), so we
+   * resolve subjects in a single batched query and attach them — replacing the
+   * old N+1 (one subject.findUnique per item).
+   */
+  private async attachItemSubjects<T extends { invoiceItems: { subjectId: string | null }[] }>(
+    invoice: T,
+  ): Promise<T> {
+    const subjectIds = [
+      ...new Set(invoice.invoiceItems.map(i => i.subjectId).filter((id): id is string => !!id)),
+    ]
+    if (subjectIds.length === 0) return invoice
+    const subjects = await this.prisma.subject.findMany({ where: { id: { in: subjectIds } } })
+    const byId = new Map(subjects.map(s => [s.id, s]))
+    invoice.invoiceItems = invoice.invoiceItems.map(item => ({
+      ...item,
+      subject: item.subjectId ? byId.get(item.subjectId) ?? null : null,
+    })) as T['invoiceItems']
+    return invoice
+  }
+
   async findOne(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
       relationLoadStrategy: 'join',
@@ -92,20 +113,9 @@ export class InvoicesService {
 
     if (!invoice) throw new NotFoundException('Invoice not found')
 
-    // Get subjects for items
-    const itemsWithSubjects = await Promise.all(
-      invoice.invoiceItems.map(async (item: any) => {
-        if (item.subjectId) {
-          const subject = await this.prisma.subject.findUnique({ where: { id: item.subjectId } })
-          return { ...item, subject }
-        }
-        return item
-      }),
-    )
-
     return {
       success: true,
-      data: this.formatInvoice({ ...invoice, invoiceItems: itemsWithSubjects }),
+      data: this.formatInvoice(await this.attachItemSubjects(invoice)),
     }
   }
 
@@ -124,20 +134,9 @@ export class InvoicesService {
 
     if (!invoice) throw new NotFoundException('Invoice not found')
 
-    // Get subjects for items
-    const itemsWithSubjects = await Promise.all(
-      invoice.invoiceItems.map(async (item: any) => {
-        if (item.subjectId) {
-          const subject = await this.prisma.subject.findUnique({ where: { id: item.subjectId } })
-          return { ...item, subject }
-        }
-        return item
-      }),
-    )
-
     return {
       success: true,
-      data: this.formatInvoice({ ...invoice, invoiceItems: itemsWithSubjects }, true),
+      data: this.formatInvoice(await this.attachItemSubjects(invoice), true),
     }
   }
 

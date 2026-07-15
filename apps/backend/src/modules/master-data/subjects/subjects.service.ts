@@ -4,7 +4,9 @@ import { CreateSubjectDto } from './dto/create-subject.dto'
 import { UpdateSubjectDto } from './dto/update-subject.dto'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
 import { TtlCacheService } from '@/common/cache/ttl-cache.service'
-import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
+import { LANDING_CACHE_KEYS, MASTER_CACHE_KEYS } from '@/common/cache/cache-keys'
+
+const MASTER_TTL_MS = 60_000
 
 @Injectable()
 export class SubjectsService {
@@ -14,6 +16,11 @@ export class SubjectsService {
   ) {}
 
   async findAll(page: number = 1, limit: number = 10, filters?: { trackingType?: string }) {
+    const key = `${MASTER_CACHE_KEYS.subjectsPrefix}list:p${page}:l${limit}:t${filters?.trackingType ?? ''}`
+    return this.cache.wrap(key, MASTER_TTL_MS, () => this._findAll(page, limit, filters))
+  }
+
+  private async _findAll(page: number, limit: number, filters?: { trackingType?: string }) {
     const skip = (page - 1) * limit
 
     const [subjects, total] = await Promise.all([
@@ -100,6 +107,8 @@ export class SubjectsService {
 
     // Public /landing/spp-rates joins active subjects — invalidate it.
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.subjectsPrefix)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,
@@ -147,6 +156,8 @@ export class SubjectsService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.subjectsPrefix)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,
@@ -170,6 +181,8 @@ export class SubjectsService {
     })
 
     this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.subjectsPrefix)
+    this.cache.deleteByPrefix(MASTER_CACHE_KEYS.sppRatesPrefix)
 
     return {
       success: true,

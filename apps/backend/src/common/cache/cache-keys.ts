@@ -11,3 +11,15 @@ export const LANDING_CACHE_KEYS = {
   /** GET /landing/content[/:section] — CMS sections (invalidate by prefix). */
   contentPrefix: 'landing:content:',
 } as const
+
+/**
+ * Near-static admin master-data reads. Each namespace is invalidated by prefix
+ * from the matching write path (so every paginated/filtered permutation is
+ * dropped at once). Note: subject writes also invalidate spp-rates because the
+ * spp-rates list embeds subject data.
+ */
+export const MASTER_CACHE_KEYS = {
+  branchesPrefix: 'master:branches:',
+  subjectsPrefix: 'master:subjects:',
+  sppRatesPrefix: 'master:spp-rates:',
+} as const
