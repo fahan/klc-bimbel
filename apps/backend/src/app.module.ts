@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { THROTTLER_CONFIG } from './common/config/throttler.config'
+import { CacheModule } from './common/cache/cache.module'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { PrismaModule } from './prisma/prisma.module'
@@ -35,6 +36,7 @@ import { AppSettingsModule } from './modules/app-settings/app-settings.module'
       envFilePath: '.env',
     }),
     ThrottlerModule.forRoot(THROTTLER_CONFIG),
+    CacheModule,
     PrismaModule,
     AuthModule,
     MasterDataModule,

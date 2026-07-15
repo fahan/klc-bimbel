@@ -132,7 +132,13 @@ export class AttendanceService {
   }
 
   async getSessionLog(sessionId: string, sessionDate: string) {
+    if (!sessionDate) {
+      throw new BadRequestException('Query parameter "date" is required (YYYY-MM-DD)')
+    }
     const date = new Date(sessionDate)
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('Query parameter "date" is invalid (expected YYYY-MM-DD)')
+    }
     date.setHours(0, 0, 0, 0)
 
     const sessionLog = await this.prisma.sessionLog.findFirst({

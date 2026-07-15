@@ -1,14 +1,22 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { createClient } from '@supabase/supabase-js'
 import { PrismaService } from '../../prisma/prisma.service'
+import { TtlCacheService } from '../../common/cache/ttl-cache.service'
 import { CreateRegistrationDto } from './dto/create-registration.dto'
 import { UpdateRegistrationDto } from './dto/update-registration.dto'
 
 const BUCKET = 'landing-images'
+// Public landing reads are near-static and hit on every visitor / admin page load.
+// Cache them briefly; content writes invalidate explicitly, rate/branch edits
+// (in other modules) surface within this TTL.
+const PUBLIC_TTL_MS = 60_000
 
 @Injectable()
 export class LandingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: TtlCacheService,
+  ) {}
 
   private get supabase() {
     const url = process.env.SUPABASE_URL
@@ -72,20 +80,24 @@ export class LandingService {
   // ─── Landing Content CMS ─────────────────────────────────────────────────
 
   async getAllContent() {
-    const rows = await this.prisma.landingContent.findMany({
-      orderBy: { section: 'asc' },
+    return this.cache.wrap('landing:content:all', PUBLIC_TTL_MS, async () => {
+      const rows = await this.prisma.landingContent.findMany({
+        orderBy: { section: 'asc' },
+      })
+      const result: Record<string, any> = {}
+      for (const row of rows) {
+        result[row.section] = row.content
+      }
+      return { success: true, data: result }
     })
-    const result: Record<string, any> = {}
-    for (const row of rows) {
-      result[row.section] = row.content
-    }
-    return { success: true, data: result }
   }
 
   async getContentSection(section: string) {
-    const row = await this.prisma.landingContent.findUnique({ where: { section } })
-    if (!row) throw new NotFoundException(`Section "${section}" tidak ditemukan`)
-    return { success: true, data: row.content }
+    return this.cache.wrap(`landing:content:section:${section}`, PUBLIC_TTL_MS, async () => {
+      const row = await this.prisma.landingContent.findUnique({ where: { section } })
+      if (!row) throw new NotFoundException(`Section "${section}" tidak ditemukan`)
+      return { success: true, data: row.content }
+    })
   }
 
   async upsertContentSection(section: string, content: any, updatedById?: string) {
@@ -94,12 +106,18 @@ export class LandingService {
       update: { content, updatedById },
       create: { section, content, updatedById },
     })
+    // Invalidate cached content so the edit is reflected immediately.
+    this.cache.deleteByPrefix('landing:content:')
     return { success: true, data: row, message: `Section "${section}" berhasil disimpan.` }
   }
 
   // ─── Public SPP Rates ────────────────────────────────────────────────────
 
   async getPublicSppRates() {
+    return this.cache.wrap('landing:spp-rates', PUBLIC_TTL_MS, () => this._getPublicSppRates())
+  }
+
+  private async _getPublicSppRates() {
     // Use raw SQL to avoid Prisma client cache issues with new columns
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -150,26 +168,34 @@ export class LandingService {
   // ─── Public Branch List ───────────────────────────────────────────────────
 
   async getPublicBranches() {
-    const branches = await this.prisma.branch.findMany({
-      where: { isActive: true },
-      orderBy: { createdAt: 'asc' },
-    })
+    return this.cache.wrap('landing:branches', PUBLIC_TTL_MS, () => this._getPublicBranches())
+  }
 
-    const withCounts = await Promise.all(
-      branches.map(async (b) => {
-        const studentCount = await this.prisma.student.count({
-          where: { branchId: b.id, isActive: true },
-        })
-        return {
-          id: b.id,
-          code: b.code,
-          name: b.name,
-          address: b.address,
-          phone: b.phone,
-          studentCount,
-        }
+  private async _getPublicBranches() {
+    // Fetch branches + all active-student counts in 2 queries (was 1 + N: a
+    // student.count per branch). groupBy returns counts for all branches at once.
+    const [branches, counts] = await Promise.all([
+      this.prisma.branch.findMany({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
       }),
-    )
+      this.prisma.student.groupBy({
+        by: ['branchId'],
+        where: { isActive: true },
+        _count: { _all: true },
+      }),
+    ])
+
+    const countByBranch = new Map(counts.map((c) => [c.branchId, c._count._all]))
+
+    const withCounts = branches.map((b) => ({
+      id: b.id,
+      code: b.code,
+      name: b.name,
+      address: b.address,
+      phone: b.phone,
+      studentCount: countByBranch.get(b.id) ?? 0,
+    }))
 
     return { success: true, data: withCounts }
   }
