@@ -74,27 +74,6 @@ export class InvoicesService {
     }
   }
 
-  /**
-   * InvoiceItem has no `subject` relation (only a `subjectId` column), so we
-   * resolve subjects in a single batched query and attach them — replacing the
-   * old N+1 (one subject.findUnique per item).
-   */
-  private async attachItemSubjects<T extends { invoiceItems: { subjectId: string | null }[] }>(
-    invoice: T,
-  ): Promise<T> {
-    const subjectIds = [
-      ...new Set(invoice.invoiceItems.map(i => i.subjectId).filter((id): id is string => !!id)),
-    ]
-    if (subjectIds.length === 0) return invoice
-    const subjects = await this.prisma.subject.findMany({ where: { id: { in: subjectIds } } })
-    const byId = new Map(subjects.map(s => [s.id, s]))
-    invoice.invoiceItems = invoice.invoiceItems.map(item => ({
-      ...item,
-      subject: item.subjectId ? byId.get(item.subjectId) ?? null : null,
-    })) as T['invoiceItems']
-    return invoice
-  }
-
   async findOne(id: string) {
     const invoice = await this.prisma.invoice.findUnique({
       relationLoadStrategy: 'join',
@@ -102,7 +81,9 @@ export class InvoicesService {
       include: {
         branch: true,
         student: true,
-        invoiceItems: true,
+        // Item subjects resolved in the same JOIN via the InvoiceItem.subject
+        // relation (was a separate batched query, before that an N+1).
+        invoiceItems: { include: { subject: true } },
         generatedBy: true,
         payments: {
           include: { recordedBy: true },
@@ -115,7 +96,7 @@ export class InvoicesService {
 
     return {
       success: true,
-      data: this.formatInvoice(await this.attachItemSubjects(invoice)),
+      data: this.formatInvoice(invoice),
     }
   }
 
@@ -126,7 +107,7 @@ export class InvoicesService {
       include: {
         branch: true,
         student: true,
-        invoiceItems: true,
+        invoiceItems: { include: { subject: true } },
         generatedBy: true,
         payments: { orderBy: { paidAt: 'desc' } },
       },
@@ -136,7 +117,7 @@ export class InvoicesService {
 
     return {
       success: true,
-      data: this.formatInvoice(await this.attachItemSubjects(invoice), true),
+      data: this.formatInvoice(invoice, true),
     }
   }
 

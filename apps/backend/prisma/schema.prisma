@@ -279,6 +279,7 @@ model Subject {
   commissionDetails     CommissionDetail[]
   commissionFormulas    SubjectCommissionFormula[]
   adHocSessionLogs      SessionLog[] @relation("adhoc_subject")
+  invoiceItems          InvoiceItem[]
 
   @@map("subjects")
 }
@@ -742,8 +743,10 @@ model InvoiceItem {
 
   // Relations
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  subject   Subject? @relation(fields: [subjectId], references: [id])
 
   @@index([invoiceId])
+  @@index([subjectId])
   @@map("invoice_items")
 }
 
