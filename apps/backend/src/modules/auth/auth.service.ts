@@ -3,9 +3,15 @@ import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import * as bcrypt from 'bcryptjs'
 import { PrismaService } from '@/prisma/prisma.service'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
+import { AUTH_CACHE_KEYS } from '@/common/cache/cache-keys'
 import { LoginDto } from './dto/login.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
 import { ChangePasswordDto } from './dto/change-password.dto'
+
+// Short enough that a stale role/active change self-heals fast even if some
+// write path forgets to invalidate; long enough to absorb bursts of requests.
+const AUTH_USER_TTL_MS = 30_000
 
 @Injectable()
 export class AuthService {
@@ -13,6 +19,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private cache: TtlCacheService,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -81,36 +88,43 @@ export class AuthService {
   }
 
   async validateUser(payload: any) {
-    const user = await this.prisma.user.findUnique({
-      relationLoadStrategy: 'join',
-      where: { id: payload.id },
-      include: {
-        roles: true,
-        branches: true,
-      },
+    // Runs on EVERY authenticated request (JwtStrategy). Cache the resolved
+    // payload per user id so we don't hit the DB each time. Invalidated on any
+    // role/branch/active/email change; 30s TTL as a safety net. Note the guard
+    // still verifies the JWT signature every request — only the DB lookup is
+    // cached, and deactivation/role changes clear the entry immediately.
+    return this.cache.wrap(AUTH_CACHE_KEYS.user(payload.id), AUTH_USER_TTL_MS, async () => {
+      const user = await this.prisma.user.findUnique({
+        relationLoadStrategy: 'join',
+        where: { id: payload.id },
+        include: {
+          roles: true,
+          branches: true,
+        },
+      })
+
+      if (!user || !user.isActive) {
+        throw new UnauthorizedException('User not found or inactive')
+      }
+
+      // Get all roles from payload or from database
+      const roles = payload.roles || (user.roles && user.roles.length > 0
+        ? user.roles.map((ur: any) => ur.role)
+        : [user.role])
+
+      // Primary branch (used for ADMIN_CABANG branch-scoped access)
+      const branchId = (user as any).branches?.find((ub: any) => ub.isPrimary)?.branchId
+        || (user as any).branches?.[0]?.branchId
+        || null
+
+      return {
+        id: user.id,
+        email: user.email,
+        role: user.role, // Keep for backward compatibility
+        roles, // New: array of all roles
+        branchId,
+      }
     })
-
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('User not found or inactive')
-    }
-
-    // Get all roles from payload or from database
-    const roles = payload.roles || (user.roles && user.roles.length > 0
-      ? user.roles.map((ur: any) => ur.role)
-      : [user.role])
-
-    // Primary branch (used for ADMIN_CABANG branch-scoped access)
-    const branchId = (user as any).branches?.find((ub: any) => ub.isPrimary)?.branchId
-      || (user as any).branches?.[0]?.branchId
-      || null
-
-    return {
-      id: user.id,
-      email: user.email,
-      role: user.role, // Keep for backward compatibility
-      roles, // New: array of all roles
-      branchId,
-    }
   }
 
   async getMe(userId: string) {
@@ -169,6 +183,9 @@ export class AuthService {
       where: { id: userId },
       data: { name: dto.name, email: dto.email, phone: dto.phone ?? null },
     })
+
+    // Email is part of the cached auth payload — drop it.
+    this.cache.delete(AUTH_CACHE_KEYS.user(userId))
 
     return {
       success: true,

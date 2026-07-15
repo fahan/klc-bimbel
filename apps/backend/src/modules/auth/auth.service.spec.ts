@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
 import { PrismaService } from '@/prisma/prisma.service'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
 import { AuthService } from './auth.service'
 
 describe('AuthService.validateUser', () => {
@@ -17,6 +18,7 @@ describe('AuthService.validateUser', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: { sign: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
+        TtlCacheService,
       ],
     }).compile()
 
