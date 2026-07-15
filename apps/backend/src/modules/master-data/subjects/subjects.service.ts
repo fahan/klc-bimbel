@@ -3,10 +3,15 @@ import { PrismaService } from '@/prisma/prisma.service'
 import { CreateSubjectDto } from './dto/create-subject.dto'
 import { UpdateSubjectDto } from './dto/update-subject.dto'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
+import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
 
 @Injectable()
 export class SubjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: TtlCacheService,
+  ) {}
 
   async findAll(page: number = 1, limit: number = 10, filters?: { trackingType?: string }) {
     const skip = (page - 1) * limit
@@ -93,6 +98,9 @@ export class SubjectsService {
       },
     })
 
+    // Public /landing/spp-rates joins active subjects — invalidate it.
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+
     return {
       success: true,
       data: this.formatSubject(subject),
@@ -138,6 +146,8 @@ export class SubjectsService {
       },
     })
 
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+
     return {
       success: true,
       data: this.formatSubject(updated),
@@ -158,6 +168,8 @@ export class SubjectsService {
       where: { id },
       data: { isActive: false },
     })
+
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
 
     return {
       success: true,

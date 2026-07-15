@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { createClient } from '@supabase/supabase-js'
 import { PrismaService } from '../../prisma/prisma.service'
 import { TtlCacheService } from '../../common/cache/ttl-cache.service'
+import { LANDING_CACHE_KEYS } from '../../common/cache/cache-keys'
 import { CreateRegistrationDto } from './dto/create-registration.dto'
 import { UpdateRegistrationDto } from './dto/update-registration.dto'
 
@@ -80,7 +81,7 @@ export class LandingService {
   // ─── Landing Content CMS ─────────────────────────────────────────────────
 
   async getAllContent() {
-    return this.cache.wrap('landing:content:all', PUBLIC_TTL_MS, async () => {
+    return this.cache.wrap(`${LANDING_CACHE_KEYS.contentPrefix}all`, PUBLIC_TTL_MS, async () => {
       const rows = await this.prisma.landingContent.findMany({
         orderBy: { section: 'asc' },
       })
@@ -93,7 +94,7 @@ export class LandingService {
   }
 
   async getContentSection(section: string) {
-    return this.cache.wrap(`landing:content:section:${section}`, PUBLIC_TTL_MS, async () => {
+    return this.cache.wrap(`${LANDING_CACHE_KEYS.contentPrefix}section:${section}`, PUBLIC_TTL_MS, async () => {
       const row = await this.prisma.landingContent.findUnique({ where: { section } })
       if (!row) throw new NotFoundException(`Section "${section}" tidak ditemukan`)
       return { success: true, data: row.content }
@@ -107,14 +108,14 @@ export class LandingService {
       create: { section, content, updatedById },
     })
     // Invalidate cached content so the edit is reflected immediately.
-    this.cache.deleteByPrefix('landing:content:')
+    this.cache.deleteByPrefix(LANDING_CACHE_KEYS.contentPrefix)
     return { success: true, data: row, message: `Section "${section}" berhasil disimpan.` }
   }
 
   // ─── Public SPP Rates ────────────────────────────────────────────────────
 
   async getPublicSppRates() {
-    return this.cache.wrap('landing:spp-rates', PUBLIC_TTL_MS, () => this._getPublicSppRates())
+    return this.cache.wrap(LANDING_CACHE_KEYS.sppRates, PUBLIC_TTL_MS, () => this._getPublicSppRates())
   }
 
   private async _getPublicSppRates() {
@@ -168,7 +169,7 @@ export class LandingService {
   // ─── Public Branch List ───────────────────────────────────────────────────
 
   async getPublicBranches() {
-    return this.cache.wrap('landing:branches', PUBLIC_TTL_MS, () => this._getPublicBranches())
+    return this.cache.wrap(LANDING_CACHE_KEYS.branches, PUBLIC_TTL_MS, () => this._getPublicBranches())
   }
 
   private async _getPublicBranches() {

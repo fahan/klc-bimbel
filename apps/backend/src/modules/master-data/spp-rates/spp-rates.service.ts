@@ -4,10 +4,15 @@ import { CreateSppRateDto } from './dto/create-spp-rate.dto'
 import { UpdateSppRateDto } from './dto/update-spp-rate.dto'
 import { Decimal } from '@prisma/client/runtime/library'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
+import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
 
 @Injectable()
 export class SppRatesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: TtlCacheService,
+  ) {}
 
   async findAll(page: number = 1, limit: number = 10, filters?: { subjectId?: string }) {
     const skip = (page - 1) * limit
@@ -139,6 +144,9 @@ export class SppRatesService {
       },
     })
 
+    // Public /landing/spp-rates is derived from active REGULAR rates — invalidate it.
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+
     return {
       success: true,
       data: this.formatSppRate(sppRate),
@@ -193,6 +201,8 @@ export class SppRatesService {
       },
     })
 
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
+
     return {
       success: true,
       data: this.formatSppRate(updated),
@@ -212,6 +222,8 @@ export class SppRatesService {
     await this.prisma.sppRate.delete({
       where: { id },
     })
+
+    this.cache.delete(LANDING_CACHE_KEYS.sppRates)
 
     return {
       success: true,

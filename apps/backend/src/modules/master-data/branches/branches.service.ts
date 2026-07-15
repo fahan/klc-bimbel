@@ -4,10 +4,15 @@ import { CreateBranchDto } from './dto/create-branch.dto'
 import { UpdateBranchDto } from './dto/update-branch.dto'
 import { Role } from '@prisma/client'
 import { PaginationMeta } from '@/common/dto/pagination.dto'
+import { TtlCacheService } from '@/common/cache/ttl-cache.service'
+import { LANDING_CACHE_KEYS } from '@/common/cache/cache-keys'
 
 @Injectable()
 export class BranchesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: TtlCacheService,
+  ) {}
 
   async getAllSystemBranches() {
     const branches = await this.prisma.branch.findMany({
@@ -129,6 +134,9 @@ export class BranchesService {
       },
     })
 
+    // Public /landing/branches lists active branches — invalidate it.
+    this.cache.delete(LANDING_CACHE_KEYS.branches)
+
     return {
       success: true,
       data: this.formatBranch(branch),
@@ -175,6 +183,8 @@ export class BranchesService {
       },
     })
 
+    this.cache.delete(LANDING_CACHE_KEYS.branches)
+
     return {
       success: true,
       data: this.formatBranch(updated),
@@ -195,6 +205,8 @@ export class BranchesService {
       where: { id },
       data: { isActive: false },
     })
+
+    this.cache.delete(LANDING_CACHE_KEYS.branches)
 
     return {
       success: true,
