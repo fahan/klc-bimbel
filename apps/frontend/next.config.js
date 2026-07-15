@@ -12,6 +12,17 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  // Ensure lucide-react resolves to per-icon imports (avoids pulling the barrel).
+  experimental: {
+    optimizePackageImports: ['lucide-react'],
+  },
+  // Allow next/image to optimize images served from Supabase Storage
+  // (landing hero/teacher photos + app logo).
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.supabase.co' },
+    ],
+  },
 };
 
 module.exports = withPWA(nextConfig);

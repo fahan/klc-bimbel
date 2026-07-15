@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useQuery } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -322,7 +323,7 @@ export default function LandingPage() {
           <div className="klc-hero-stack">
             <div className="klc-photo klc-photo--main">
               {hero.photoUrl
-                ? <img src={hero.photoUrl} alt="Suasana belajar KLC" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '24px' }} />
+                ? <Image src={hero.photoUrl} alt="Suasana belajar KLC" fill priority sizes="(max-width: 768px) 300px, 380px" style={{ objectFit: 'cover', borderRadius: '24px' }} />
                 : <div className="klc-photo-figure">[ foto: anak & guru, suasana belajar ]</div>
               }
             </div>
@@ -718,7 +719,7 @@ export default function LandingPage() {
               <div className="klc-guru-card" key={i}>
                 <div className="klc-guru-photo">
                   {t.photoUrl
-                    ? <img src={t.photoUrl} alt={t.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                    ? <Image src={t.photoUrl} alt={t.name} fill sizes="(max-width: 768px) 50vw, 240px" style={{ objectFit: 'cover', borderRadius: '16px' }} />
                     : <span className="label">[ foto {t.name} ]</span>
                   }
                 </div>
